@@ -1,0 +1,2 @@
+aws:
+  bucket: "fake-chainstorage-eth-prod"

@@ -1,0 +1,69 @@
+// (-- api-linter: core::0140::abbreviations=disabled
+//     aip.dev/not-precedent: Matching the naming convention of rosetta --)
+syntax = "proto3";
+
+// The stable release for rosetta types
+package coinbase.crypto.rosetta.types;
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/crypto/rosetta/types";
+
+import "google/protobuf/any.proto";
+import "coinbase/crypto/rosetta/types/account_identifer.proto";
+import "coinbase/crypto/rosetta/types/amount.proto";
+import "coinbase/crypto/rosetta/types/coin_change.proto";
+
+// Operations contain all balance-changing information within a transaction. They are always
+// one-sided (only affect 1 AccountIdentifier) and can succeed or fail independently from a
+// Transaction. Operations are used both to represent on-chain data (Data API) and to
+// construct new transactions (Construction API), creating a standard interface for reading
+// and writing to blockchains.
+message Operation {
+  // The operation_identifier uniquely identifies an operation within a transaction.
+  OperationIdentifier operation_identifier = 1;
+  // Restrict referenced related_operations to identifier indices " the current
+  // operation_identifier.index. This ensures there exists a clear DAG-structure of relations.
+  // Since operations are one-sided, one could imagine relating operations in a single transfer
+  // or linking operations in a call tree.
+  repeated OperationIdentifier related_operations = 2;
+  // Type is the network-specific type of the operation. Ensure that any type that can be returned
+  // here is also specified in the NetworkOptionsResponse. This can be very useful to downstream
+  // consumers that parse all block data.
+  string type = 3;
+  // Status is the network-specific status of the operation. Status is not defined on the transaction
+  // object because blockchains with smart contracts may have transactions that partially apply (some
+  // operations are successful and some are not). Blockchains with atomic transactions (all operations
+  // succeed or all operations fail) will have the same status for each operation. On-chain operations
+  // (operations retrieved in the /block and /block/transaction endpoints) MUST have a populated status
+  // field (anything on-chain must have succeeded or failed). However, operations provided during
+  // transaction construction (often times called "intent" in the documentation) MUST NOT have a
+  // populated status field (operations yet to be included on-chain have not yet succeeded or failed).
+  string status = 4;
+  // The account_identifier uniquely identifies an account within a network. All fields in the
+  // account_identifier are utilized to determine this uniqueness (including the metadata field,
+  // if populated).
+  AccountIdentifier account = 5;
+  // Amount is some Value of a Currency. It is considered invalid to specify a Value without a Currency.
+  Amount amount = 6;
+  // CoinChange is used to represent a change in state of a some coin identified by a coin_identifier.
+  // This object is part of the Operation model and must be populated for UTXO-based blockchains.
+  // Coincidentally, this abstraction of UTXOs allows for supporting both account-based transfers and
+  // UTXO-based transfers on the same blockchain (when a transfer is account-based, don't populate
+  // this model).
+  CoinChange coin_change = 7;
+  // Metadata stores any protocol specific information regarding the operation
+  map<string, google.protobuf.Any> metadata = 8;
+}
+
+// OperationIdentifier uniquely identifies an operation within a transaction.
+message OperationIdentifier {
+  // The operation index is used to ensure each operation has a unique identifier within a transaction.
+  // This index is only relative to the transaction and NOT GLOBAL. The operations in each transaction
+  // should start from index 0. To clarify, there may not be any notion of an operation index in the
+  // blockchain being described.
+  int64 index = 1;
+  // Some blockchains specify an operation index that is essential for client use. For example, Bitcoin
+  // uses a network_index to identify which UTXO was used in a transaction. network_index should not be
+  // populated if there is no notion of an operation index in a blockchain (typically most
+  // account-based blockchains).
+  // Note that this this should be >= 0
+  int64 network_index = 2;
+}

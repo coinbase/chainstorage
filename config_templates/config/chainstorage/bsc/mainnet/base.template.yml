@@ -1,0 +1,31 @@
+aws:
+  aws_account: development
+  storage:
+    data_compression: GZIP
+cron:
+  disable_node_canary: false
+  disable_polling_canary: false
+  disable_streaming_canary: false
+sla:
+  block_height_delta: 50
+  block_time_delta: 2m
+  out_of_sync_node_distance: 50
+  time_since_last_block: 3m
+  tier: 2
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer/event_tag=1
+workflows:
+  backfiller:
+    num_concurrent_extractors: 16
+  monitor:
+    backoff_interval: 3s
+chain:
+  block_tag:
+    latest: 2
+    stable: 2
+  block_time: 3s
+  event_tag:
+    latest: 1
+    stable: 1

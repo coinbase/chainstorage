@@ -1,0 +1,230 @@
+syntax = "proto3";
+
+package coinbase.chainstorage;
+
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/chainstorage";
+
+import "google/protobuf/timestamp.proto";
+import "coinbase/chainstorage/blockchain.proto";
+
+enum Compression {
+  // No compression applied.
+  NONE = 0;
+  // Compressed using gzip.
+  GZIP = 1;
+}
+
+message BlockFile {
+  uint32 tag = 1;
+  string hash = 2;
+  string parent_hash = 3;
+  uint64 height = 4;
+  string file_url = 5;
+  uint64 parent_height = 6;
+  bool skipped = 7;
+  Compression compression = 8;
+}
+
+message BlockchainEvent {
+  enum Type {
+    UNKNOWN = 0;
+    // Events that indicate a block was added to the corresponding chain.
+    BLOCK_ADDED = 1;
+    // Events that indicate an existing block
+    // was removed from the corresponding chain due to reorg.
+    BLOCK_REMOVED = 2;
+  }
+
+  // Deprecated: Use sequence_num (int64) instead.
+  string sequence = 1 [deprecated=true];
+
+  // BLOCK_ADDED or BLOCK_REMOVED.
+  Type type = 2;
+
+  // Block metadata that includes all the immutable information
+  // needed for consumers to call SDK/APIs to retrieve block data.
+  BlockIdentifier block = 3;
+
+  // Streaming event version.
+  uint32 event_tag = 4;
+
+  // The sequence number for this event.
+  // To process the events exactly once, consumers should keep track of the last sequence_num it has processed and then specify it in the next API request.
+  int64 sequence_num = 5;
+}
+
+message GetLatestBlockRequest {
+  uint32 tag = 1;
+}
+
+message GetLatestBlockResponse {
+  uint32 tag = 1;
+  string hash = 2;
+  string parent_hash = 3;
+  uint64 height = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message GetBlockFileRequest {
+  uint32 tag = 1;
+  uint64 height = 2;
+  string hash = 3;
+}
+
+message GetBlockFileResponse {
+  BlockFile file = 1;
+}
+
+message GetBlockFilesByRangeRequest {
+  uint32 tag = 1;
+  uint64 start_height = 2;
+  uint64 end_height = 3;
+}
+
+message GetBlockFilesByRangeResponse {
+  repeated BlockFile files = 1;
+}
+
+message GetRawBlockRequest {
+  uint32 tag = 1;
+  uint64 height = 2;
+  string hash = 3;
+}
+
+message GetRawBlockResponse {
+  Block block = 1;
+}
+
+message GetRawBlocksByRangeRequest {
+  uint32 tag = 1;
+  uint64 start_height = 2;
+  uint64 end_height = 3;
+}
+
+message GetRawBlocksByRangeResponse {
+  repeated Block blocks = 1;
+}
+
+message GetNativeBlockRequest {
+  uint32 tag = 1;
+  uint64 height = 2;
+  string hash = 3;
+}
+
+message GetNativeBlockResponse {
+  NativeBlock block = 1;
+}
+
+message GetNativeBlocksByRangeRequest {
+  uint32 tag = 1;
+  uint64 start_height = 2;
+  uint64 end_height = 3;
+}
+
+message GetNativeBlocksByRangeResponse {
+  repeated NativeBlock blocks = 1;
+}
+
+message GetRosettaBlockRequest {
+  uint32 tag = 1;
+  uint64 height = 2;
+  string hash = 3;
+}
+
+message GetRosettaBlockResponse {
+  RosettaBlock block = 1;
+}
+
+message GetRosettaBlocksByRangeRequest {
+  uint32 tag = 1;
+  uint64 start_height = 2;
+  uint64 end_height = 3;
+}
+
+message GetRosettaBlocksByRangeResponse {
+  repeated RosettaBlock blocks = 1;
+}
+
+message ChainEventsRequest {
+  // Indicates the initial cursor to start streaming events from when the sequence field is not set.
+  // Setting this fields as a uint64 value (as string) will start the stream from the first event involved for a given block height.
+  // Setting this field as "LATEST" will start the stream from the latest event.
+  // Setting this field as "EARLIEST" will start the stream from the earliest event.
+  // If sequence is set, cursor will start from sequence + 1.
+  string initial_position_in_stream = 1;
+
+  // Deprecated: Use sequence_num (int64) instead.
+  string sequence = 2 [deprecated=true];
+
+  // Indicates the streaming version.
+  // If not set, it's 0.
+  uint32 event_tag = 3;
+
+  // Please set this value to be last processed sequence_num so we will stream events after that to you.
+  // If neither initial_position_in_stream nor sequence_num is set, we will stream from the earliest event.
+  int64 sequence_num = 4;
+}
+
+message ChainEventsResponse {
+  BlockchainEvent event = 1;
+}
+
+message GetChainEventsRequest {
+  // Deprecated: Use sequence_num (int64) instead.
+  string sequence = 1 [deprecated=true];
+  string initial_position_in_stream = 2;
+  uint64 max_num_events = 3;
+  uint32 event_tag = 4;
+  int64 sequence_num = 5;
+}
+
+message GetChainEventsResponse {
+  repeated BlockchainEvent events = 1;
+}
+
+message GetChainMetadataRequest {
+}
+
+message GetChainMetadataResponse {
+  uint32 latest_block_tag = 8;
+  uint32 stable_block_tag = 9;
+  uint32 latest_event_tag = 10;
+  uint32 stable_event_tag = 11;
+  uint64 block_start_height = 12;
+  uint64 irreversible_distance = 13;
+  string block_time = 14;
+}
+
+message GetVersionedChainEventRequest {
+  // stream event tag of the known event
+  uint32 from_event_tag = 1;
+
+  // Use from_sequence_num (int64) instead.
+  string from_sequence = 2 [deprecated=true];
+
+  // stream event tag in which the new corresponding event want to be found
+  uint32 to_event_tag = 3;
+
+  // sequence of the known event
+  int64 from_sequence_num = 4;
+}
+
+message GetVersionedChainEventResponse {
+  BlockchainEvent event = 1;
+}
+
+service ChainStorage {
+  rpc GetLatestBlock (GetLatestBlockRequest) returns (GetLatestBlockResponse);
+  rpc GetBlockFile(GetBlockFileRequest) returns (GetBlockFileResponse);
+  rpc GetBlockFilesByRange (GetBlockFilesByRangeRequest) returns (GetBlockFilesByRangeResponse);
+  rpc GetRawBlock (GetRawBlockRequest) returns (GetRawBlockResponse);
+  rpc GetRawBlocksByRange (GetRawBlocksByRangeRequest) returns (GetRawBlocksByRangeResponse);
+  rpc GetNativeBlock (GetNativeBlockRequest) returns (GetNativeBlockResponse);
+  rpc GetNativeBlocksByRange (GetNativeBlocksByRangeRequest) returns (GetNativeBlocksByRangeResponse);
+  rpc GetRosettaBlock (GetRosettaBlockRequest) returns (GetRosettaBlockResponse);
+  rpc GetRosettaBlocksByRange (GetRosettaBlocksByRangeRequest) returns (GetRosettaBlocksByRangeResponse);
+  rpc StreamChainEvents(ChainEventsRequest) returns (stream ChainEventsResponse);
+  rpc GetChainEvents(GetChainEventsRequest) returns (GetChainEventsResponse);
+  rpc GetChainMetadata(GetChainMetadataRequest) returns (GetChainMetadataResponse);
+  rpc GetVersionedChainEvent(GetVersionedChainEventRequest) returns (GetVersionedChainEventResponse);
+}

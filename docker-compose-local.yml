@@ -1,0 +1,60 @@
+version: '3'
+
+volumes:
+  dynamodb_data:
+
+services:
+  localstack:
+    image: localstack/localstack:0.11.6
+    ports:
+      - 4566:4566
+    environment:
+      - SERVICES=s3,dynamodb,sqs
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=requirednotused
+      - AWS_SECRET_ACCESS_KEY=requirednotused
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./bin/localstack:/docker-entrypoint-initaws.d
+      - ./bin/localstack/policies:/policies
+  postgresql:
+    image: postgres:11.2
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=temporal
+      - POSTGRES_PASSWORD=temporal
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+  temporal:
+    image: temporalio/auto-setup:1.12.4
+    depends_on:
+      - postgresql
+    command: ['autosetup']
+    ports:
+      - 7233:7233
+      - 7234:7234
+      - 7235:7235
+    labels:
+      service_group: temporal
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - USE_HOSTNAME_IP=true
+    restart: always
+  temporal-web:
+    image: temporalio/web:1.12.0
+    ports:
+      - 8088:8088
+    labels:
+      service_group: temporal-web
+    environment:
+      - TEMPORAL_GRPC_ENDPOINT=temporal:7233
+    depends_on:
+      - temporal

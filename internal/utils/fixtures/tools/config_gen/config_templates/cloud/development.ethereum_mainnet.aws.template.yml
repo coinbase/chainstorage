@@ -1,0 +1,7 @@
+services:
+  admin:
+    autoscaling:
+      min_size: 1
+      max_size: 1
+    instance_type: t2.medium
+    tosub: a-service-name-{{blockchain}}-{{network}}-{{env}}

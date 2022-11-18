@@ -1,0 +1,40 @@
+gomocks:
+  - package: internal/storage/metastorage
+    interfaces:
+      - MetaStorage
+      - EventStorage
+      - BlockStorage
+      - DynamoAPI
+  - package: internal/storage/blobstorage
+    interfaces:
+      - BlobStorage
+  - package: internal/storage/blobstorage/downloader
+    interfaces:
+      - BlockDownloader
+  - package: internal/s3
+    interfaces:
+      - Downloader
+      - Uploader
+      - Client
+  - package: internal/dlq
+    interfaces:
+      - DLQ
+  - package: internal/blockchain/parser
+    interfaces:
+      - Parser
+  - package: internal/blockchain/jsonrpc
+    interfaces:
+      - Client
+      - HTTPClient
+  - package: internal/blockchain/client
+    interfaces:
+      - Client
+  - package: protos/coinbase/chainstorage
+    interfaces:
+      - ChainStorageClient
+      - ChainStorage_StreamChainEventsClient
+  - package: sdk
+    interfaces:
+      - Client
+      - Parser
+      - Session

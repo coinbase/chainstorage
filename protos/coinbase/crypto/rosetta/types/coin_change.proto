@@ -1,0 +1,37 @@
+// (-- api-linter: core::0140::abbreviations=disabled
+//     aip.dev/not-precedent: Matching the naming convention of rosetta --)
+syntax = "proto3";
+
+// The stable release for rosetta types
+package coinbase.crypto.rosetta.types;
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/crypto/rosetta/types";
+
+// CoinChange is used to represent a change in state of a coin identified by a coin_identifier.
+// This object is part of the Operation model and must be populated for UTXO-based blockchains.
+// Coincidentally, this abstraction of UTXOs allows for supporting both account-based transfers and
+// UTXO-based transfers on the same blockchain (when a transfer is account-based, don't populate
+// this model).
+message CoinChange {
+  // CoinIdentifier uniquely identifies a Coin.
+  CoinIdentifier coin_identifier = 1;
+
+  // CoinActions are different state changes that a Coin can undergo. It is assumed that a single
+  // Coin cannot be created or spent more than once.
+  enum CoinAction {
+    // COIN_ACTION_UNSPECIFIED indicating a CoinAction is not set
+    COIN_ACTION_UNSPECIFIED = 0;
+    // COIN_CREATED indicating a Coin was created.
+    COIN_CREATED = 1;
+    // COIN_SPENT indicating a Coin was spent.
+    COIN_SPENT = 2;
+  }
+  // CoinActions are different state changes that a Coin can undergo
+  CoinAction coin_action = 2;
+}
+
+// CoinIdentifier uniquely identifies a Coin.
+message CoinIdentifier {
+  // Identifier should be populated with a globally unique identifier of a Coin. In Bitcoin, this
+  // identifier would be transaction_hash:index.
+  string identifier = 1;
+}

@@ -1,0 +1,44 @@
+{
+  "transaction": {
+    "transaction_identifier": {
+      "hash": "2f71578c0ae103b5f5ed1d2b743b923f647914f8c0f27dde1b93f2ab4c5cf611"
+    },
+    "operations": [
+      {
+        "operation_identifier": {
+          "index": 0,
+          "network_index": 0
+        },
+        "type": "THIS_IS_AN_UNKNOWN_TYPE",
+        "status": "SUCCESS",
+        "account": {
+          "address": "2MtSgfBmXzZv6raD7yyuGzFamzBzQD7G6Rf"
+        },
+        "amount": {
+          "value": "5000000000",
+          "currency": {
+            "symbol": "DOGETEST",
+            "decimals": 8
+          }
+        },
+        "coin_change": {
+          "coin_identifier": {
+            "identifier": "76ce1be50d999c8694f47ee49e4c0934e418ff1b24be7467b1125a2d67db8f7b:0"
+          },
+          "coin_action": "coin_created"
+        },
+        "metadata": {
+          "scriptPubKey": {
+            "addresses": [
+              "2MtSgfBmXzZv6raD7yyuGzFamzBzQD7G6Rf"
+            ],
+            "asm": "OP_HASH160 0d22f70849cbf78dfc449b5e0bbf117d9a70fc04 OP_EQUAL",
+            "hex": "a9140d22f70849cbf78dfc449b5e0bbf117d9a70fc0487",
+            "reqSigs": 1,
+            "type": "scripthash"
+          }
+        }
+      }
+    ]
+  }
+}

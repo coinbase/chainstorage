@@ -1,0 +1,28 @@
+{
+  "endpoints": [
+    {
+      "name": "",
+      "url": "https://254c3b9c-be59-41c3-8f6f-3cc3342c7b3c.ethereum.bison.run",
+      "user": "foo",
+      "password": "bar",
+      "weight": 4
+    }
+  ],
+  "endpoints_failover": [
+    {
+      "name": "chain-storage-eth-03",
+      "url": "https://e608c8ee-9d88-4861-b2b1-adea0d41664b.ethereum.bison.run",
+      "user": "foo",
+      "password": "bar",
+      "weight": 4
+    },
+    {
+      "name": "chain-storage-eth-07",
+      "url": "https://79612859-a432-46d7-8512-f76a0605ac73.ethereum.bison.run",
+      "user": "foo",
+      "password": "bar",
+      "weight": 4
+    }
+  ],
+  "use_failover": true
+}

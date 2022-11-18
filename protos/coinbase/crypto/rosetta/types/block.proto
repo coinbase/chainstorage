@@ -1,0 +1,49 @@
+// (-- api-linter: core::0140::abbreviations=disabled
+//     aip.dev/not-precedent: Matching the naming convention of rosetta --)
+syntax = "proto3";
+
+// The stable release for rosetta types
+package coinbase.crypto.rosetta.types;
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/crypto/rosetta/types";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import "coinbase/crypto/rosetta/types/transaction.proto";
+
+// Blocks contain an array of Transactions that occurred at a particular BlockIdentifier.
+// A hard requirement for blocks returned by Rosetta implementations is that they MUST be
+// immutable: once a client has requested and received a block identified by a specific
+// BlockIndentifier, all future calls for that same BlockIdentifier must return the same
+// block contents.
+message Block {
+  // NetworkIdentifier uniquely identify the network the block belongs to
+  reserved 1;
+  reserved "network_identifier";
+
+  // BlockIdentifier uniquely identifies a block in a particular network.
+  BlockIdentifier block_identifier = 2;
+
+  // BlockIdentifier uniquely identifies a block in a particular network.
+  BlockIdentifier parent_block_identifier = 3;
+
+  // The timestamp of the block since the Unix Epoch. The rosetta spec only
+  // support timestamp in milliseconds granularity.
+  // (-- api-linter: core::0142::time-field-names=disabled
+  //     go/aip/not-precedent: This field was called timestamp in rosetta spec. --)
+  google.protobuf.Timestamp timestamp = 4;
+
+  // Transactions within the block.
+  repeated Transaction transactions = 5;
+
+  // Metadata for the block.
+  map<string, google.protobuf.Any> metadata = 6;
+}
+
+// The block identifier uniquely identifies a block in a particular network.
+message BlockIdentifier {
+  // The block height.  Note that this this should be >= 0
+  int64 index = 1;
+
+  // The block hash.
+  string hash = 2;
+}
