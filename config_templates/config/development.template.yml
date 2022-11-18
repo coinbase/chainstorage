@@ -1,0 +1,7 @@
+aws:
+  aws_account: development
+  bucket: example-chainstorage-{{blockchain}}-{{network}}-{{short_env}}
+cadence:
+  address: temporal-dev.example.com:7233
+server:
+  bind_address: "0.0.0.0:9090"

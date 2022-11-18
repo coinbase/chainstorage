@@ -1,0 +1,135 @@
+api:
+  max_num_block_files: 1000
+  max_num_blocks: 50
+  num_workers: 10
+  streaming_batch_size: 50
+  streaming_interval: 1s
+  streaming_max_no_event_time: 10m
+aws:
+  aws_account: development
+  bucket: ""
+  dlq:
+    delay_secs: 900
+    name: example_chainstorage_blocks_{{blockchain}}_{{network}}_dlq
+    visibility_timeout_secs: 600
+  dynamodb:
+    block_table: example_chainstorage_blocks_{{blockchain}}_{{network}}
+    event_table: example_chainstorage_block_events_{{blockchain}}_{{network}}
+    event_table_height_index: example_chainstorage_block_events_by_height_{{blockchain}}_{{network}}
+    versioned_event_table: example_chainstorage_versioned_block_events_{{blockchain}}_{{network}}
+    versioned_event_table_block_index: example_chainstorage_versioned_block_events_by_block_id_{{blockchain}}_{{network}}
+  presigned_url_expiration: 30m
+  region: us-east-1
+  storage:
+    data_compression: GZIP
+cadence:
+  address: ""
+  retention_period: 7
+  domain: chainstorage-{{blockchain}}-{{network}}
+chain:
+  block_start_height: 0
+  blockchain: BLOCKCHAIN_{{BLOCKCHAIN}}
+  client:
+    master:
+      endpoint_group: ""
+    slave:
+      endpoint_group: ""
+    validator:
+      endpoint_group: ""
+  network: NETWORK_{{BLOCKCHAIN}}_{{NETWORK}}
+  block_tag:
+    latest: 1
+    stable: 1
+  event_tag:
+    latest: 1
+    stable: 1
+  irreversible_distance: 100
+  feature:
+    rosetta_parser: false
+config_name: "{{blockchain}}_{{network}}"
+cron:
+  block_range_size: 4
+functional_test: ""
+sdk:
+  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/{{blockchain}}/{{network}}/v1
+  num_workers: 10
+  restful: true
+server:
+  bind_address: "localhost:9090"
+sla:
+  tier: 3
+workflows:
+  backfiller:
+    activity_retry_maximum_attempts: 3
+    activity_schedule_to_start_timeout: 5m
+    activity_start_to_close_timeout: 10m
+    batch_size: 2500
+    checkpoint_size: 5000
+    max_reprocessed_per_batch: 30
+    task_list: default
+    workflow_decision_timeout: 2m
+    workflow_execution_timeout: 24h
+    workflow_identity: workflow.backfiller
+  benchmarker:
+    activity_retry_maximum_attempts: 3
+    activity_schedule_to_start_timeout: 5m
+    activity_start_to_close_timeout: 10m
+    child_workflow_execution_start_to_close_timeout: 60m
+    task_list: default
+    workflow_decision_timeout: 2m
+    workflow_execution_timeout: 24h
+    workflow_identity: workflow.benchmarker
+  monitor:
+    activity_retry_maximum_attempts: 8
+    activity_schedule_to_start_timeout: 5m
+    activity_start_to_close_timeout: 10m
+    backoff_interval: 10s
+    batch_size: 50
+    checkpoint_size: 500
+    parallelism: 4
+    task_list: default
+    workflow_decision_timeout: 2m
+    workflow_execution_timeout: 24h
+    workflow_identity: workflow.monitor
+  poller:
+    activity_heartbeat_timeout: 5m
+    activity_retry_maximum_attempts: 8
+    activity_schedule_to_start_timeout: 2m
+    activity_start_to_close_timeout: 10m
+    backoff_interval: 3s
+    checkpoint_size: 1000
+    fast_sync: false
+    max_blocks_to_sync_per_cycle: 100
+    parallelism: 4
+    task_list: default
+    workflow_decision_timeout: 2m
+    workflow_execution_timeout: 24h
+    session_creation_timeout: 2m
+    session_enabled: false
+    workflow_identity: workflow.poller
+  streamer:
+    activity_retry_maximum_attempts: 5
+    activity_schedule_to_start_timeout: 2m
+    activity_start_to_close_timeout: 2m
+    backoff_interval: 3s
+    batch_size: 500
+    checkpoint_size: 500
+    task_list: default
+    workflow_decision_timeout: 2m
+    workflow_execution_timeout: 24h
+    workflow_identity: workflow.streamer
+  cross_validator:
+    activity_retry_maximum_attempts: 5
+    activity_schedule_to_start_timeout: 5m
+    activity_start_to_close_timeout: 10m
+    backoff_interval: 1s
+    batch_size: 100
+    checkpoint_size: 1000
+    parallelism: 4
+    task_list: default
+    validation_percentage: 10
+    workflow_decision_timeout: 2m
+    workflow_execution_timeout: 24h
+    workflow_identity: workflow.cross_validator
+  workers:
+    - task_list: default

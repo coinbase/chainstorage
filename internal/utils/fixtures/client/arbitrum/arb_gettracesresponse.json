@@ -1,0 +1,36 @@
+[
+    {
+        "action": {
+            "callType": "call",
+            "from": "0xda24ee2c4b4b1ea69de3aa9c820438c7069d7d83",
+            "gas": "0x5fcbb",
+            "input": "0xa23e1aee000000000000000000000000ff970a61a04b1ca1",
+            "to": "0x146c57abb43a5b457cd8e109d35ac27057a672e2",
+            "value": "0x0"
+        },
+        "result": {
+            "gasUsed": "0x28d11",
+            "output": "0x0000000000000000000000000000000000000000000000000163"
+        },
+        "transactionHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
+        "transactionPosition": 0,
+        "type": "call"
+    },
+    {
+        "action": {
+            "callType": "call",
+            "from": "0x146c57abb43a5b457cd8e109d35ac27057a672e2",
+            "gas": "0x5fcbb",
+            "input": "0xa23e1aee000000000000000000000000ff970a61a04b1ca1",
+            "to": "0x146c57abb43a5b457cd8e109d35ac27057a6wfe2",
+            "value": "0x0"
+        },
+        "result": {
+            "gasUsed": "0x28d11",
+            "output": "0x0000000000000000000000000000000000000000000000000163"
+        },
+        "transactionHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
+        "transactionPosition": 0,
+        "type": "call"
+    }
+]

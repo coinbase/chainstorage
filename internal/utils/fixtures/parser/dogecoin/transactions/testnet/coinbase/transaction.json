@@ -1,0 +1,21 @@
+{
+  "transaction": {
+    "transaction_identifier": {
+      "hash": "7819315bc3a5c40c0766b466ab95de02e81bbd7e7758b17d3b25c8a706d960a6"
+    },
+    "operations": [
+      {
+        "operation_identifier": {
+          "index": 0,
+          "network_index": 0
+        },
+        "type": "COINBASE",
+        "status": "SUCCESS",
+        "metadata": {
+          "coinbase": "03387f300104",
+          "sequence": 4294967295
+        }
+      }
+    ]
+  }
+}

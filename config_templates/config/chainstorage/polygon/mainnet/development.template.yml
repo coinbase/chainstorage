@@ -1,0 +1,7 @@
+aws:
+  aws_account: development
+chain:
+  block_tag:
+    stable: 2
+  event_tag:
+    latest: 2

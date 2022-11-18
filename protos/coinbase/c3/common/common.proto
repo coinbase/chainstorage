@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package coinbase.c3.common;
+
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/c3/common";
+
+// Blockchain defines an enumeration of supported blockchains.
+// The field numbers are not continuous because only a subset is open sourced.
+enum Blockchain {
+    BLOCKCHAIN_UNKNOWN = 0;
+    BLOCKCHAIN_SOLANA = 11;
+    BLOCKCHAIN_BITCOIN = 16;
+    BLOCKCHAIN_ETHEREUM = 17;
+    BLOCKCHAIN_DOGECOIN = 26;
+    BLOCKCHAIN_BSC = 31;
+    BLOCKCHAIN_AVACCHAIN = 32;
+    BLOCKCHAIN_POLYGON = 35;
+    BLOCKCHAIN_OPTIMISM = 39;
+    BLOCKCHAIN_ARBITRUM = 41;
+}
+
+// Network defines an enumeration of supported networks.
+// The field numbers are not continuous because only a subset is open sourced.
+enum Network {
+    NETWORK_UNKNOWN = 0;
+
+    NETWORK_SOLANA_MAINNET = 22;
+    NETWORK_SOLANA_TESTNET = 23;
+
+    NETWORK_BITCOIN_MAINNET = 33;
+    NETWORK_BITCOIN_TESTNET = 34;
+
+    NETWORK_ETHEREUM_MAINNET = 35;
+    NETWORK_ETHEREUM_TESTNET = 36;
+    NETWORK_ETHEREUM_GOERLI = 66;
+
+    NETWORK_DOGECOIN_MAINNET = 56;
+    NETWORK_DOGECOIN_TESTNET = 57;
+
+    NETWORK_BSC_MAINNET = 70;
+    NETWORK_BSC_TESTNET = 71;
+
+    NETWORK_AVACCHAIN_MAINNET = 72;
+    NETWORK_AVACCHAIN_TESTNET = 73;
+
+    NETWORK_POLYGON_MAINNET = 78;
+    NETWORK_POLYGON_TESTNET = 79;
+
+    NETWORK_OPTIMISM_MAINNET = 86;
+    NETWORK_OPTIMISM_TESTNET = 87;
+
+    NETWORK_ARBITRUM_MAINNET = 91;
+    NETWORK_ARBITRUM_TESTNET = 92;
+}

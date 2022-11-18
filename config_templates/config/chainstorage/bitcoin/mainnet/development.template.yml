@@ -1,0 +1,6 @@
+aws:
+  aws_account: development
+workflows:
+  poller:
+    activity_heartbeat_timeout: 10m
+    checkpoint_size: 100

@@ -1,0 +1,11 @@
+{
+  "endpoints": [
+    {
+      "name": "chain-storage-eth-04",
+      "url": "https://254c3b9c-be59-41c3-8f6f-3cc3342c7b3c.ethereum.bison.run",
+      "user": "foo",
+      "password": "bar",
+      "weight": 4
+    }
+  ]
+}

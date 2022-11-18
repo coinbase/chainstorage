@@ -1,0 +1,33 @@
+{
+  "transaction": {
+    "transaction_identifier": {
+      "hash": "2f71578c0ae103b5f5ed1d2b743b923f647914f8c0f27dde1b93f2ab4c5cf611"
+    },
+    "operations": [
+      {
+        "operation_identifier": {
+          "index": 2,
+          "network_index": 1
+        },
+        "type": "OUTPUT",
+        "status": "SUCCESS",
+        "account": {
+          "address": "2N3ZbAaJqtxD5jfbLDZichV6SSHZ6PBYPmi"
+        },
+        "amount": {
+          "value": "10000000000",
+          "currency": {
+            "symbol": "DOGETEST",
+            "decimals": 8
+          }
+        },
+        "coin_change": {
+          "coin_identifier": {
+            "identifier": "THIS_IS_INVALID"
+          },
+          "coin_action": "coin_created"
+        }
+      }
+    ]
+  }
+}

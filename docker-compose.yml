@@ -1,0 +1,18 @@
+version: '3'
+services:
+  admin:
+    command: ["-c", "trap : INT TERM QUIT; sleep infinity & wait"]
+    entrypoint: /bin/bash
+    image: coinbase/chainstorage
+    network_mode: host
+    restart: always
+  api:
+    command: ["./server"]
+    image: coinbase/chainstorage
+    network_mode: host
+    restart: always
+  cron:
+    command: ["./cron"]
+    image: coinbase/chainstorage
+    network_mode: host
+    restart: always

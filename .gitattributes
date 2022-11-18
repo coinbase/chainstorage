@@ -1,0 +1,3 @@
+config/config.go linguist-generated=true
+config/**/*.yml linguist-generated=true
+cloud/**/*.yml linguist-generated=true

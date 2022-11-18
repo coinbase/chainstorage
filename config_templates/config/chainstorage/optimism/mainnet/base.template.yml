@@ -1,0 +1,14 @@
+chain:
+  block_time: 2m
+sla:
+  block_height_delta: 100
+  block_time_delta: 5m
+  out_of_sync_node_distance: 100
+  tier: 3
+  time_since_last_block: 10m
+workflows:
+  backfiller:
+    num_concurrent_extractors: 100
+    activity_start_to_close_timeout: 20m
+cron:
+  disable_workflow_status: true

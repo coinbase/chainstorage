@@ -1,0 +1,5 @@
+chain:
+  block_start_height: 2222
+  config_name: "{{blockchain}}-{{network}}"
+  details:
+    sub_details: "my-details-{{blockchain}}-{{network}}-{{env}}"

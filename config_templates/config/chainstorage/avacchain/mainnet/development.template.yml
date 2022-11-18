@@ -1,0 +1,5 @@
+chain:
+  block_start_height: 16000000
+workflows:
+  cross_validator:
+    validation_start_height: 16000000

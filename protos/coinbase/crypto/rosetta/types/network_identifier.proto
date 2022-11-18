@@ -1,0 +1,34 @@
+// (-- api-linter: core::0140::abbreviations=disabled
+//     aip.dev/not-precedent: Matching the naming convention of rosetta --)
+syntax = "proto3";
+
+// The stable release for rosetta types
+package coinbase.crypto.rosetta.types;
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/crypto/rosetta/types";
+
+import "google/protobuf/any.proto";
+
+// NetworkIdentifier specifies which network a particular object is associated with.
+message NetworkIdentifier {
+  // Blockchain the network is associated with
+  string blockchain = 1;
+  // If a blockchain has a specific chain-id or network identifier, it should go in
+  // this field. It is up to the client to determine which network-specific identifier
+  // is mainnet or testnet.
+  string network = 2;
+  // In blockchains with sharded state, the SubNetworkIdentifier is required to query
+  // some object on a specific shard. This identifier is optional for all non-sharded
+  // blockchains.
+  SubNetworkIdentifier sub_network_identifier = 3;
+}
+
+// In blockchains with sharded state, the SubNetworkIdentifier is required to
+// query some object on a specific shard. This identifier is optional for
+// all non-sharded blockchains.
+message SubNetworkIdentifier {
+  // The subnetwork identifier.
+  string network = 1;
+
+  // Metadata info for the subnetwork.
+  map<string, google.protobuf.Any> metadata = 2;
+}

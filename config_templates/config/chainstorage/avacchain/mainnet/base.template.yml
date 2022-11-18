@@ -1,0 +1,24 @@
+chain:
+  block_time: 2s
+  event_tag:
+    latest: 1
+    stable: 1
+sla:
+  block_height_delta: 20
+  block_time_delta: 5m
+  out_of_sync_node_distance: 50
+  tier: 2
+  time_since_last_block: 10m
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer/event_tag=1
+    - datalake/block_tag=1
+    - cross_validator
+workflows:
+  backfiller:
+    num_concurrent_extractors: 100
+  cross_validator:
+    batch_size: 1000
+    backoff_interval: 500ms
+    validation_percentage: 1

@@ -1,0 +1,42 @@
+aws:
+  aws_account: development
+  storage:
+    data_compression: GZIP
+chain:
+  block_tag:
+    latest: 2
+    stable: 2
+  block_time: 13s
+  event_tag:
+    latest: 1
+    stable: 0
+  irreversible_distance: 14
+  feature:
+    rosetta_parser: true
+sla:
+  block_height_delta: 10
+  block_time_delta: 2m
+  out_of_sync_node_distance: 10
+  tier: 1
+  time_since_last_block: 3m
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer
+    - streamer/event_tag=1
+    - datalake/block_tag=2
+    - cross_validator
+workflows:
+  backfiller:
+    checkpoint_size: 5000
+    num_concurrent_extractors: 24
+  cross_validator:
+    batch_size: 1000
+    backoff_interval: 500ms
+    validation_start_height: 15500000
+    validation_percentage: 1
+  poller:
+    parallelism: 10
+    failover_enabled: true
+  monitor:
+    failover_enabled: true

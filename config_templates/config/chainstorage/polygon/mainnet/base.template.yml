@@ -1,0 +1,58 @@
+api:
+  streaming_max_no_event_time: 15m
+chain:
+  block_tag:
+    latest: 2
+    stable: 1
+  block_time: 2s
+  event_tag:
+    latest: 0
+    stable: 0
+  client:
+    retry:
+      max_attempts: 5
+  irreversible_distance: 300
+  feature:
+    rosetta_parser: true
+aws:
+  aws_account: development
+  storage:
+    data_compression: GZIP
+sla:
+  block_height_delta: 100 # reorg distance is high according to https://polygonscan.com/blocks_forked
+  block_time_delta: 5m
+  out_of_sync_node_distance: 100
+  tier: 2
+  time_since_last_block: 10m
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer
+    - streamer/event_tag=1
+    - datalake/block_tag=2
+workflows:
+  backfiller:
+    batch_size: 2500
+    checkpoint_size: 5000
+    num_concurrent_extractors: 120
+    max_reprocessed_per_batch: 100
+    failover_enabled: true
+  benchmarker:
+    child_workflow_execution_start_to_close_timeout: 2h
+  cross_validator:
+    batch_size: 1000
+    backoff_interval: 500ms
+    validation_start_height: 3500000
+    validation_percentage: 1
+  monitor:
+    backoff_interval: 3s
+    failover_enabled: true
+  poller:
+    backoff_interval: 500ms
+    checkpoint_size: 250
+    max_blocks_to_sync_per_cycle: 300
+    parallelism: 24
+    session_enabled: true
+    failover_enabled: true
+  streamer:
+    backoff_interval: 500ms

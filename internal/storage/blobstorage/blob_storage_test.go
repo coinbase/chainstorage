@@ -1,0 +1,161 @@
+package blobstorage
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"testing"
+
+	"github.com/aws/aws-sdk-go/awstesting"
+	"github.com/aws/aws-sdk-go/awstesting/unit"
+	awss3 "github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/golang/mock/gomock"
+	"go.uber.org/fx"
+
+	"github.com/coinbase/chainstorage/internal/s3"
+	s3mocks "github.com/coinbase/chainstorage/internal/s3/mocks"
+	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	"github.com/coinbase/chainstorage/internal/utils/testapp"
+	"github.com/coinbase/chainstorage/internal/utils/testutil"
+	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
+	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+)
+
+func TestBlobStorage_NoCompression(t *testing.T) {
+	const expectedObjectKey = "BLOCKCHAIN_ETHEREUM/NETWORK_ETHEREUM_MAINNET/1/12345/0xabcde"
+	const expectedObjectSize = int64(12432)
+
+	require := testutil.Require(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	downloader := s3mocks.NewMockDownloader(ctrl)
+	downloader.EXPECT().DownloadWithContext(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, writer io.WriterAt, input *awss3.GetObjectInput) (int64, error) {
+			require.NotNil(input.Bucket)
+			require.NotEmpty(*input.Bucket)
+			require.NotNil(input.Key)
+			require.Equal(expectedObjectKey, *input.Key)
+
+			return expectedObjectSize, nil
+		})
+
+	uploader := s3mocks.NewMockUploader(ctrl)
+	uploader.EXPECT().UploadWithContext(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, input *s3manager.UploadInput) (*s3manager.UploadOutput, error) {
+			require.NotNil(input.Bucket)
+			require.NotEmpty(*input.Bucket)
+			require.NotNil(input.Key)
+			require.Equal(expectedObjectKey, *input.Key)
+			require.NotNil(input.ContentMD5)
+			require.NotEmpty(*input.ContentMD5)
+
+			return &s3manager.UploadOutput{}, nil
+		})
+
+	var storage BlobStorage
+	app := testapp.New(
+		t,
+		Module,
+		fx.Provide(func() s3.Downloader { return downloader }),
+		fx.Provide(func() s3.Uploader { return uploader }),
+		fx.Populate(&storage),
+	)
+	defer app.Close()
+
+	require.NotNil(storage)
+	objectKey, err := storage.Upload(context.Background(), &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		Metadata: &api.BlockMetadata{
+			Tag:    1,
+			Height: 12345,
+			Hash:   "0xabcde",
+		},
+	}, api.Compression_NONE)
+	require.NoError(err)
+	require.Equal(expectedObjectKey, objectKey)
+
+	metadata := &api.BlockMetadata{
+		Tag:           1,
+		Height:        12345,
+		Hash:          "0xabcde",
+		ObjectKeyMain: objectKey,
+	}
+	block, err := storage.Download(context.Background(), metadata)
+	require.NoError(err)
+	require.NotNil(block)
+}
+
+func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
+	require := testutil.Require(t)
+
+	var storage BlobStorage
+	app := testapp.New(
+		t,
+		Module,
+		fx.Provide(func() s3.Downloader { return nil }),
+		fx.Provide(func() s3.Uploader { return nil }),
+		fx.Populate(&storage),
+	)
+	defer app.Close()
+
+	metadata := &api.BlockMetadata{
+		Tag:     1,
+		Height:  12345,
+		Skipped: true,
+	}
+	objectKey, err := storage.Upload(context.Background(), &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		Metadata:   metadata,
+	}, api.Compression_NONE)
+	require.NoError(err)
+	require.Empty(objectKey)
+
+	block, err := storage.Download(context.Background(), metadata)
+	require.NoError(err)
+	require.NotNil(block)
+	require.Equal(&api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		Metadata:   metadata,
+	}, block)
+}
+
+func TestBlobStorage_DownloadErrRequestCanceled(t *testing.T) {
+	require := testutil.Require(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	uploader := s3mocks.NewMockUploader(ctrl)
+	downloader := s3manager.NewDownloader(unit.Session)
+
+	var blobStorage BlobStorage
+	app := testapp.New(
+		t,
+		Module,
+		fx.Provide(func() s3.Downloader { return downloader }),
+		fx.Provide(func() s3.Uploader { return uploader }),
+		fx.Populate(&blobStorage),
+	)
+	defer app.Close()
+	require.NotNil(blobStorage)
+
+	ctx := &awstesting.FakeContext{DoneCh: make(chan struct{})}
+	ctx.Error = fmt.Errorf("context canceled")
+	close(ctx.DoneCh)
+
+	metadata := &api.BlockMetadata{
+		Tag:           1,
+		Height:        12345,
+		Hash:          "0xabcde",
+		ObjectKeyMain: "some download key",
+	}
+	_, err := blobStorage.Download(ctx, metadata)
+	require.Error(err)
+	require.Equal(errors.ErrRequestCanceled, err)
+}

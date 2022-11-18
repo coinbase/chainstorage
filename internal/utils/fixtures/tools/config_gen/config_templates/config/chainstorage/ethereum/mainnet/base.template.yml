@@ -1,0 +1,5 @@
+chain:
+  block_start_height: 11000000
+cadence:
+  retention_period: 7
+top_level: '{{env}}'
