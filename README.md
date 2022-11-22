@@ -26,8 +26,9 @@
   - [APIs](#apis)
 - [SDK](#sdk)
 - [Examples](#examples)
-  - [Blocks](#blocks)
-  - [Events](#events)
+  - [Batch](#batch)
+  - [Stream](#stream)
+  - [Unified](#unified)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -75,12 +76,12 @@ The directory structure is as follows: `config/{namespace}/{blockchain}/{network
 
 - `CHAINSTORAGE_NAMESPACE`:
   A `{namespace}` is logical grouping of several services, each of which manages its own blockchain and network. The
-  default namespace is [chainstorage](./config/chainstorage).
-  To deploy a different namespace, set the env var to the name of a subdirectory of [./config](./config).
+  default namespace is [chainstorage](/config/chainstorage).
+  To deploy a different namespace, set the env var to the name of a subdirectory of [./config](/config).
 - `CHAINSTORAGE_CONFIG`:
   This env var, in the format of `{blockchain}-{network}`, determines the blockchain and network managed by the service.
   The naming is defined
-  in [c3/common](./protos/coinbase/c3/common/common.proto).
+  in [c3/common](/protos/coinbase/c3/common/common.proto).
 - `CHAINSTORAGE_ENVIRONMENT`:
   This env var controls the `{environment}` in which the service is deployed. Possible values include `production`
   , `development`, and `local` (which is also the default value).
@@ -149,7 +150,7 @@ are derived from the directory and file naming schemes associated with cloud and
 ### Endpoint Group
 
 Endpoint group is an abstraction for one or more JSON-RPC endpoints.
-[EndpointProvider](./internal/blockchain/endpoints/endpoint_provider.go) uses the `endpoint_group` config to implement
+[EndpointProvider](/internal/blockchain/endpoints/endpoint_provider.go) uses the `endpoint_group` config to implement
 client-side routing to the node provider.
 
 ChainStorage utilizes two endpoint groups to speed up data ingestion:
@@ -435,9 +436,9 @@ Note:
 
 Below are several examples you can choose for data processing.
 
-### Blocks
+### Batch
 
-In this example, we use the blocks API to fetch the confirmed blocks as follows:
+In [this example](/examples/batch/main.go), we use the blocks API to fetch the confirmed blocks as follows:
 1. Fetch the maximum reorg distance (`irreversibleDistance`).
 2. Fetch the latest block height (`latest`).
 3. Poll for new blocks from the checkpoint up to the latest confirmed block  (`latest - irreversibleDistance`).
@@ -448,21 +449,35 @@ using `GetBlocksByRange`.
 ```shell
 export CHAINSTORAGE_SDK_AUTH_HEADER=cb-nft-api-token
 export CHAINSTORAGE_SDK_AUTH_TOKEN=****
-go run ./examples/blocks
+go run ./examples/batch
 ```
 
-### Events
+### Stream
 
-1. If you want the most up-to-date blocks, you need to use the streaming APIs
-    1. Unified batch and streaming:
-        - Download, let's say 10k events, using `GetChainEvents`.
-        - Break down 10k events into small batches, e.g. 20 events/batch.
-        - Process those batches in parallel.
-        - For events in each batch, it can be processed either sequentially or in parallel using `GetBlockWithTag`.
-        - Update watermark once all small batches have been processed.
-        - Repeat above steps.
+[This example](/examples/stream/main.go) demonstrates how to stream the latest blocks and handle chain reorgs.
 
-       With the above pattern, you can unify batch and streaming use cases. When your data pipeline is close to the tip,
-       `GetChainEvents` will simply return all available blocks.
-    2. Separate workflows for backfilling and live streaming:
-       Use `GetBlocksByRangeWithTag` for backfilling and then switch over to `StreamChainEvents` for live streaming.
+```shell
+export CHAINSTORAGE_SDK_AUTH_HEADER=cb-nft-api-token
+export CHAINSTORAGE_SDK_AUTH_TOKEN=****
+go run ./examples/stream
+```
+
+### Unified
+
+The [last example] showcases how to turn the data processing into an embarrassingly parallel problem by leveraging 
+the mono-increasing sequence number.
+1. Download, say 10k events, using `GetChainEvents`. Note that this API is non-blocking, and it returns all the 
+   available events if the requested amount is not available.
+2. Break down 10k events into small batches, e.g. 20 events/batch.
+3. Distribute those batches to a number of workers for parallel processing
+4. For events in each batch, it can be processed either sequentially or in parallel using `GetBlockWithTag`.
+5. Implement versioning using the mono-increasing sequence numbers provided by the events. 
+   See [here](https://aws.amazon.com/blogs/database/implementing-version-control-using-amazon-dynamodb/) for more details.
+6. Update watermark once all the batches have been processed.
+7. Repeat above steps.
+
+```shell
+export CHAINSTORAGE_SDK_AUTH_HEADER=cb-nft-api-token
+export CHAINSTORAGE_SDK_AUTH_TOKEN=****
+go run ./examples/unified
+```
