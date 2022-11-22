@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"

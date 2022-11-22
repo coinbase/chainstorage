@@ -5,7 +5,8 @@ go 1.17
 require (
 	github.com/VividCortex/ewma v1.2.0
 	github.com/aws/aws-sdk-go v1.40.45
-	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
+	github.com/btcsuite/btcd/btcutil v1.1.0
+	github.com/btcsuite/btcutil v1.0.2
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/coinbase/rosetta-sdk-go v0.7.0
 	github.com/ethereum/go-ethereum v1.10.7
@@ -52,8 +53,11 @@ require (
 	github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
-	github.com/btcsuite/btcd v0.21.0-beta // indirect
+	github.com/btcsuite/btcd v0.23.4 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.1.3 // indirect
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/dfuse-io/logging v0.0.0-20210109005628-b97a57253f70 // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
