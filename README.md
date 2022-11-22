@@ -18,7 +18,6 @@
   - [Unit Test](#unit-test)
   - [Integration Test](#integration-test)
   - [Functional Test](#functional-test)
-    - [Run Functional Test Locally](#run-functional-test-locally)
 - [Development](#development)
   - [Running Server](#running-server)
   - [AWS localstack](#aws-localstack)
@@ -285,22 +284,27 @@ make test TARGET=internal/blockchain/...
 # Run everything
 make integration
 
-# Run the workflow package only
-make integration TARGET=internal/workflow/...
-
-# Run TestIntegrationEthereumGetBlock only
-make integration TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationEthereumGetBlock
-
-# If test class implemented with test suite, add suite name before the test name
-make integration TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygonTestSuite/TestPolygonGetBlock
+# Run the storage package only
+make integration TARGET=internal/storage/...
 ```
 
 ### Functional Test
 
-#### Run Functional Test Locally
+Before running the functional test, you need to provide the endpoint group config by creating `secrets.yml`.
+See [here](#endpoint-group) for more details.
 
 ```shell
+# Run everything
 make functional
+
+# Run the workflow package only
+make functional TARGET=internal/workflow/...
+
+# Run TestIntegrationEthereumGetBlock only
+make functional TARGET=internal/blockchain/... TEST_FILTER='TestIntegrationEthereumGetBlock$$'
+
+# If test class implemented with test suite, add suite name before the test name
+make functional TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygonTestSuite/TestPolygonGetBlock
 ```
 
 ## Development
