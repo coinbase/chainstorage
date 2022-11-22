@@ -88,7 +88,7 @@ config:
 .PHONY: fmt
 fmt:
 	@echo "--- fmt"
-	@goimports -l -w $(SRCS)
+	@goimports -l -w -local github.com/coinbase/chainstorage $(SRCS)
 
 .PHONY: server
 server:

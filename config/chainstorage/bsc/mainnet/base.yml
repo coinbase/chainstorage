@@ -56,6 +56,8 @@ cron:
   disable_streaming_canary: false
 functional_test: ""
 sdk:
+  auth_header: ""
+  auth_token: ""
   chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/bsc/mainnet/v1
   num_workers: 10
   restful: true

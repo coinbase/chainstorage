@@ -25,7 +25,9 @@
   - [Checking Workflow Statuses](#checking-workflow-statuses)
   - [APIs](#apis)
 - [SDK](#sdk)
-  - [Data Processing Pattern](#data-processing-pattern)
+- [Examples](#examples)
+  - [Blocks](#blocks)
+  - [Events](#events)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -429,9 +431,27 @@ Note:
   In conclusion, it's safe to use `GetBlocksByRangeWithTag` for backfilling since the reorg will not happen for past
   blocks, however, you'd be suggested to use `GetBlockWithTag` for recent blocks (e.g. streaming case).
 
-### Data Processing Pattern
+## Examples
 
-Below are several patterns you can choose for data processing.
+Below are several examples you can choose for data processing.
+
+### Blocks
+
+In this example, we use the blocks API to fetch the confirmed blocks as follows:
+1. Fetch the maximum reorg distance (`irreversibleDistance`).
+2. Fetch the latest block height (`latest`).
+3. Poll for new blocks from the checkpoint up to the latest confirmed block  (`latest - irreversibleDistance`).
+using `GetBlocksByRange`.
+4. Update the checkpoint.
+5. Repeat above steps periodically.
+
+```shell
+export CHAINSTORAGE_SDK_AUTH_HEADER=cb-nft-api-token
+export CHAINSTORAGE_SDK_AUTH_TOKEN=****
+go run ./examples/blocks
+```
+
+### Events
 
 1. If you want the most up-to-date blocks, you need to use the streaming APIs
     1. Unified batch and streaming:
@@ -446,10 +466,3 @@ Below are several patterns you can choose for data processing.
        `GetChainEvents` will simply return all available blocks.
     2. Separate workflows for backfilling and live streaming:
        Use `GetBlocksByRangeWithTag` for backfilling and then switch over to `StreamChainEvents` for live streaming.
-2. If you don't want to deal with chain reorg, you may use the batch APIs as follows:
-    - Maintain a distance (`irreversibleDistance`) to the tip, the irreversible distance can be queried
-      using `GetChainMetadata`.
-    - Get the latest block height (`latest`) using `GetLatestBlock`.
-    - Poll for new data from current watermark block to the block (`latest - irreversibleDistance`)
-      using `GetBlocksByRangeWithTag`.
-    - Repeat above steps periodically.

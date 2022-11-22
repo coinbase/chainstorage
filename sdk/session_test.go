@@ -52,25 +52,6 @@ func TestNew_Tag(t *testing.T) {
 	require.Equal(uint32(123), session.Client().GetTag())
 }
 
-func TestNew_ClientID(t *testing.T) {
-	require := testutil.Require(t)
-	manager := services.NewMockSystemManager()
-	defer manager.Shutdown()
-
-	clientID := "fake-id"
-	session, err := New(manager, &Config{
-		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
-		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
-		Env:        EnvDevelopment,
-		ClientID:   clientID,
-	})
-	require.NoError(err)
-	require.NotNil(session)
-	require.NotNil(session.Client())
-	require.NotNil(session.Parser())
-	require.Equal(clientID, session.Client().GetClientID())
-}
-
 func TestNew_InvalidEnv(t *testing.T) {
 	require := testutil.Require(t)
 	manager := services.NewMockSystemManager()

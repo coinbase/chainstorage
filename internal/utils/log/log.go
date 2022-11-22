@@ -6,10 +6,11 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/coinbase/chainstorage/internal/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
+
+	"github.com/coinbase/chainstorage/internal/config"
 )
 
 func New() *zap.Logger {

@@ -54,6 +54,8 @@ cron:
   disable_dlq_processor: true
 functional_test: ""
 sdk:
+  auth_header: ""
+  auth_token: ""
   chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/bitcoin/mainnet/v1
   num_workers: 10
   restful: true

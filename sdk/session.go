@@ -74,10 +74,6 @@ func New(manager services.SystemManager, cfg *Config) (Session, error) {
 		session.Client().SetTag(cfg.Tag)
 	}
 
-	if cfg.ClientID != "" {
-		session.Client().SetClientID(cfg.ClientID)
-	}
-
 	return session, nil
 }
 

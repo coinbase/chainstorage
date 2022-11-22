@@ -14,7 +14,6 @@ type (
 		Network    common.Network    `validate:"required"`
 		Env        Env               `validate:"required,oneof=production development local"`
 		Tag        uint32
-		ClientID   string
 	}
 
 	Env = config.Env

@@ -53,6 +53,8 @@ cron:
   block_range_size: 4
 functional_test: ""
 sdk:
+  auth_header: ""
+  auth_token: ""
   chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/avacchain/mainnet/v1
   num_workers: 10
   restful: true

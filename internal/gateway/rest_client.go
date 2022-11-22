@@ -9,16 +9,17 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/coinbase/chainstorage/internal/utils/consts"
-	"github.com/coinbase/chainstorage/internal/utils/finalizer"
-	"github.com/coinbase/chainstorage/internal/utils/log"
-	"github.com/coinbase/chainstorage/internal/utils/retry"
-	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
+
+	"github.com/coinbase/chainstorage/internal/utils/consts"
+	"github.com/coinbase/chainstorage/internal/utils/finalizer"
+	"github.com/coinbase/chainstorage/internal/utils/log"
+	"github.com/coinbase/chainstorage/internal/utils/retry"
+	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
 type (
