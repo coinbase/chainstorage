@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 
-	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/coinbase/chainstorage/sdk"
@@ -22,7 +21,7 @@ const (
 
 type (
 	Worker struct {
-		manager              services.SystemManager
+		manager              sdk.SystemManager
 		logger               *zap.Logger
 		session              sdk.Session
 		checkpoint           uint64
@@ -34,7 +33,7 @@ type (
 )
 
 func main() {
-	manager := services.NewManager()
+	manager := sdk.NewManager()
 	defer manager.Shutdown()
 
 	worker, err := NewWorker(manager)
@@ -47,7 +46,7 @@ func main() {
 	}
 }
 
-func NewWorker(manager services.SystemManager) (*Worker, error) {
+func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 	logger := manager.Logger()
 	session, err := sdk.New(manager, &sdk.Config{
 		Blockchain: blockchain,

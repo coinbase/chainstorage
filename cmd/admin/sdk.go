@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 
-	"github.com/coinbase/chainstorage/internal/services"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/coinbase/chainstorage/sdk"
 )
@@ -31,7 +30,7 @@ var (
 		Use:   "range",
 		Short: "Fetch and parse blocks in the given range.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager := services.NewManager(services.WithLogger(logger))
+			manager := sdk.NewManager(sdk.WithLogger(logger))
 			defer manager.Shutdown()
 
 			session, err := newSession(manager)
@@ -57,7 +56,7 @@ var (
 		Use:   "get",
 		Short: "Fetch and parse a block.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager := services.NewManager(services.WithLogger(logger))
+			manager := sdk.NewManager(sdk.WithLogger(logger))
 			defer manager.Shutdown()
 
 			session, err := newSession(manager)
@@ -82,7 +81,7 @@ var (
 		Use:   "latest",
 		Short: "Fetch and parse latest block",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager := services.NewManager(services.WithLogger(logger))
+			manager := sdk.NewManager(sdk.WithLogger(logger))
 			defer manager.Shutdown()
 
 			session, err := newSession(manager)
@@ -104,7 +103,7 @@ var (
 		Use:   "stream",
 		Short: "Stream blocks",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager := services.NewManager(services.WithLogger(logger))
+			manager := sdk.NewManager(sdk.WithLogger(logger))
 			defer manager.Shutdown()
 
 			session, err := newSession(manager)
@@ -137,7 +136,7 @@ var (
 	}
 )
 
-func newSession(manager services.SystemManager) (sdk.Session, error) {
+func newSession(manager sdk.SystemManager) (sdk.Session, error) {
 	err := initializeBlockchainNetworkEnvFromFlags()
 	if err != nil {
 		return nil, err
