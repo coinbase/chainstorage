@@ -15,7 +15,7 @@ import (
 
 const (
 	blockchain    = common.Blockchain_BLOCKCHAIN_ETHEREUM
-	network       = common.Network_NETWORK_ETHEREUM_GOERLI
+	network       = common.Network_NETWORK_ETHEREUM_MAINNET
 	batchSize     = 20
 	startDistance = 100
 )
@@ -25,7 +25,6 @@ type (
 		manager              services.SystemManager
 		logger               *zap.Logger
 		session              sdk.Session
-		batchSize            uint64
 		checkpoint           uint64
 		irreversibleDistance uint64
 		backoffInterval      time.Duration
@@ -61,9 +60,16 @@ func NewWorker(manager services.SystemManager) (*Worker, error) {
 
 	ctx := manager.ServiceContext()
 	client := session.Client()
+
 	chainMetadata, err := client.GetChainMetadata(ctx, &api.GetChainMetadataRequest{})
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get chain metadata: %w", err)
+	}
+
+	irreversibleDistance := chainMetadata.IrreversibleDistance
+	backoffInterval, err := time.ParseDuration(chainMetadata.BlockTime)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to parse block time: %w", err)
 	}
 
 	latestHeight, err := client.GetLatestBlock(ctx)
@@ -75,18 +81,12 @@ func NewWorker(manager services.SystemManager) (*Worker, error) {
 	// In this example, we simply derive the checkpoint from the latest height.
 	checkpoint := latestHeight - startDistance
 
-	backoffInterval, err := time.ParseDuration(chainMetadata.BlockTime)
-	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block time: %w", err)
-	}
-
 	return &Worker{
 		manager:              manager,
 		logger:               logger,
 		session:              session,
-		batchSize:            batchSize,
 		checkpoint:           checkpoint,
-		irreversibleDistance: chainMetadata.IrreversibleDistance,
+		irreversibleDistance: irreversibleDistance,
 		backoffInterval:      backoffInterval,
 		numTransactions:      0,
 		numBatches:           0,
@@ -110,8 +110,8 @@ func (w *Worker) Run() error {
 		}
 
 		endHeight := latestHeight - w.irreversibleDistance
-		if endHeight > w.checkpoint+w.batchSize {
-			endHeight = w.checkpoint + w.batchSize
+		if endHeight > w.checkpoint+batchSize {
+			endHeight = w.checkpoint + batchSize
 		}
 
 		if err := w.processBatch(ctx, startHeight, endHeight); err != nil {
@@ -130,6 +130,7 @@ func (w *Worker) processBatch(ctx context.Context, startHeight uint64, endHeight
 			"waiting for new blocks",
 			zap.Uint64("startHeight", startHeight),
 			zap.Uint64("endHeight", endHeight),
+			zap.String("backoffInterval", w.backoffInterval.String()),
 		)
 		time.Sleep(w.backoffInterval)
 		return nil

@@ -99,6 +99,11 @@ type (
 	}
 )
 
+const (
+	InitialPositionLatest   = "LATEST"
+	InitialPositionEarliest = "EARLIEST"
+)
+
 func newClient(params clientParams) (Client, error) {
 	logger := log.WithPackage(params.Logger)
 	return &clientImpl{

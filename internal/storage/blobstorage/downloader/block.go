@@ -84,7 +84,6 @@ func (d *blockDownloaderImpl) Download(ctx context.Context, blockFile *api.Block
 		}, nil
 	}
 
-	defer d.logDuration(time.Now())
 	var block *api.Block
 	if err := d.retry.Retry(ctx, func(ctx context.Context) error {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, blockFile.FileUrl, nil)
@@ -130,11 +129,4 @@ func (d *blockDownloaderImpl) Download(ctx context.Context, blockFile *api.Block
 	}
 
 	return block, nil
-}
-
-func (c *blockDownloaderImpl) logDuration(start time.Time) {
-	c.logger.Debug(
-		"downloader.request",
-		zap.Duration("duration", time.Since(start)),
-	)
 }
