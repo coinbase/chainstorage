@@ -190,6 +190,8 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 			w.numTransactions += len(block.GetEthereum().Transactions)
 		} else if event.Type == api.BlockchainEvent_BLOCK_REMOVED {
 			if len(w.blocks) > 0 {
+				// ChainStorage guarantees the ordering of the events.
+				// +1, +2, +3, -3, -2, +2', +3'
 				lastBlock := w.blocks[len(w.blocks)-1]
 				if block.Height != lastBlock.Height {
 					return 0, xerrors.Errorf("invalid chain: block=%v, lastBlock=%v", block.Height, lastBlock.Height)

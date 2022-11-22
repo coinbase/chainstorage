@@ -62,6 +62,7 @@ type (
 
 		// StreamChainEvents streams raw blocks from ChainStorage.
 		// The caller is responsible for keeping track of the sequence or sequence_num in BlockchainEvent.
+		// This API is currently not supported in the Coinbase public APIs due to limitations in our edge gateway.
 		StreamChainEvents(ctx context.Context, cfg StreamingConfiguration) (<-chan *ChainEventResult, error)
 
 		// GetChainEvents returns at most req.MaxNumEvents available chain events.

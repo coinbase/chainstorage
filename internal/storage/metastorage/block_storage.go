@@ -126,7 +126,7 @@ func (a *blockStorageImpl) getBlockByKeys(
 	blockKeyMap := getBlockKeyMap(blockPid, blockRid)
 	outputItem, err := a.blockTable.GetItem(ctx, blockKeyMap)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block metadata with GetItem: %w", err)
+		return nil, xerrors.Errorf("failed to get block metadata with GetBlock: %w", err)
 	}
 	blockDDBEntry, ok := outputItem.(*model.BlockMetaDataDDBEntry)
 	if !ok {

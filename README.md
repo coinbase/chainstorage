@@ -434,7 +434,8 @@ Note:
 
 ## Examples
 
-Below are several examples you can choose for data processing.
+See below for a few examples for implementing a simple indexer using the SDK.
+Note that the examples are provided in increasing complexity.
 
 ### Batch
 
@@ -464,12 +465,14 @@ go run ./examples/stream
 
 ### Unified
 
-The [last example] showcases how to turn the data processing into an embarrassingly parallel problem by leveraging 
-the mono-increasing sequence number.
+The [last example](/examples/unified/main.go) showcases how to turn the data processing into an embarrassingly parallel
+problem by leveraging the mono-increasing sequence number. In this example, the logical ordering guarantee is preserved,
+though the events are processed in parallel and out of order.
 1. Download, say 10k events, using `GetChainEvents`. Note that this API is non-blocking, and it returns all the 
-   available events if the requested amount is not available.
+   available events if the requested amount is not available. This enables us to unify batch and stream processing.
 2. Break down 10k events into small batches, e.g. 20 events/batch.
-3. Distribute those batches to a number of workers for parallel processing
+3. Distribute those batches to a number of workers for parallel processing.
+   Note that this step is not part of the example.
 4. For events in each batch, it can be processed either sequentially or in parallel using `GetBlockWithTag`.
 5. Implement versioning using the mono-increasing sequence numbers provided by the events. 
    See [here](https://aws.amazon.com/blogs/database/implementing-version-control-using-amazon-dynamodb/) for more details.
