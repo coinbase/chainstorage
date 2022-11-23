@@ -29,6 +29,8 @@
   - [Batch](#batch)
   - [Stream](#stream)
   - [Unified](#unified)
+- [Public APIs](#public-apis)
+- [Contact Us](#contact-us)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -57,11 +59,14 @@ brew link go@1.17
 ```
 
 To set up for the first time (only done once):
+
 ```shell
+sudo chown $(whoami) /usr/local/bin /usr/local/include
+
 make bootstrap
 ```
 
-Rebuild everything
+Rebuild everything:
 
 ```shell
 make build
@@ -456,6 +461,9 @@ go run ./examples/batch
 ### Stream
 
 [This example](/examples/stream/main.go) demonstrates how to stream the latest blocks and handle chain reorgs.
+The worker processes the events sequentially and relies on [BlockchainEvent_Type](/protos/coinbase/chainstorage/api.proto)
+to construct the canonical chain.
+For example, given `+1, +2, +3, -3, -2, +2', +3'` as the events, the canonical chain would be `+1, +2', +3'`.
 
 ```shell
 export CHAINSTORAGE_SDK_AUTH_HEADER=cb-nft-api-token
@@ -466,8 +474,8 @@ go run ./examples/stream
 ### Unified
 
 The [last example](/examples/unified/main.go) showcases how to turn the data processing into an embarrassingly parallel
-problem by leveraging the mono-increasing sequence number. In this example, the logical ordering guarantee is preserved,
-though the events are processed in parallel and out of order.
+problem by leveraging the mono-increasing sequence number. In this example, though the events are processed in parallel
+and out of order, the logical ordering guarantee is preserved.
 1. Download, say 10k events, using `GetChainEvents`. Note that this API is non-blocking, and it returns all the 
    available events if the requested amount is not available. This enables us to unify batch and stream processing.
 2. Break down 10k events into small batches, e.g. 20 events/batch.
@@ -484,3 +492,35 @@ export CHAINSTORAGE_SDK_AUTH_HEADER=cb-nft-api-token
 export CHAINSTORAGE_SDK_AUTH_TOKEN=****
 go run ./examples/unified
 ```
+
+## Public APIs
+
+The ChainStorage APIs are in beta preview. Note that the APIs are currently exposed as restful APIs through grpc
+transcoding. Please refer to the [proto file](/protos/coinbase/chainstorage/api.proto) for the data schema.
+
+See below for a few examples.
+
+```shell
+export CHAINSTORAGE_SDK_AUTH_TOKEN=****
+
+curl -s -X POST \
+  -H "content-type: application/json" \
+  -H "cb-nft-api-token: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
+  https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetLatestBlock | jq
+
+curl -s -X POST \
+  -H "content-type: application/json" \
+  -H "cb-nft-api-token: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
+  -d '{"height": 16000000}' \
+  https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetNativeBlock | jq
+
+curl -s -X POST \
+  -H "content-type: application/json" \
+  -H "cb-nft-api-token: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
+  -d '{"start_height": 16000000, "end_height": 16000005}' \
+  https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetNativeBlocksByRange | jq
+```
+
+## Contact Us
+
+We will set up a telegram group soon. Stay tuned!
