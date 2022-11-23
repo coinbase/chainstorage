@@ -25,12 +25,12 @@ type (
 		manager              sdk.SystemManager
 		logger               *zap.Logger
 		session              sdk.Session
-		irreversibleDistance uint64
+		irreversibleDistance uint64 // N
 		backoffInterval      time.Duration
 		checkpoint           int64
 		numTransactions      int
 		numBatches           int
-		blocks               []*api.NativeBlock
+		blocks               []*api.NativeBlock // Last N blocks in the canonical chain.
 	}
 )
 
