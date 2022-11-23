@@ -74,7 +74,7 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 	}
 
 	events, err := client.GetChainEvents(ctx, &api.GetChainEventsRequest{
-		InitialPositionInStream: sdk.InitialPositionLatest,
+		InitialPositionInStream: api.InitialPosition_LATEST.String(),
 		MaxNumEvents:            1,
 	})
 	if err != nil {

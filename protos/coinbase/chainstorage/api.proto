@@ -14,6 +14,11 @@ enum Compression {
   GZIP = 1;
 }
 
+enum InitialPosition {
+  EARLIEST = 0;
+  LATEST = 1;
+}
+
 message BlockFile {
   uint32 tag = 1;
   string hash = 2;
@@ -148,8 +153,8 @@ message GetRosettaBlocksByRangeResponse {
 message ChainEventsRequest {
   // Indicates the initial cursor to start streaming events from when the sequence field is not set.
   // Setting this fields as a uint64 value (as string) will start the stream from the first event involved for a given block height.
-  // Setting this field as "LATEST" will start the stream from the latest event.
-  // Setting this field as "EARLIEST" will start the stream from the earliest event.
+  // Setting this field as InitialPosition_LATEST will start the stream from the latest event.
+  // Setting this field as InitialPosition_EARLIEST will start the stream from the earliest event.
   // If sequence is set, cursor will start from sequence + 1.
   string initial_position_in_stream = 1;
 
