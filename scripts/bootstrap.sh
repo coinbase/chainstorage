@@ -11,6 +11,6 @@ go install github.com/golang/mock/mockgen@v1.6.0
 go install github.com/gordonklaus/ineffassign@v0.0.0-20210914165742-4cc7213b9bc8
 go install github.com/kisielk/errcheck@v1.6.0
 go install github.com/go-bindata/go-bindata/go-bindata@v3.1.2
-go install git.org/x/tools/cmd/goimports@v0.1.10
+go install golang.org/x/tools/cmd/goimports@v0.3.0
 go mod download
 go mod tidy

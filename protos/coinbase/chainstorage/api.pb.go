@@ -2276,7 +2276,7 @@ var file_coinbase_chainstorage_api_proto_goTypes = []interface{}{
 	(*GetVersionedChainEventRequest)(nil),   // 29: coinbase.chainstorage.GetVersionedChainEventRequest
 	(*GetVersionedChainEventResponse)(nil),  // 30: coinbase.chainstorage.GetVersionedChainEventResponse
 	(*BlockIdentifier)(nil),                 // 31: coinbase.chainstorage.BlockIdentifier
-	(*timestamp.Timestamp)(nil),             // 32: google.protobuf.Timestamp
+	(*timestamppb.Timestamp)(nil),           // 32: google.protobuf.Timestamp
 	(*Block)(nil),                           // 33: coinbase.chainstorage.Block
 	(*NativeBlock)(nil),                     // 34: coinbase.chainstorage.NativeBlock
 	(*RosettaBlock)(nil),                    // 35: coinbase.chainstorage.RosettaBlock

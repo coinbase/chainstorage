@@ -8,8 +8,15 @@ if ! [ -x "$(command -v protoc)" ]; then
   exit 1
 fi
 
-# Check if protobuf is installed
+# Check if yq is installed
 if ! [ -x "$(command -v yq)" ]; then
   echo 'Error: yq is not installed.' >&2
   exit 1
 fi
+
+# Check if protoc-gen-go-grpc is installed
+if ! [ -x "$(command -v protoc-gen-go-grpc)" ]; then
+  echo 'Error: protoc-gen-go-grpc is not installed.' >&2
+  exit 1
+fi
+
