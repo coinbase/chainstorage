@@ -124,8 +124,6 @@ const (
 )
 
 const (
-	InitialPositionLatest               = "LATEST"
-	InitialPositionEarliest             = "EARLIEST"
 	streamingShortWaitTime              = time.Duration(0)
 	streamingBackoffMaxInterval         = time.Minute
 	streamingBackoffMultiplier          = 1.5
@@ -134,6 +132,9 @@ const (
 )
 
 var (
+	InitialPositionLatest   = api.InitialPosition_LATEST.String()
+	InitialPositionEarliest = api.InitialPosition_EARLIEST.String()
+
 	errServerShutDown       = xerrors.New("sever is shutting down")
 	errNoNewEventForTooLong = xerrors.New("there was no new event for quite a while")
 

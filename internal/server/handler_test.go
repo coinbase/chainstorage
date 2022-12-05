@@ -1282,6 +1282,7 @@ func (s *handlerTestSuite) TestStreamChainEventsEarliest() {
 		startEventId = metastorage.EventIdStartValue
 		endEventId   = metastorage.EventIdStartValue + 100
 	)
+	require.Equal("EARLIEST", InitialPositionEarliest)
 	eventDDBEntries := s.setupMetaStorageForEvents(s.eventTagForTestEvents, startEventId, endEventId)
 	ctx, cancel := context.WithCancel(context.Background())
 	mockServer := &mockStreamChainEventsServer{
@@ -1345,6 +1346,7 @@ func (s *handlerTestSuite) TestStreamChainEventsLatest() {
 		startEventId int64 = 100
 		endEventId   int64 = 200
 	)
+	require.Equal("LATEST", InitialPositionLatest)
 	eventDDBEntries := s.setupMetaStorageForEvents(s.eventTagForTestEvents, startEventId, endEventId)
 	s.metaStorage.EXPECT().GetMaxEventId(gomock.Any(), s.eventTagForTestEvents).Times(1).Return(startEventId, nil)
 
