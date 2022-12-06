@@ -56,13 +56,15 @@ Make sure your local go version is 1.17 by running the following commands:
 brew install go@1.17
 brew unlink go
 brew link go@1.17
+
+brew install protobuf@3.21.9
+brew unlink protobuf
+brew link protobuf
 ```
 
 To set up for the first time (only done once):
 
 ```shell
-sudo chown $(whoami) /usr/local/bin /usr/local/include
-
 make bootstrap
 ```
 
