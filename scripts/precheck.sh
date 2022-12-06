@@ -14,9 +14,3 @@ if ! [ -x "$(command -v yq)" ]; then
   exit 1
 fi
 
-# Check if protoc-gen-go-grpc is installed
-if ! [ -x "$(command -v protoc-gen-go-grpc)" ]; then
-  echo 'Error: protoc-gen-go-grpc is not installed.' >&2
-  exit 1
-fi
-
