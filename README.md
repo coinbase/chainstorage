@@ -57,11 +57,9 @@ brew install go@1.17
 brew unlink go
 brew link go@1.17
 
-brew install protobuf@3
+brew install protobuf@3.21.9
 brew unlink protobuf
 brew link protobuf
-
-brew install protoc-gen-go-grpc
 ```
 
 To set up for the first time (only done once):
