@@ -124,7 +124,7 @@ const (
 )
 
 const (
-	streamingShortWaitTime              = time.Duration(0)
+	streamingShortWaitTime              = time.Millisecond * 10
 	streamingBackoffMaxInterval         = time.Minute
 	streamingBackoffMultiplier          = 1.5
 	streamingBackoffRandomizationFactor = 0.5

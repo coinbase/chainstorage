@@ -13,7 +13,7 @@ package types
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	any "github.com/golang/protobuf/ptypes/any"
+	any1 "github.com/golang/protobuf/ptypes/any"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -113,7 +113,7 @@ type SubNetworkIdentifier struct {
 	// The subnetwork identifier.
 	Network string `protobuf:"bytes,1,opt,name=network,proto3" json:"network,omitempty"`
 	// Metadata info for the subnetwork.
-	Metadata map[string]*any.Any `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *SubNetworkIdentifier) Reset() {
@@ -155,7 +155,7 @@ func (x *SubNetworkIdentifier) GetNetwork() string {
 	return ""
 }
 
-func (x *SubNetworkIdentifier) GetMetadata() map[string]*any.Any {
+func (x *SubNetworkIdentifier) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -223,7 +223,7 @@ var file_coinbase_crypto_rosetta_types_network_identifier_proto_goTypes = []inte
 	(*NetworkIdentifier)(nil),    // 0: coinbase.crypto.rosetta.types.NetworkIdentifier
 	(*SubNetworkIdentifier)(nil), // 1: coinbase.crypto.rosetta.types.SubNetworkIdentifier
 	nil,                          // 2: coinbase.crypto.rosetta.types.SubNetworkIdentifier.MetadataEntry
-	(*any.Any)(nil),              // 3: google.protobuf.Any
+	(*any1.Any)(nil),             // 3: google.protobuf.Any
 }
 var file_coinbase_crypto_rosetta_types_network_identifier_proto_depIdxs = []int32{
 	1, // 0: coinbase.crypto.rosetta.types.NetworkIdentifier.sub_network_identifier:type_name -> coinbase.crypto.rosetta.types.SubNetworkIdentifier

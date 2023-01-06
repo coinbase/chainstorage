@@ -13,7 +13,7 @@ package types
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	any "github.com/golang/protobuf/ptypes/any"
+	any1 "github.com/golang/protobuf/ptypes/any"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -54,7 +54,7 @@ type Block struct {
 	// Transactions within the block.
 	Transactions []*Transaction `protobuf:"bytes,5,rep,name=transactions,proto3" json:"transactions,omitempty"`
 	// Metadata for the block.
-	Metadata map[string]*any.Any `protobuf:"bytes,6,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,6,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *Block) Reset() {
@@ -117,7 +117,7 @@ func (x *Block) GetTransactions() []*Transaction {
 	return nil
 }
 
-func (x *Block) GetMetadata() map[string]*any.Any {
+func (x *Block) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -260,7 +260,7 @@ var file_coinbase_crypto_rosetta_types_block_proto_goTypes = []interface{}{
 	nil,                         // 2: coinbase.crypto.rosetta.types.Block.MetadataEntry
 	(*timestamp.Timestamp)(nil), // 3: google.protobuf.Timestamp
 	(*Transaction)(nil),         // 4: coinbase.crypto.rosetta.types.Transaction
-	(*any.Any)(nil),             // 5: google.protobuf.Any
+	(*any1.Any)(nil),            // 5: google.protobuf.Any
 }
 var file_coinbase_crypto_rosetta_types_block_proto_depIdxs = []int32{
 	1, // 0: coinbase.crypto.rosetta.types.Block.block_identifier:type_name -> coinbase.crypto.rosetta.types.BlockIdentifier

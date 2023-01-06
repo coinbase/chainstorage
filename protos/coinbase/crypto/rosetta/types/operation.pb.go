@@ -13,7 +13,7 @@ package types
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	any "github.com/golang/protobuf/ptypes/any"
+	any1 "github.com/golang/protobuf/ptypes/any"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -74,7 +74,7 @@ type Operation struct {
 	// this model).
 	CoinChange *CoinChange `protobuf:"bytes,7,opt,name=coin_change,json=coinChange,proto3" json:"coin_change,omitempty"`
 	// Metadata stores any protocol specific information regarding the operation
-	Metadata map[string]*any.Any `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *Operation) Reset() {
@@ -158,7 +158,7 @@ func (x *Operation) GetCoinChange() *CoinChange {
 	return nil
 }
 
-func (x *Operation) GetMetadata() map[string]*any.Any {
+func (x *Operation) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -322,7 +322,7 @@ var file_coinbase_crypto_rosetta_types_operation_proto_goTypes = []interface{}{
 	(*AccountIdentifier)(nil),   // 3: coinbase.crypto.rosetta.types.AccountIdentifier
 	(*Amount)(nil),              // 4: coinbase.crypto.rosetta.types.Amount
 	(*CoinChange)(nil),          // 5: coinbase.crypto.rosetta.types.CoinChange
-	(*any.Any)(nil),             // 6: google.protobuf.Any
+	(*any1.Any)(nil),            // 6: google.protobuf.Any
 }
 var file_coinbase_crypto_rosetta_types_operation_proto_depIdxs = []int32{
 	1, // 0: coinbase.crypto.rosetta.types.Operation.operation_identifier:type_name -> coinbase.crypto.rosetta.types.OperationIdentifier

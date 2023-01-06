@@ -15,7 +15,7 @@ package types
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	any "github.com/golang/protobuf/ptypes/any"
+	any1 "github.com/golang/protobuf/ptypes/any"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -47,7 +47,7 @@ type Amount struct {
 	// convert an Amount.Value from atomic units (Satoshis) to standard units (Bitcoins).
 	Currency *Currency `protobuf:"bytes,2,opt,name=currency,proto3" json:"currency,omitempty"`
 	// The metadata is protocol specific metadata
-	Metadata map[string]*any.Any `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *Amount) Reset() {
@@ -96,7 +96,7 @@ func (x *Amount) GetCurrency() *Currency {
 	return nil
 }
 
-func (x *Amount) GetMetadata() map[string]*any.Any {
+func (x *Amount) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -118,7 +118,7 @@ type Currency struct {
 	Decimals int32 `protobuf:"varint,2,opt,name=decimals,proto3" json:"decimals,omitempty"`
 	// Any additional information related to the currency itself. For example, it would be useful to
 	// populate this object with the contract address of an ERC-20 token.
-	Metadata map[string]*any.Any `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *Currency) Reset() {
@@ -167,7 +167,7 @@ func (x *Currency) GetDecimals() int32 {
 	return 0
 }
 
-func (x *Currency) GetMetadata() map[string]*any.Any {
+func (x *Currency) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -240,7 +240,7 @@ var file_coinbase_crypto_rosetta_types_amount_proto_goTypes = []interface{}{
 	(*Currency)(nil), // 1: coinbase.crypto.rosetta.types.Currency
 	nil,              // 2: coinbase.crypto.rosetta.types.Amount.MetadataEntry
 	nil,              // 3: coinbase.crypto.rosetta.types.Currency.MetadataEntry
-	(*any.Any)(nil),  // 4: google.protobuf.Any
+	(*any1.Any)(nil), // 4: google.protobuf.Any
 }
 var file_coinbase_crypto_rosetta_types_amount_proto_depIdxs = []int32{
 	1, // 0: coinbase.crypto.rosetta.types.Amount.currency:type_name -> coinbase.crypto.rosetta.types.Currency
