@@ -13,7 +13,7 @@ package types
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	any "github.com/golang/protobuf/ptypes/any"
+	any1 "github.com/golang/protobuf/ptypes/any"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -102,7 +102,7 @@ type Transaction struct {
 	RelatedTransactions []*RelatedTransaction `protobuf:"bytes,3,rep,name=related_transactions,json=relatedTransactions,proto3" json:"related_transactions,omitempty"`
 	// Transactions that are related to other transactions (like a cross-shard transaction) should
 	// include the tranaction_identifier of these transactions in the metadata.
-	Metadata map[string]*any.Any `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *Transaction) Reset() {
@@ -158,7 +158,7 @@ func (x *Transaction) GetRelatedTransactions() []*RelatedTransaction {
 	return nil
 }
 
-func (x *Transaction) GetMetadata() map[string]*any.Any {
+func (x *Transaction) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -388,7 +388,7 @@ var file_coinbase_crypto_rosetta_types_transaction_proto_goTypes = []interface{}
 	nil,                               // 4: coinbase.crypto.rosetta.types.Transaction.MetadataEntry
 	(*Operation)(nil),                 // 5: coinbase.crypto.rosetta.types.Operation
 	(*NetworkIdentifier)(nil),         // 6: coinbase.crypto.rosetta.types.NetworkIdentifier
-	(*any.Any)(nil),                   // 7: google.protobuf.Any
+	(*any1.Any)(nil),                  // 7: google.protobuf.Any
 }
 var file_coinbase_crypto_rosetta_types_transaction_proto_depIdxs = []int32{
 	2, // 0: coinbase.crypto.rosetta.types.Transaction.transaction_identifier:type_name -> coinbase.crypto.rosetta.types.TransactionIdentifier

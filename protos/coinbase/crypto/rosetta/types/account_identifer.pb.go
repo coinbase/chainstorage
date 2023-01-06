@@ -13,7 +13,7 @@ package types
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	any "github.com/golang/protobuf/ptypes/any"
+	any1 "github.com/golang/protobuf/ptypes/any"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -46,7 +46,7 @@ type AccountIdentifier struct {
 	SubAccount *SubAccountIdentifier `protobuf:"bytes,2,opt,name=sub_account,json=subAccount,proto3" json:"sub_account,omitempty"`
 	// Blockchains that utilize a username model (where the address is not a derivative of a
 	// cryptographic public key) should specify the public key(s) owned by the address in metadata.
-	Metadata map[string]*any.Any `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *AccountIdentifier) Reset() {
@@ -95,7 +95,7 @@ func (x *AccountIdentifier) GetSubAccount() *SubAccountIdentifier {
 	return nil
 }
 
-func (x *AccountIdentifier) GetMetadata() map[string]*any.Any {
+func (x *AccountIdentifier) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -115,7 +115,7 @@ type SubAccountIdentifier struct {
 	// If the SubAccount address is not sufficient to uniquely specify a SubAccount, any other identifying
 	// information can be stored here. It is important to note that two SubAccounts with identical addresses
 	// but differing metadata will not be considered equal by clients.
-	Metadata map[string]*any.Any `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Metadata map[string]*any1.Any `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (x *SubAccountIdentifier) Reset() {
@@ -157,7 +157,7 @@ func (x *SubAccountIdentifier) GetAddress() string {
 	return ""
 }
 
-func (x *SubAccountIdentifier) GetMetadata() map[string]*any.Any {
+func (x *SubAccountIdentifier) GetMetadata() map[string]*any1.Any {
 	if x != nil {
 		return x.Metadata
 	}
@@ -233,7 +233,7 @@ var file_coinbase_crypto_rosetta_types_account_identifer_proto_goTypes = []inter
 	(*SubAccountIdentifier)(nil), // 1: coinbase.crypto.rosetta.types.SubAccountIdentifier
 	nil,                          // 2: coinbase.crypto.rosetta.types.AccountIdentifier.MetadataEntry
 	nil,                          // 3: coinbase.crypto.rosetta.types.SubAccountIdentifier.MetadataEntry
-	(*any.Any)(nil),              // 4: google.protobuf.Any
+	(*any1.Any)(nil),             // 4: google.protobuf.Any
 }
 var file_coinbase_crypto_rosetta_types_account_identifer_proto_depIdxs = []int32{
 	1, // 0: coinbase.crypto.rosetta.types.AccountIdentifier.sub_account:type_name -> coinbase.crypto.rosetta.types.SubAccountIdentifier
