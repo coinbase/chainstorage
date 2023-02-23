@@ -1,4 +1,4 @@
-FROM golang:1.17 as build
+FROM golang:1.18 as build
 
 ENV GO111MODULE on
 
@@ -11,7 +11,7 @@ RUN go mod download
 COPY . ./
 RUN make bin
 
-FROM golang:1.17 as deploy
+FROM golang:1.18 as deploy
 
 WORKDIR /app/
 
