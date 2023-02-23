@@ -57,7 +57,7 @@ brew install go@1.18
 brew unlink go
 brew link go@1.18
 
-brew install protobuf@3.21.9
+brew install protobuf@3.21.12
 brew unlink protobuf
 brew link protobuf
 
