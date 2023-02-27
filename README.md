@@ -110,6 +110,7 @@ respective config directories
 
 ### Template Format and Inheritance
 
+
 Configuration templates are composable and inherit configuration properties from
 "parent templates", which can be defined in `base.template.yml`, `local.template.yml`, `development.template.yml`,
 and `production.template.yml`.
