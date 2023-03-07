@@ -56,13 +56,16 @@ Make sure your local go version is 1.18 by running the following commands:
 brew install go@1.18
 brew unlink go
 brew link go@1.18
+
+brew install protobuf@3.21.12
+brew unlink protobuf
+brew link protobuf
+
 ```
 
 To set up for the first time (only done once):
 
 ```shell
-sudo chown $(whoami) /usr/local/bin /usr/local/include
-
 make bootstrap
 ```
 
@@ -106,6 +109,7 @@ directories. All configurations from this directory will be generated within the
 respective config directories
 
 ### Template Format and Inheritance
+
 
 Configuration templates are composable and inherit configuration properties from
 "parent templates", which can be defined in `base.template.yml`, `local.template.yml`, `development.template.yml`,
@@ -523,4 +527,4 @@ curl -s -X POST \
 
 ## Contact Us
 
-We will set up a telegram group soon. Stay tuned!
+We will set up a discord server soon. Stay tuned!
