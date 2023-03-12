@@ -4,6 +4,8 @@
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
+  - [Develop on Mac](#develop-on-mac)
+  - [Develop with Docker](#develop-with-docker)
 - [Configuration](#configuration)
   - [Environment Variables](#environment-variables)
   - [Creating New Configurations](#creating-new-configurations)
@@ -50,6 +52,8 @@ It aims to provide an efficient and flexible way to access the on-chain data:
 
 ## Quick Start
 
+### Develop on Mac
+
 Make sure your local go version is 1.18 by running the following commands:
 
 ```shell
@@ -57,10 +61,9 @@ brew install go@1.18
 brew unlink go
 brew link go@1.18
 
-brew install protobuf@3.21.12
+brew install protobuf@3.21.2
 brew unlink protobuf
 brew link protobuf
-
 ```
 
 To set up for the first time (only done once):
@@ -73,6 +76,21 @@ Rebuild everything:
 
 ```shell
 make build
+```
+
+### Develop with Docker
+
+It is slower than local development, but if it is the only option, you can use the following commands to build, test and run your edevelopment codes.
+
+```shell
+# Build the image
+docker build  -f Dockerfile_debug -t csdev .
+```
+
+```shell
+# Run the container and mount the project directory to the container
+# You can continue to develop locally and build the changes in the container
+docker run -v $(pwd):/go/src -p 8080:8080 -it csdev bash
 ```
 
 ## Configuration
