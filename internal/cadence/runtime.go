@@ -72,7 +72,7 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 	address := params.Config.Cadence.Address
 	tlsConfig := params.Config.Cadence.TLSConfig
 	connectionOptions := client.ConnectionOptions{}
-	if tlsConfig.Enabled {
+	if tlsConfig.Enabled && params.Config.Env() != config.EnvLocal {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to parse address (%v): %w", address, err)
