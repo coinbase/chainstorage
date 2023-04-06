@@ -79,11 +79,9 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 		}
 
 		connectionOptions.TLS = &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		}
-
-		if tlsConfig.ValidateHostname {
-			connectionOptions.TLS.ServerName = host
+			MinVersion:         tls.VersionTLS12,
+			ServerName:         host,
+			InsecureSkipVerify: !tlsConfig.ValidateHostname,
 		}
 
 		if tlsConfig.CertificateAuthority != "" {
