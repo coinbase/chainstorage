@@ -2,12 +2,16 @@ package parser
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/golang/protobuf/ptypes/any"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+
+	"github.com/coinbase/chainstorage/internal/blockchain/bootstrap"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/types"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -89,6 +93,21 @@ func (p *ethereumRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *ap
 		return nil, xerrors.Errorf("failed to parse block transactions: %w", err)
 	}
 
+	if nativeBlock.Height == 0 {
+		// For ethereum mainnet, we use this allocation file as reference:
+		// https://github.com/coinbase/rosetta-ethereum/blob/master/rosetta-cli-conf/mainnet/bootstrap_balances.json
+		genesisAllocation, err := bootstrap.GenerateGenesisAllocations(p.config.Chain.Network)
+		if err != nil {
+			return nil, err
+		}
+
+		genesisTransactions, err := p.getGenesisTransactions(genesisAllocation)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to generate genesis transactions: %w", err)
+		}
+		transactions = append(transactions, genesisTransactions...)
+	}
+
 	return &api.RosettaBlock{
 		Block: &rosetta.Block{
 			BlockIdentifier:       blockIdentifier,
@@ -101,15 +120,15 @@ func (p *ethereumRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *ap
 }
 
 func (p *ethereumRosettaParserImpl) getRosettaTransactions(block *api.EthereumBlock, blobData *api.EthereumBlobdata) ([]*rosetta.Transaction, error) {
-	rosettaTransactions := make([]*rosetta.Transaction, len(block.Transactions)+1)
-
-	// compute the reward transaction
-	rosettaTransactions[0] = p.createBlockRewardTransaction(block)
-
-	rosettaTxs, err := getRosettaTransactionsFromCSBlock(block, blobData, block.Header.Miner, &ethereumRosettaCurrency, p.feeOps)
+	rosettaTxs, err := getRosettaTransactionsFromCSBlock(block, blobData, block.Header.Miner, &ethereumRosettaCurrency, p.feeOps, p.tokenTransferOpsFn)
 	if err != nil {
 		return nil, err
 	}
+
+	rosettaTransactions := make([]*rosetta.Transaction, len(rosettaTxs)+1)
+
+	// compute the reward transaction
+	rosettaTransactions[0] = p.createBlockRewardTransaction(block)
 
 	for i := range rosettaTxs {
 		rosettaTransactions[i+1] = rosettaTxs[i]
@@ -301,4 +320,49 @@ func (p *ethereumRosettaParserImpl) feeOps(transaction *api.EthereumTransaction,
 	ops = append(ops, burntOp)
 
 	return ops, nil
+}
+
+func (p *ethereumRosettaParserImpl) tokenTransferOpsFn(transaction *api.EthereumTransaction, startIndex int) ([]*rosetta.Operation, error) {
+	return []*rosetta.Operation{}, nil
+}
+
+func (p *ethereumRosettaParserImpl) getGenesisTransactions(allocations []*bootstrap.GenesisAllocation) ([]*rosetta.Transaction, error) {
+	var genesisTxns []*rosetta.Transaction
+	for _, allo := range allocations {
+		address := allo.AccountIdentifier.Address
+		_, err := checksumAddress(address)
+		if err != nil {
+			return nil, xerrors.Errorf("%s is not a valid address", address)
+		}
+		addressLower := strings.ToLower(address)
+
+		genesisOp := &rosetta.Operation{
+			OperationIdentifier: &rosetta.OperationIdentifier{
+				Index: 0,
+			},
+			Type:   opTypeGenesis,
+			Status: opStatusSuccess,
+			Account: &rosetta.AccountIdentifier{
+				Address: addressLower,
+			},
+			Amount: &rosetta.Amount{
+				Value:    allo.Value,
+				Currency: &ethereumRosettaCurrency,
+			},
+			Metadata: map[string]*any.Any{},
+		}
+
+		txnIdentifier := fmt.Sprintf("GENESIS_%s", addressLower[2:])
+		txn := &rosetta.Transaction{
+			TransactionIdentifier: &rosetta.TransactionIdentifier{
+				Hash: txnIdentifier,
+			},
+			Operations: []*rosetta.Operation{genesisOp},
+			Metadata:   map[string]*any.Any{},
+		}
+
+		genesisTxns = append(genesisTxns, txn)
+	}
+
+	return genesisTxns, nil
 }

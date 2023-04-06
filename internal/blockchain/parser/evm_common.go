@@ -2,9 +2,12 @@ package parser
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/golang/protobuf/ptypes/any"
 	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -31,9 +34,14 @@ const (
 	opTypeFee             = "FEE"
 	opTypeMinerReward     = "MINER_REWARD"
 	opTypePayment         = "PAYMENT"
+	opTypeGenesis         = "GENESIS"
+	opTypeWithdrawal      = "WITHDRAWAL"
 	traceTypeCall         = "CALL"
 	traceTypeSelfDestruct = "SELFDESTRUCT"
 	traceTypeCreate       = "CREATE"
+	traceTypeCallCode     = "CALLCODE"
+	traceTypeDelegateCall = "DELEGATECALL"
+	traceTypeStaticCall   = "STATICCALL"
 
 	// ContractAddressKey is the key used to denote the contract address
 	// for a token, provided via Currency metadata.
@@ -105,7 +113,8 @@ func getFeeDetails(transaction *api.EthereumTransaction, block *api.EthereumBloc
 }
 
 // Ref: https://github.com/coinbase/rosetta-ethereum/blob/3a9db2f08ab5fae90cd8d08876ba69a9097e29f5/ethereum/client.go#L569
-func convertCSTransactionToRosettaOps(transaction *api.EthereumTransaction, startIndex int, currency *rosetta.Currency) ([]*rosetta.Operation, error) {
+// Should also exclude DELEGATECALL and CALLCODE since those ops are not transfer value
+func convertCSTransactionToRosettaOps(transaction *api.EthereumTransaction, currency *rosetta.Currency, startIndex int) ([]*rosetta.Operation, error) {
 	var ops []*rosetta.Operation
 	flattenedTraces := transaction.FlattenedTraces
 	if len(flattenedTraces) == 0 {
@@ -132,7 +141,8 @@ func convertCSTransactionToRosettaOps(transaction *api.EthereumTransaction, star
 		}
 
 		zeroValue := traceValue.Sign() == 0
-		shouldAdd := !zeroValue || trace.TraceType != traceTypeCall
+		shouldAdd := (!zeroValue || (len(trace.Type) > 0 && !isCallType(trace.Type))) &&
+			shouldIncludeType(trace.Type)
 
 		if shouldAdd {
 			var amount *rosetta.Amount
@@ -264,18 +274,41 @@ func getRosettaTransactionsFromCSBlock(
 	rewardRecipient string,
 	currency *rosetta.Currency,
 	feeOpsFn func(*api.EthereumTransaction, string, *api.EthereumBlock) ([]*rosetta.Operation, error),
+	tokenTransferOpsFn func(*api.EthereumTransaction, int) ([]*rosetta.Operation, error),
+	opsFns ...func(*api.EthereumTransaction, int) ([]*rosetta.Operation, error),
 ) ([]*rosetta.Transaction, error) {
-	rosettaTransactions := make([]*rosetta.Transaction, len(block.Transactions))
-
+	withdrawls := block.GetHeader().GetWithdrawals()
+	rosettaTransactions := make([]*rosetta.Transaction, len(block.Transactions)+len(withdrawls))
 	for i, ethTxn := range block.Transactions {
-		feeOps, err := feeOpsFn(ethTxn, rewardRecipient, block)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to parse fee operations: %w", err)
+		var ops []*rosetta.Operation
+
+		if rewardRecipient != "" {
+			feeOps, err := feeOpsFn(ethTxn, rewardRecipient, block)
+			if err != nil {
+				return nil, xerrors.Errorf("failed to parse fee operations: %w", err)
+			}
+			ops = append(ops, feeOps...)
 		}
 
-		traceOps, err := convertCSTransactionToRosettaOps(ethTxn, len(feeOps), currency)
+		tokenTransferOps, err := tokenTransferOpsFn(ethTxn, len(ops))
+		if err != nil {
+			return nil, xerrors.Errorf("failed to parse token transfer operations: %w", err)
+		}
+		ops = append(ops, tokenTransferOps...)
+
+		traceOps, err := convertCSTransactionToRosettaOps(ethTxn, currency, len(ops))
 		if err != nil {
 			return nil, xerrors.Errorf("failed to parse trace operations: %w", err)
+		}
+		ops = append(ops, traceOps...)
+
+		for _, opsFn := range opsFns {
+			extraOps, err := opsFn(ethTxn, len(ops))
+			if err != nil {
+				return nil, xerrors.Errorf("failed to parse extra operations: %w", err)
+			}
+
+			ops = append(ops, extraOps...)
 		}
 
 		var receiptMap map[string]interface{}
@@ -308,11 +341,74 @@ func getRosettaTransactionsFromCSBlock(
 			TransactionIdentifier: &rosetta.TransactionIdentifier{
 				Hash: ethTxn.Hash,
 			},
-			Operations:          append(feeOps, traceOps...),
+			Operations:          ops,
+			RelatedTransactions: nil,
+			Metadata:            metadata,
+		}
+	}
+
+	for i, withdrawal := range withdrawls {
+		addressLower := strings.ToLower(withdrawal.Address)
+
+		ops := []*rosetta.Operation{
+			{
+				OperationIdentifier: &rosetta.OperationIdentifier{
+					Index: 0,
+				},
+				Type:   opTypeWithdrawal,
+				Status: opStatusSuccess,
+				Account: &rosetta.AccountIdentifier{
+					Address: addressLower,
+				},
+				Amount: &rosetta.Amount{
+					// the withdrawal amount is gwei, converting it to wei to be consistent with the rest
+					// of the amounts in the parser
+					// https://eips.ethereum.org/EIPS/eip-4895
+					Value:    new(big.Int).SetUint64(withdrawal.Amount * params.GWei).String(),
+					Currency: currency,
+				},
+				Metadata: nil,
+			},
+		}
+
+		metadata, err := rosetta.FromSDKMetadata(map[string]interface{}{
+			"index":           hexutil.EncodeUint64(withdrawal.Index),
+			"validator_index": hexutil.EncodeUint64(withdrawal.ValidatorIndex),
+			"address":         addressLower,
+			"amount":          hexutil.EncodeUint64(withdrawal.Amount),
+		})
+		if err != nil {
+			return nil, xerrors.Errorf("failed to convert withdrawal metadata to rosetta proto: %w", err)
+		}
+
+		rosettaTransactions[len(block.Transactions)+i] = &rosetta.Transaction{
+			TransactionIdentifier: &rosetta.TransactionIdentifier{
+				Hash: fmt.Sprintf("WITHDRAWAL_%s_%d", block.GetHeader().GetHash(), withdrawal.Index),
+			},
+			Operations:          ops,
 			RelatedTransactions: nil,
 			Metadata:            metadata,
 		}
 	}
 
 	return rosettaTransactions, nil
+}
+
+func isCallType(traceType string) bool {
+	switch traceType {
+	case traceTypeCall, traceTypeCallCode, traceTypeDelegateCall, traceTypeStaticCall:
+		return true
+	}
+	return false
+}
+
+// as the CALLCODE and DELEGATECALL actually calling contract to send a message
+// to an external contract but execute the related code in the context of the caller.
+// shouldn't really make amount transfer, should exclude.
+func shouldIncludeType(traceType string) bool {
+	switch traceType {
+	case traceTypeCallCode, traceTypeDelegateCall:
+		return false
+	}
+	return true
 }

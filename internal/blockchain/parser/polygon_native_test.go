@@ -56,6 +56,8 @@ func (s *polygonParserTestSuite) TearDownTest() {
 func (s *polygonParserTestSuite) TestParsePolygonBlock() {
 	require := testutil.Require(s.T())
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -309,6 +311,7 @@ func (s *polygonParserTestSuite) TestParsePolygonBlock() {
 func (s *polygonParserTestSuite) TestParsePolygonBlock_TransactionTraceWithGasAsString() {
 	require := testutil.Require(s.T())
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_POLYGON,
 		Network:    common.Network_NETWORK_POLYGON_MAINNET,
@@ -532,6 +535,8 @@ func (s *polygonParserTestSuite) TestParsePolygonBlock_WithAuthor() {
 	polygonFixtureHeader, err := fixtures.ReadFile("parser/polygon/polygon_fixture_header.json")
 	require.NoError(err)
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_POLYGON,
 		Network:    common.Network_NETWORK_POLYGON_MAINNET,

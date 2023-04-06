@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
+	geth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"golang.org/x/xerrors"
 
@@ -17,6 +18,7 @@ type nopParser struct{}
 
 const (
 	ethHexAddressLength = 40
+	genesisBlockIndex   = int64(0)
 )
 
 var _ Parser = (*nopParser)(nil)
@@ -148,4 +150,21 @@ func encodeBase58(b []byte) string {
 
 func decodeBase58(s string) []byte {
 	return base58.Decode(s)
+}
+
+// bigInt returns a *big.Int representation of a value.
+func bigInt(value string) (*big.Int, error) {
+	parsedVal, ok := new(big.Int).SetString(value, 10)
+	if !ok {
+		return nil, xerrors.Errorf("%s is not an integer", value)
+	}
+	return parsedVal, nil
+}
+
+func checksumAddress(address string) (string, error) {
+	mixedCaseAddress, err := geth.NewMixedcaseAddressFromString(address)
+	if err != nil {
+		return "", xerrors.Errorf("fail to normalize address=%s: %w", address, err)
+	}
+	return mixedCaseAddress.Address().Hex(), nil
 }

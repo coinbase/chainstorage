@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 
+	"github.com/coinbase/chainstorage/internal/utils/fixtures"
+
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -50,6 +52,8 @@ func (s *avacchainParserTestSuite) TearDownTest() {
 func (s *avacchainParserTestSuite) TestParseAvacchainBlock() {
 	require := testutil.Require(s.T())
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_AVACCHAIN,
 		Network:    common.Network_NETWORK_AVACCHAIN_MAINNET,
