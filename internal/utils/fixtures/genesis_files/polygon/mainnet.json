@@ -1,0 +1,82 @@
+[
+  {
+    "account_identifier": {
+      "address": "0x0000000000000000000000000000000000001010"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "9999993000000000000000000000"
+  },
+  {
+    "account_identifier": {
+      "address": "0x5973918275c01f50555d44e92c9d9b353cadad54"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "1000000000000000000000"
+  },
+  {
+    "account_identifier": {
+      "address": "0xb8bb158b93c94ed35c1970d610d1e2b34e26652c"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "1000000000000000000000"
+  },
+  {
+    "account_identifier": {
+      "address": "0xf84c74dea96df0ec22e11e7c33996c73fcc2d822"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "1000000000000000000000"
+  },
+  {
+    "account_identifier": {
+      "address": "0xb702f1c9154ac9c08da247a8e30ee6f2f3373f41"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "1000000000000000000000"
+  },
+  {
+    "account_identifier": {
+      "address": "0x7fcd58c2d53d980b247f1612fdba93e9a76193e6"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "1000000000000000000000"
+  },
+  {
+    "account_identifier": {
+      "address": "0x0375b2fc7140977c9c76d45421564e354ed42277"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "1000000000000000000000"
+  },
+  {
+    "account_identifier": {
+      "address": "0x42eefcda06ead475cde3731b8eb138e88cd0bac3"
+    },
+    "currency": {
+      "symbol": "MATIC",
+      "decimals": 18
+    },
+    "value": "1000000000000000000000"
+  }
+]

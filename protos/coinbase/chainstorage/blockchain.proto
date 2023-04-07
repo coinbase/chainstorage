@@ -90,6 +90,13 @@ message EthereumBlock {
   repeated EthereumHeader uncles = 3;
 }
 
+message EthereumWithdrawal {
+  uint64 index = 1;
+  uint64 validator_index = 2;
+  string address = 3;
+  uint64 amount = 4;
+}
+
 message EthereumHeader {
   string hash = 1;
   string parent_hash = 2;
@@ -113,6 +120,9 @@ message EthereumHeader {
   oneof optional_base_fee_per_gas {
     uint64 base_fee_per_gas = 20;
   }
+  string mix_hash = 21;
+  repeated EthereumWithdrawal withdrawals = 22;
+  string withdrawals_root = 23;
 }
 
 message EthereumTransactionAccess {

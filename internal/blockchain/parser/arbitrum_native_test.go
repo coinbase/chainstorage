@@ -59,6 +59,7 @@ func (s *arbitrumParserTestSuite) TearDownTest() {
 func (s *arbitrumParserTestSuite) TestParseArbitrumBlock() {
 	require := testutil.Require(s.T())
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
 	traces := s.fixtureTracesParsingHelper("parser/arbitrum/arb_paritytrace_basic.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ARBITRUM,
@@ -322,6 +323,7 @@ func (s *arbitrumParserTestSuite) TestParseArbitrumBlock() {
 func (s *arbitrumParserTestSuite) TestParseArbitrumNativeBlock_ErrorFlattenedTraces() {
 	require := testutil.Require(s.T())
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
 	traces := s.fixtureTracesParsingHelper("parser/arbitrum/arb_paritytrace_errorflattenedtrace.json")
 
 	block := &api.Block{
@@ -359,6 +361,7 @@ func (s *arbitrumParserTestSuite) TestParseArbitrumNativeBlock_ErrorFlattenedTra
 func (s *arbitrumParserTestSuite) TestParseArbitrumNativeBlock_ErrorFlattenedTraces_TraceOutOfOrder() {
 	require := testutil.Require(s.T())
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
 	traces := s.fixtureTracesParsingHelper("parser/arbitrum/arb_paritytrace_traceoutoforder.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ARBITRUM,

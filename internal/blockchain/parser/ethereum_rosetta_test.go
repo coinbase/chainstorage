@@ -11,6 +11,8 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
+	"github.com/coinbase/chainstorage/internal/utils/fixtures"
+
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -53,6 +55,8 @@ func (s *ethereumRosettaParserTestSuite) TearDownTest() {
 func (s *ethereumRosettaParserTestSuite) TestEthereumRosettaParser() {
 	require := testutil.Require(s.T())
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -315,7 +319,7 @@ func (s *ethereumRosettaParserTestSuite) TestRosettaEthereumResponseParity() {
 	require.NoError(err)
 	actualRosettaBlock, err := s.parser.ParseRosettaBlock(context.Background(), block)
 	require.NoError(err)
-	expectedRosettaBlock, err := testutil.LoadRosettablock("parser/ethereum/rosetta_ethereum_block_response_468179.json")
+	expectedRosettaBlock, err := testutil.LoadRosettaBlock("parser/ethereum/rosetta_ethereum_block_response_468179.json")
 	require.NoError(err)
 
 	expectedRosettaProtoTxns, err := rosetta.FromSDKTransactions(expectedRosettaBlock.Block.Transactions)
@@ -528,7 +532,7 @@ func (s *ethereumRosettaParserTestSuite) normalizeTransactions(expected *rosetta
 }
 
 // Block with EIP-1559 base fee & txs. This block taken from mainnet:
-//   https://etherscan.io/block/0x68985b6b06bb5c6012393145729babb983fc16c50ec5207972ddda02de02f7e2
+// https://etherscan.io/block/0x68985b6b06bb5c6012393145729babb983fc16c50ec5207972ddda02de02f7e2
 // This block has 7 transactions, all EIP-1559 type except the last.
 func (s *ethereumRosettaParserTestSuite) TestBlock_13998626() {
 	require := testutil.Require(s.T())
@@ -536,7 +540,7 @@ func (s *ethereumRosettaParserTestSuite) TestBlock_13998626() {
 	require.NoError(err)
 	actualRosettaBlock, err := s.parser.ParseRosettaBlock(context.Background(), block)
 	require.NoError(err)
-	expectedRosettaBlock, err := testutil.LoadRosettablock("parser/ethereum/rosetta_ethereum_block_response_13998626.json")
+	expectedRosettaBlock, err := testutil.LoadRosettaBlock("parser/ethereum/rosetta_ethereum_block_response_13998626.json")
 	require.NoError(err)
 
 	expectedRosettaProtoTxns, err := rosetta.FromSDKTransactions(expectedRosettaBlock.Block.Transactions)
@@ -563,4 +567,79 @@ func (s *ethereumRosettaParserTestSuite) TestBlock_SelfDestruct() {
 	txn := actualRosettaBlock.Block.Transactions[74]
 	lastOp := txn.Operations[len(txn.Operations)-1]
 	require.Equal(opTypeDestruct, lastOp.Type)
+}
+
+func (s *ethereumRosettaParserTestSuite) TestParseBlock_EthereumMainnet_Genesis() {
+	require := testutil.Require(s.T())
+
+	block, err := testutil.LoadRawBlock("parser/ethereum/raw_block_0.json")
+	require.NoError(err)
+	actualRosettaBlock, err := s.parser.ParseRosettaBlock(context.Background(), block)
+	require.NoError(err)
+	require.NotNil(actualRosettaBlock)
+
+	txns := actualRosettaBlock.GetBlock().Transactions
+	require.Equal(8892, len(txns))
+	sampleTxn := txns[2]
+	require.Equal("GENESIS_001762430ea9c3a26e5749afdb70da5f78ddbb8c", sampleTxn.TransactionIdentifier.Hash)
+	sampleOperation := txns[2].Operations[0]
+	require.Equal("0x001762430ea9c3a26e5749afdb70da5f78ddbb8c", sampleOperation.Account.Address)
+	require.Equal("200000000000000000000", sampleOperation.Amount.Value)
+	require.Equal("ETH", sampleOperation.Amount.Currency.Symbol)
+	require.Equal(int32(18), sampleOperation.Amount.Currency.Decimals)
+}
+
+func (s *ethereumRosettaParserTestnetTestSuite) TestParseBlock_EthereumMainnet_PostShanghai() {
+	require := testutil.Require(s.T())
+
+	fixtureHeaderPostShanghai := fixtures.MustReadFile("parser/ethereum/raw_block_header_post_shanghai.json")
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
+
+	block := &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		Metadata:   ethereumMetadata,
+		Blobdata: &api.Block_Ethereum{
+			Ethereum: &api.EthereumBlobdata{
+				Header:              fixtureHeaderPostShanghai,
+				TransactionReceipts: [][]byte{fixtureReceipt},
+				TransactionTraces:   [][]byte{fixtureTraces},
+			},
+		},
+	}
+	actualRosettaBlock, err := s.parser.ParseRosettaBlock(context.Background(), block)
+	require.NoError(err)
+	require.NotNil(actualRosettaBlock)
+
+	txns := actualRosettaBlock.GetBlock().Transactions
+	require.Equal(4, len(txns))
+	sampleTxn := txns[2]
+	require.Equal("WITHDRAWAL_0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b_115096", sampleTxn.TransactionIdentifier.Hash)
+	sampleOperation := txns[2].Operations[0]
+	require.Equal(int64(0), sampleOperation.OperationIdentifier.Index)
+	require.Equal(opTypeWithdrawal, sampleOperation.Type)
+	require.Equal(opStatusSuccess, sampleOperation.Status)
+	require.Equal("0xf97e180c050e5ab072211ad2c213eb5aee4df134", sampleOperation.Account.Address)
+	require.Equal("191408000000000", sampleOperation.Amount.Value)
+	require.Equal("ETH", sampleOperation.Amount.Currency.Symbol)
+	require.Equal(int32(18), sampleOperation.Amount.Currency.Decimals)
+}
+
+func (s *ethereumRosettaParserTestSuite) TestParseBlock_SkipExcludedCallTrace() {
+	require := testutil.Require(s.T())
+
+	targetTxHash := "0x9ea1dd7a534b79ed492e51ab1ada0f1b2976d984163364aad4c16a2f49eedc36"
+	block, err := testutil.LoadRawBlock("parser/ethereum/raw_block_16899757.json")
+	require.NoError(err)
+	rosettaBlock, err := s.parser.ParseRosettaBlock(context.Background(), block)
+	require.NoError(err)
+	require.Equal(148, len(rosettaBlock.Block.Transactions))
+	var delegateCallTx *rosetta.Transaction
+	for _, txn := range rosettaBlock.Block.Transactions {
+		if txn.TransactionIdentifier.Hash == targetTxHash {
+			delegateCallTx = txn
+		}
+	}
+	require.Equal(7, len(delegateCallTx.Operations))
 }

@@ -52,6 +52,12 @@ type (
 		// The EIP-1559 base fee for the block, if it exists.
 		BaseFeePerGas *EthereumQuantity `json:"baseFeePerGas"`
 		ExtraHeader   PolygonHeader     `json:"extraHeader"`
+
+		// EIP-4895 introduces new fields in the execution payload
+		// https://eips.ethereum.org/EIPS/eip-4895
+		// Note that the unit of withdrawal `amount` is in Gwei (1e9 wei).
+		Withdrawals     []*EthereumWithdrawal `json:"withdrawals"`
+		WithdrawalsRoot EthereumHexString     `json:"withdrawalsRoot"`
 	}
 
 	PolygonHeader struct {
@@ -67,6 +73,13 @@ type (
 		Transactions []*EthereumTransactionLit `json:"transactions"`
 		Uncles       []EthereumHexString       `json:"uncles"`
 		Timestamp    EthereumQuantity          `json:"timestamp"`
+	}
+
+	EthereumWithdrawal struct {
+		Index          EthereumQuantity  `json:"index"`
+		ValidatorIndex EthereumQuantity  `json:"validatorIndex"`
+		Address        EthereumHexString `json:"address"`
+		Amount         EthereumQuantity  `json:"amount"`
 	}
 
 	EthereumTransactionAccess struct {
@@ -634,6 +647,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 		}
 	}
 	uncles := p.copyEthereumHexStrings(block.Uncles)
+	withdrawals := p.parseWithdrawals(block.Withdrawals)
 	header := &api.EthereumHeader{
 		Hash:             block.Hash.Value(),
 		ParentHash:       block.ParentHash.Value(),
@@ -654,6 +668,8 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 		GasLimit:         block.GasLimit.Value(),
 		GasUsed:          block.GasUsed.Value(),
 		Uncles:           uncles,
+		Withdrawals:      withdrawals,
+		WithdrawalsRoot:  block.WithdrawalsRoot.Value(),
 	}
 	if block.BaseFeePerGas != nil {
 		header.OptionalBaseFeePerGas = &api.EthereumHeader_BaseFeePerGas{
@@ -723,6 +739,19 @@ func (p *ethereumNativeParserImpl) parseTransactionAccessList(transaction *Ether
 	}
 
 	return accessList
+}
+
+func (p *ethereumNativeParserImpl) parseWithdrawals(withdrawals []*EthereumWithdrawal) []*api.EthereumWithdrawal {
+	result := make([]*api.EthereumWithdrawal, len(withdrawals))
+	for i, withdrawal := range withdrawals {
+		result[i] = &api.EthereumWithdrawal{
+			Index:          withdrawal.Index.Value(),
+			ValidatorIndex: withdrawal.ValidatorIndex.Value(),
+			Address:        withdrawal.Address.Value(),
+			Amount:         withdrawal.Amount.Value(),
+		}
+	}
+	return result
 }
 
 func (p *ethereumNativeParserImpl) parseEventLogs(receipt *EthereumTransactionReceipt) []*api.EthereumEventLog {

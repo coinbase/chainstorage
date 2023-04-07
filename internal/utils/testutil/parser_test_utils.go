@@ -77,7 +77,7 @@ func LoadRosettaRaw(
 	return rosettaRaw, nil
 }
 
-func LoadRosettablock(file string) (*rt.BlockResponse, error) {
+func LoadRosettaBlock(file string) (*rt.BlockResponse, error) {
 	data, err := fixtures.ReadFile(file)
 	if err != nil {
 		return nil, err

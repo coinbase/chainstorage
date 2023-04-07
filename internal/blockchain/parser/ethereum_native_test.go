@@ -11,6 +11,8 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/fx"
 
+	"github.com/coinbase/chainstorage/internal/utils/fixtures"
+
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -248,87 +250,6 @@ var (
     	"uncles": []
 	}`)
 
-	fixtureReceipt = []byte(`
-	{
-		"blockHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
-		"blockNumber": "0xacc290",
-		"contractAddress": null,
-		"cumulativeGasUsed": "0xbca58c",
-		"from": "0x98265d92b016df8758f361fb8d2f9a813c82494a",
-		"gasUsed": "0x1b889",
-		"logs": [
-			{
-				"address": "0xe5caef4af8780e59df925470b050fb23c43ca68c",
-				"blockHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
-				"blockNumber": "0xacc290",
-				"data": "0x0000000000000000000000000000000000000000000000000000000715d435c0",
-				"logIndex": "0x119",
-				"removed": false,
-				"topics": [
-					"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-					"0x00000000000000000000000098265d92b016df8758f361fb8d2f9a813c82494a",
-					"0x00000000000000000000000092330d8818e8a3b50f027c819fa46031ffba2c8c"
-				],
-				"transactionHash": "0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8",
-				"transactionIndex": "0x0"
-			},
-			{
-				"address": "0xe5caef4af8780e59df925470b050fb23c43ca68c",
-				"blockHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
-				"blockNumber": "0xacc290",
-				"data": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e029ae811464737200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000033b2e3cbfa3d80192847e1a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-				"logIndex": "0x120",
-				"removed": false,
-				"topics": [
-				  "0x29ae811400000000000000000000000000000000000000000000000000000000",
-				  "0x000000000000000000000000be8e3e3618f7474f8cb1d074a26affef007e98fb",
-				  "0x6473720000000000000000000000000000000000000000000000000000000000",
-				  "0x0000000000000000000000000000000000000000033b2e3cbfa3d80192847e1a"
-				],
-				"transactionHash": "0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8",
-				"transactionIndex": "0x0"
-			},
-			{
-				"address": "0xad72c532d9fe5c51292d950dd0a160c76ff3fa30",
-				"blockHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
-				"blockNumber": "0xacc290",
-				"data": "0x00000000000000000000000000000000000000000000000000000000000000c8",
-				"logIndex": "0x121",
-				"removed": false,
-				"topics": [
-					"0xc1405953cccdad6b442e266c84d66ad671e2534c6584f8e6ef92802f7ad294d5",
-					"0x000000000000000000000000be8e3e3618f7474f8cb1d074a26affef007e98fb",
-					"0x0000000000000000000000000000000000000000033b2e3cbfa3d80192847e1a",
-					"0x0000000000000000000000001fe16de955718cfab7a44605458ab023838c2793"
-				],
-				"transactionHash": "0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8",
-				"transactionIndex": "0x0"
-			},
-			{
-				"address": "0x518ba36f1ca6dfe3bb1b098b8dd0444030e79d9f",
-				"blockHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
-				"blockNumber": "0xacc290",
-				"data": "0x",
-				"logIndex": "0x122",
-				"removed": false,
-				"topics": [
-					"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-					"0x0000000000000000000000000000000000000000",
-					"0x05379b307e6ae02e522fb134fad1254a4e7fbac1",
-					"0x0000000000000000000000000000000000000000000000000000000000001950"
-				],
-				"transactionHash": "0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8",
-				"transactionIndex": "0x0"
-			}
-		],
-		"logsBloom": "0x00200000000000000000000080000000000080000200000000010000000000000000000000000000000000000000000002000000080000000000000000200001000000000000000010000008000000200000000000400000000000000000000000000000000000000000000000000000000000002000040000000010000000000000000000000000004000000000000000002000000000088000004000000000020000000000000000000000000000000400000000000000000000000000800000000002000001000000000000000000000000000000001000000002000020000010200000000000000000000000000000000000000000000000008004000000",
-		"status": "0x1",
-		"to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
-		"transactionHash": "0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8",
-		"transactionIndex": "0x0",
-		"type": "0x0"
-	}`)
-
 	fixtureLargeLogDataReceipt = []byte(`
 	{
 		"blockHash": "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
@@ -508,30 +429,6 @@ var (
 		"type": "0x0"
 	}`)
 
-	fixtureTraces = []byte(`
-	{
-		"type": "CALL",
-		"from": "0x4823cc90c145fd6a16ab7668043dbba5ce79cdfc",
-		"to": "0xdac17f958d2ee523a2206206994597c13d831ec7",
-		"value": "0x0",
-		"gas": "0x10b1c",
-		"gasUsed": "0x4c91",
-		"input": "0xa9059cbb00000000000000000000000022852cdfdda5eb9b0e25d6581bdb82a156ac4c400000000000000000000000000000000000000000000000000000000162598040",
-		"output": "0x",
-		"time": "41.567024ms",
-		"calls": [
-			{
-				"from": "0x61c86828fd30ca479c51413abc03f0f8dcec2120",
-				"gas": "0x7207e",
-				"gasUsed": "0x2fd4",
-				"input": "0x70a0823100000000000000000000000061c86828fd30ca479c51413abc03f0f8dcec2120",
-				"output": "0x00000000000000000000000000000000000000000000000b94174e1c4d4a9288",
-				"to": "0xba630d3ba20502ba07975b15c719beecc8e4ebb0",
-				"type": "CALL",
-				"value": "0x1"
-			}
-		]
-	}`)
 	fixtureTransactionTraceWithGasAsNumber = []byte(`
     {
          "gas": 0,
@@ -1303,9 +1200,76 @@ func TestParseEthereumBlockLit(t *testing.T) {
 	}
 }
 
+func TestParseEthereumHeaderWithdrawals(t *testing.T) {
+	tests := []struct {
+		name           string
+		hasWithdrawals bool
+		input          string
+	}{
+		{
+			name:           "headerWithdrawals",
+			hasWithdrawals: true,
+			input: `{
+				"hash": "0x38d41d2096a98d2e1afe42b0cb1eaad33dce00916cbd3443dcb05016f362fb45",
+				"withdrawals": [
+					{
+						"index":"0x1c198",
+						"validatorIndex":"0xc2d0",
+						"address":"0xf97e180c050e5ab072211ad2c213eb5aee4df134",
+						"amount":"0x2ebb0"
+					},
+					{
+						"index":"0x1c199",
+						"validatorIndex":"0xc2d1",
+						"address":"0xf97e180c050e5ab072211ad2c213eb5aee4df134",
+						"amount":"0x2ebb0"
+					 }
+				],
+				"withdrawalsRoot": "0x3dedde670f7fb1c5825b11964c975e496f02e6b2f1917bd09465dba52eb31063"
+			}`,
+		},
+		{
+			name:           "noWithdrawals",
+			hasWithdrawals: false,
+			input: `{
+				"hash": "0x38d41d2096a98d2e1afe42b0cb1eaad33dce00916cbd3443dcb05016f362fb45"
+			}`,
+		},
+		{
+			name:           "emptyWithdrawals",
+			hasWithdrawals: false,
+			input: `{
+				"hash": "0x38d41d2096a98d2e1afe42b0cb1eaad33dce00916cbd3443dcb05016f362fb45",
+				"withdrawals": [],
+				"withdrawalsRoot": ""
+			}`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := testutil.Require(t)
+
+			var block EthereumBlock
+			err := json.Unmarshal([]byte(test.input), &block)
+			require.NoError(err)
+
+			require.Equal("0x38d41d2096a98d2e1afe42b0cb1eaad33dce00916cbd3443dcb05016f362fb45", block.Hash.Value())
+			if test.hasWithdrawals {
+				require.Equal("0x3dedde670f7fb1c5825b11964c975e496f02e6b2f1917bd09465dba52eb31063", block.WithdrawalsRoot.Value())
+				require.Equal(2, len(block.Withdrawals))
+			} else {
+				require.Empty(block.WithdrawalsRoot)
+				require.Equal(0, len(block.Withdrawals))
+			}
+		})
+	}
+}
+
 func TestParseEthereumBlock(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -1567,9 +1531,60 @@ func TestParseEthereumBlock(t *testing.T) {
 	require.Equal(expected.Transactions, actual.Transactions)
 }
 
+func TestParseEthereumBlock_PostShanghai(t *testing.T) {
+	require := testutil.Require(t)
+
+	fixtureHeaderPostShanghai := fixtures.MustReadFile("parser/ethereum/raw_block_header_post_shanghai.json")
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
+
+	block := &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		Metadata:   ethereumMetadata,
+		Blobdata: &api.Block_Ethereum{
+			Ethereum: &api.EthereumBlobdata{
+				Header:              fixtureHeaderPostShanghai,
+				TransactionReceipts: [][]byte{fixtureReceipt},
+				TransactionTraces:   [][]byte{fixtureTraces},
+			},
+		},
+	}
+
+	var expectedHeader api.EthereumHeader
+	err := fixtures.UnmarshalPB("parser/ethereum/native_block_header_post_shanghai.json", &expectedHeader)
+	require.NoError(err)
+
+	var parser Parser
+	app := testapp.New(
+		t,
+		Module,
+		fx.Populate(&parser),
+	)
+	defer app.Close()
+	require.NotNil(parser)
+
+	nativeBlock, err := parser.ParseNativeBlock(context.Background(), block)
+	require.NoError(err)
+	require.Equal(common.Blockchain_BLOCKCHAIN_ETHEREUM, nativeBlock.Blockchain)
+	require.Equal(common.Network_NETWORK_ETHEREUM_MAINNET, nativeBlock.Network)
+	require.Equal(ethereumTag, nativeBlock.Tag)
+	require.Equal(ethereumHash, nativeBlock.Hash)
+	require.Equal(ethereumParentHash, nativeBlock.ParentHash)
+	require.Equal(ethereumHeight, nativeBlock.Height)
+	require.Equal(ethereumParentHeight, nativeBlock.ParentHeight)
+	require.Equal(testutil.MustTimestamp("2020-11-24T16:07:21Z"), nativeBlock.Timestamp)
+	require.Equal(uint64(1), nativeBlock.NumTransactions)
+
+	actual := nativeBlock.GetEthereum()
+	require.NotNil(actual)
+	require.Equal(&expectedHeader, actual.Header)
+}
+
 func TestParseEthereumBlock_LargeEventLogData(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -1741,6 +1756,7 @@ func TestParseEthereumBlock_LargeEventLogData(t *testing.T) {
 func TestParseEthereumBlock_EmptyStatus(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -1976,6 +1992,7 @@ func TestParseEthereumBlock_BlockZero(t *testing.T) {
 func TestParseEthereumBlock_InvalidTransactionReceipt(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -2308,6 +2325,7 @@ func TestParseEthereumBlock_PostLondon_LegacyTransaction(t *testing.T) {
 func TestParseEthereumBlock_FlattenedTraces(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -2448,6 +2466,7 @@ func TestParseEthereumBlock_FlattenedTraces(t *testing.T) {
 func TestParseEthereumBlock_FlattenedTracesWithParentError(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
@@ -2578,6 +2597,8 @@ func TestParseEthereumBlock_LargeGasPrice_Mainnet(t *testing.T) {
 func TestParseEthereumBlock_LargeGasPrice_Testnet(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_GOERLI,

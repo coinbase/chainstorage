@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/coinbase/chainstorage/internal/utils/fixtures"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -59,6 +60,8 @@ var (
 func TestParseBscBlock(t *testing.T) {
 	require := testutil.Require(t)
 
+	fixtureReceipt := fixtures.MustReadFile("parser/ethereum/raw_block_receipt.json")
+	fixtureTraces := fixtures.MustReadFile("parser/ethereum/raw_block_traces.json")
 	block := &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_BSC,
 		Network:    common.Network_NETWORK_BSC_MAINNET,
