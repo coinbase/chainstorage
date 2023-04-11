@@ -43,10 +43,6 @@ func (s *clientTestSuite) SetupTest() {
 	s.gatewayClient = apimocks.NewMockChainStorageClient(s.ctrl)
 	s.downloaderClient = downloadermocks.NewMockBlockDownloader(s.ctrl)
 
-	//var err error
-	//s.config, err = config.New()
-	//s.require.NoError(err)
-
 	s.app = testapp.New(
 		s.T(),
 		Module,
