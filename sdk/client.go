@@ -72,6 +72,10 @@ type (
 
 		// GetChainMetadata returns chain metadata, e.g. LatestEventTag.
 		GetChainMetadata(ctx context.Context, req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error)
+
+		// GetStaticChainMetadata returns the static chain metadata, getting from the Config, instead of querying the ChainStorage server.
+		// This is useful if the caller needs a consistent snapshot of chain metadata during its current lifecycle.
+		GetStaticChainMetadata(ctx context.Context, req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error)
 	}
 
 	ChainEventResult struct {
@@ -387,4 +391,8 @@ func (c *clientImpl) GetChainMetadata(ctx context.Context, req *api.GetChainMeta
 	}
 
 	return resp, nil
+}
+
+func (c *clientImpl) GetStaticChainMetadata(ctx context.Context, req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error) {
+	return c.config.GetChainMetadataHelper(req)
 }

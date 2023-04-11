@@ -942,15 +942,7 @@ func (s *Server) parseChainEventsRequest(ctx context.Context, input parseChainEv
 }
 
 func (s *Server) GetChainMetadata(ctx context.Context, req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error) {
-	return &api.GetChainMetadataResponse{
-		LatestBlockTag:       s.config.GetLatestBlockTag(),
-		StableBlockTag:       s.config.GetStableBlockTag(),
-		LatestEventTag:       s.config.GetLatestEventTag(),
-		StableEventTag:       s.config.GetStableEventTag(),
-		BlockStartHeight:     s.config.Chain.BlockStartHeight,
-		IrreversibleDistance: s.config.Chain.IrreversibleDistance,
-		BlockTime:            s.config.Chain.BlockTime.String(),
-	}, nil
+	return s.config.GetChainMetadataHelper(req)
 }
 
 func (s *Server) GetVersionedChainEvent(ctx context.Context, req *api.GetVersionedChainEventRequest) (*api.GetVersionedChainEventResponse, error) {

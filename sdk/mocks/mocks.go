@@ -155,6 +155,21 @@ func (mr *MockClientMockRecorder) GetLatestBlock(arg0 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestBlock", reflect.TypeOf((*MockClient)(nil).GetLatestBlock), arg0)
 }
 
+// GetStaticChainMetadata mocks base method.
+func (m *MockClient) GetStaticChainMetadata(arg0 context.Context, arg1 *chainstorage.GetChainMetadataRequest) (*chainstorage.GetChainMetadataResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStaticChainMetadata", arg0, arg1)
+	ret0, _ := ret[0].(*chainstorage.GetChainMetadataResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStaticChainMetadata indicates an expected call of GetStaticChainMetadata.
+func (mr *MockClientMockRecorder) GetStaticChainMetadata(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStaticChainMetadata", reflect.TypeOf((*MockClient)(nil).GetStaticChainMetadata), arg0, arg1)
+}
+
 // GetTag mocks base method.
 func (m *MockClient) GetTag() uint32 {
 	m.ctrl.T.Helper()
