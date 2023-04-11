@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
@@ -14,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
+	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	downloadermocks "github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader/mocks"
@@ -60,7 +60,6 @@ func (s *clientTestSuite) SetupTest() {
 		fx.Provide(func() gateway.Client { return s.gatewayClient }),
 		fx.Populate(&s.client),
 	)
-	s.require = testutil.Require(s.T())
 	s.require.NotNil(s.client)
 }
 
