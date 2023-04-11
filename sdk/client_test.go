@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
@@ -41,6 +42,11 @@ func (s *clientTestSuite) SetupTest() {
 	s.streamClient = apimocks.NewMockChainStorage_StreamChainEventsClient(s.ctrl)
 	s.gatewayClient = apimocks.NewMockChainStorageClient(s.ctrl)
 	s.downloaderClient = downloadermocks.NewMockBlockDownloader(s.ctrl)
+
+	//var err error
+	//s.config, err = config.New()
+	//s.require.NoError(err)
+
 	s.app = testapp.New(
 		s.T(),
 		Module,
@@ -567,4 +573,24 @@ func (s *clientTestSuite) TestGetChainMetadata() {
 	s.require.Equal(uint64(11_000_000), resp.BlockStartHeight)
 	s.require.Equal(uint64(30), resp.IrreversibleDistance)
 	s.require.Equal("13s", resp.BlockTime)
+}
+
+func (s *clientTestSuite) TestGetStaticChainMetadata() {
+	s.app.Config().Chain.BlockTag.Latest = 1
+	s.app.Config().Chain.BlockTag.Stable = 2
+	s.app.Config().Chain.EventTag.Latest = 3
+	s.app.Config().Chain.EventTag.Stable = 4
+	s.app.Config().Chain.BlockStartHeight = 100
+	s.app.Config().Chain.IrreversibleDistance = 10
+	s.app.Config().Chain.BlockTime = 3 * time.Second
+
+	resp, err := s.client.GetStaticChainMetadata(context.Background(), &api.GetChainMetadataRequest{})
+	s.require.NoError(err)
+	s.require.Equal(uint32(1), resp.LatestBlockTag)
+	s.require.Equal(uint32(2), resp.StableBlockTag)
+	s.require.Equal(uint32(3), resp.LatestEventTag)
+	s.require.Equal(uint32(4), resp.StableEventTag)
+	s.require.Equal(uint64(100), resp.BlockStartHeight)
+	s.require.Equal(uint64(10), resp.IrreversibleDistance)
+	s.require.Equal("3s", resp.BlockTime)
 }

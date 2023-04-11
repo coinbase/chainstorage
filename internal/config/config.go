@@ -589,6 +589,18 @@ func (c *Config) GetEffectiveEventTag(eventTag uint32) uint32 {
 	return c.Chain.EventTag.GetEffectiveEventTag(eventTag)
 }
 
+func (c *Config) GetChainMetadataHelper(req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error) {
+	return &api.GetChainMetadataResponse{
+		LatestBlockTag:       c.GetLatestBlockTag(),
+		StableBlockTag:       c.GetStableBlockTag(),
+		LatestEventTag:       c.GetLatestEventTag(),
+		StableEventTag:       c.GetStableEventTag(),
+		BlockStartHeight:     c.Chain.BlockStartHeight,
+		IrreversibleDistance: c.Chain.IrreversibleDistance,
+		BlockTime:            c.Chain.BlockTime.String(),
+	}, nil
+}
+
 func WithNamespace(namespace string) ConfigOption {
 	return func(opts *configOptions) {
 		opts.Namespace = namespace
