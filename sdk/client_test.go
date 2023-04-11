@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
@@ -30,6 +31,7 @@ type clientTestSuite struct {
 	gatewayClient    *apimocks.MockChainStorageClient
 	downloaderClient *downloadermocks.MockBlockDownloader
 	client           Client
+	config           *config.Config
 	require          *testutil.Assertions
 }
 
@@ -39,14 +41,21 @@ func TestClientTestSuite(t *testing.T) {
 
 func (s *clientTestSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
+	s.require = testutil.Require(s.T())
+
 	s.streamClient = apimocks.NewMockChainStorage_StreamChainEventsClient(s.ctrl)
 	s.gatewayClient = apimocks.NewMockChainStorageClient(s.ctrl)
 	s.downloaderClient = downloadermocks.NewMockBlockDownloader(s.ctrl)
+
+	var err error
+	s.config, err = config.New()
+	s.require.NoError(err)
 
 	s.app = testapp.New(
 		s.T(),
 		Module,
 		parser.Module,
+		testapp.WithConfig(s.config),
 		fx.Provide(func() downloader.BlockDownloader { return s.downloaderClient }),
 		fx.Provide(func() gateway.Client { return s.gatewayClient }),
 		fx.Populate(&s.client),
@@ -572,13 +581,13 @@ func (s *clientTestSuite) TestGetChainMetadata() {
 }
 
 func (s *clientTestSuite) TestGetStaticChainMetadata() {
-	s.app.Config().Chain.BlockTag.Latest = 1
-	s.app.Config().Chain.BlockTag.Stable = 2
-	s.app.Config().Chain.EventTag.Latest = 3
-	s.app.Config().Chain.EventTag.Stable = 4
-	s.app.Config().Chain.BlockStartHeight = 100
-	s.app.Config().Chain.IrreversibleDistance = 10
-	s.app.Config().Chain.BlockTime = 3 * time.Second
+	s.config.Chain.BlockTag.Latest = 1
+	s.config.Chain.BlockTag.Stable = 2
+	s.config.Chain.EventTag.Latest = 3
+	s.config.Chain.EventTag.Stable = 4
+	s.config.Chain.BlockStartHeight = 100
+	s.config.Chain.IrreversibleDistance = 10
+	s.config.Chain.BlockTime = 3 * time.Second
 
 	resp, err := s.client.GetStaticChainMetadata(context.Background(), &api.GetChainMetadataRequest{})
 	s.require.NoError(err)
