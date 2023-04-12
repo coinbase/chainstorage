@@ -28,6 +28,7 @@ type (
 	EthereumHexString   string
 	EthereumQuantity    uint64
 	EthereumBigQuantity big.Int
+	EthereumBigFloat    big.Float
 
 	EthereumBlock struct {
 		Hash             EthereumHexString      `json:"hash" validate:"required"`
@@ -123,21 +124,26 @@ type (
 	}
 
 	EthereumTransactionReceipt struct {
-		TransactionHash   EthereumHexString   `json:"transactionHash"`
-		TransactionIndex  EthereumQuantity    `json:"transactionIndex"`
-		BlockHash         EthereumHexString   `json:"blockHash"`
-		BlockNumber       EthereumQuantity    `json:"blockNumber"`
-		From              EthereumHexString   `json:"from"`
-		To                EthereumHexString   `json:"to"`
-		CumulativeGasUsed EthereumQuantity    `json:"cumulativeGasUsed"`
-		GasUsed           EthereumQuantity    `json:"gasUsed"`
-		ContractAddress   EthereumHexString   `json:"contractAddress"`
-		Logs              []*EthereumEventLog `json:"logs"`
-		LogsBloom         EthereumHexString   `json:"logsBloom"`
-		Root              EthereumHexString   `json:"root"`
-		Status            *EthereumQuantity   `json:"status"`
-		Type              EthereumQuantity    `json:"type"`
-		EffectiveGasPrice *EthereumQuantity   `json:"effectiveGasPrice"`
+		TransactionHash   EthereumHexString    `json:"transactionHash"`
+		TransactionIndex  EthereumQuantity     `json:"transactionIndex"`
+		BlockHash         EthereumHexString    `json:"blockHash"`
+		BlockNumber       EthereumQuantity     `json:"blockNumber"`
+		From              EthereumHexString    `json:"from"`
+		To                EthereumHexString    `json:"to"`
+		CumulativeGasUsed EthereumQuantity     `json:"cumulativeGasUsed"`
+		GasUsed           EthereumQuantity     `json:"gasUsed"`
+		ContractAddress   EthereumHexString    `json:"contractAddress"`
+		Logs              []*EthereumEventLog  `json:"logs"`
+		LogsBloom         EthereumHexString    `json:"logsBloom"`
+		Root              EthereumHexString    `json:"root"`
+		Status            *EthereumQuantity    `json:"status"`
+		Type              EthereumQuantity     `json:"type"`
+		EffectiveGasPrice *EthereumQuantity    `json:"effectiveGasPrice"`
+		GasUsedForL1      *EthereumQuantity    `json:"gasUsedForL1"` // For Arbitrum network https://github.com/OffchainLabs/arbitrum/blob/6ca0d163417470b9d2f7eea930c3ad71d702c0b2/packages/arb-evm/evm/result.go#L336
+		L1GasUsed         *EthereumBigQuantity `json:"l1GasUsed"`    // For Optimism and Base networks https://github.com/ethereum-optimism/optimism/blob/3c3e1a88b234a68bcd59be0c123d9f3cc152a91e/l2geth/core/types/receipt.go#L73
+		L1GasPrice        *EthereumBigQuantity `json:"l1GasPrice"`   //
+		L1Fee             *EthereumBigQuantity `json:"l1Fee"`        //
+		L1FeeScaler       *EthereumBigFloat    `json:"l1FeeScalar"`  //
 	}
 
 	EthereumTransactionReceiptLit struct {
@@ -344,6 +350,38 @@ func (v EthereumBigQuantity) Uint64() (uint64, error) {
 		return 0, xerrors.Errorf("failed to parse EthereumBigQuantity to uint64 %v", v.Value())
 	}
 	return i.Uint64(), nil
+}
+
+func (v EthereumBigFloat) MarshalJSON() ([]byte, error) {
+	bf := big.Float(v)
+	s := fmt.Sprintf(`"%s"`, bf.String())
+	return []byte(s), nil
+}
+
+func (v *EthereumBigFloat) UnmarshalJSON(input []byte) error {
+	var s string
+	if err := json.Unmarshal(input, &s); err != nil {
+		return xerrors.Errorf("failed to unmarshal EthereumBigFloat: %w", err)
+	}
+
+	if s == "" {
+		*v = EthereumBigFloat{}
+		return nil
+	}
+
+	scalar := new(big.Float)
+	scalar, ok := scalar.SetString(s)
+	if !ok {
+		return xerrors.Errorf("cannot parse EthereumBigFloat")
+	}
+
+	*v = EthereumBigFloat(*scalar)
+	return nil
+}
+
+func (v EthereumBigFloat) Value() string {
+	f := big.Float(v)
+	return f.String()
 }
 
 func (v *EthereumTransactionLit) UnmarshalJSON(input []byte) error {
@@ -710,6 +748,53 @@ func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.Ethere
 		if receipt.Status != nil {
 			receipts[i].OptionalStatus = &api.EthereumTransactionReceipt_Status{
 				Status: receipt.Status.Value(),
+			}
+		}
+
+		if receipt.L1GasUsed != nil {
+			l1GasUsed, err := receipt.L1GasUsed.Uint64()
+			if err != nil {
+				return nil, xerrors.Errorf("failed to parse receipt L1GasUsed to uint64 %v", receipt.L1GasUsed.Value())
+			}
+
+			feeScalar := ""
+			if receipt.L1FeeScaler != nil && receipt.L1FeeScaler.Value() != "0" {
+				feeScalar = receipt.L1FeeScaler.Value()
+			}
+
+			optionalL1FeeInfo := &api.EthereumTransactionReceipt_L1FeeInfo_{
+				L1FeeInfo: &api.EthereumTransactionReceipt_L1FeeInfo{
+					L1GasUsed:   l1GasUsed,
+					L1FeeScalar: feeScalar,
+				},
+			}
+			receipts[i].OptionalL1FeeInfo = optionalL1FeeInfo
+
+			if receipt.L1GasPrice != nil {
+				l1GasPrice, err := receipt.L1GasPrice.Uint64()
+				if err != nil {
+					return nil, xerrors.Errorf("failed to parse receipt L1GasPrice to uint64 %v", receipt.L1GasPrice.Value())
+				}
+
+				optionalL1FeeInfo.L1FeeInfo.L1GasPrice = l1GasPrice
+			}
+
+			if receipt.L1Fee != nil {
+				l1Fee, err := receipt.L1Fee.Uint64()
+				if err != nil {
+					return nil, xerrors.Errorf("failed to parse receipt L1Fee to uint64 %v", receipt.L1Fee.Value())
+				}
+
+				optionalL1FeeInfo.L1FeeInfo.L1Fee = l1Fee
+			}
+
+		}
+
+		if receipt.GasUsedForL1 != nil {
+			receipts[i].OptionalL1FeeInfo = &api.EthereumTransactionReceipt_L1FeeInfo_{
+				L1FeeInfo: &api.EthereumTransactionReceipt_L1FeeInfo{
+					L1GasUsed: receipt.GasUsedForL1.Value(),
+				},
 			}
 		}
 

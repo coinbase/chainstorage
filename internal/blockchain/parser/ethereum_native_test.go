@@ -90,6 +90,104 @@ var (
         "transactionsRoot": "0x8fcfe4d75266508496020675b9c3acfdf0074bf2d177c6366b40f669306310db"
 	}`)
 
+	fixtureHeaderOptimism = []byte(`
+	{
+	    "difficulty": "0x2",
+		"extraData": "0xd98301090a846765746889676f312e31352e3133856c696e75780000000000009c3827892825f0825a7e329b6913b84c9e4f89168350aff0939e0e6609629f2e7f07f2aeb62acbf4b16a739cab68866f4880ea406583a4b28a59d4f55dc2314e00",
+	  	"gasLimit": "0xe4e1c0",
+	  	"gasUsed": "0x3183d",
+	  	"hash": "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+	  	"logsBloom": "0x00000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000400000000000100000000000000200000000002000000000000001000000000000000000004000000000000000000000000000040000400000100400000000000000100000000000000000000000000000020000000000000000000000000000000000000000000000001000000000000000000000100000000000000000000000000000000000000000000000000000000000000088000000080000000000010000000000000000000000000000800008000120000000000000000000000000000000002000",
+	  	"miner": "0x0000000000000000000000000000000000000000",
+	  	"mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+	  	"nonce": "0x0000000000000000",
+	  	"number": "0x1",
+	  	"parentHash": "0x7ca38a1916c42007829c55e69d3e9a73265554b586a499015373241b8a3fa48b",
+	  	"receiptsRoot": "0xf4c97b1186b690ad3318f907c0cdaf46f4598f27f711a5609064b2690a767287",
+	  	"sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+	  	"size": "0x30c",
+	  	"stateRoot": "0xd3ac40854cd2ac17d8effeae6065cea990b04be714f7061544973feeb2f1c95f",
+	  	"timestamp": "0x618d8837",
+	  	"totalDifficulty": "0x3",
+	  	"transactions": [
+			{
+			    "blockHash": "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+			  	"blockNumber": "0x1",
+			  	"from": "0x70b17c0fe982ab4a7ac17a4c25485643151a1f2d",
+			  	"gas": "0x7a120",
+			  	"gasPrice": "0x1",
+			  	"hash": "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+			  	"input": "0x202ee0ed000000000000000000000000000000000000000000000000000000000001421800000000000000000000000000000000000000000000000000000000d0e3ebf0",
+			  	"nonce": "0x28972",
+			  	"to": "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+			  	"transactionIndex": "0x0",
+			 	 "value": "0x0",
+			  	"v": "0x38",
+			  	"r": "0xc878d22e771004beb73e7a4268fd4f447735812b94b217f6807412efcec90d61",
+			  	"s": "0x3588018735fb361c49e5de54b266b8b157c1ba3d6ee08e3bcbdee7cd725c16e8",
+			  	"queueOrigin": "sequencer",
+			  	"l1TxOrigin": null,
+			  	"l1BlockNumber": "0xcf7a45",
+			  	"l1Timestamp": "0x618d8837",
+			  	"index": "0x0",
+			  	"queueIndex": null,
+			  	"rawTransaction": "0xf8a883028972018307a120948ce8c13d816fe6daf12d6fd9e4952e1fc88850af80b844202ee0ed000000000000000000000000000000000000000000000000000000000001421800000000000000000000000000000000000000000000000000000000d0e3ebf038a0c878d22e771004beb73e7a4268fd4f447735812b94b217f6807412efcec90d61a03588018735fb361c49e5de54b266b8b157c1ba3d6ee08e3bcbdee7cd725c16e8"
+			}
+	  	],
+	  	"transactionsRoot": "0x19f5efd0d94386e72fcb3f296f1cb2936d017c37487982f76f09c591129f561f",
+	  	"uncles": []
+	}`)
+
+	fixtureHeaderArbitrum = []byte(`
+	{
+   		"baseFeePerGas":"0x5f5e100",
+   		"difficulty":"0x1",
+        "extraData":"0xc9e8ac1498b67eb1b6146d45200732408801569883d2dc824902c280b00a0542",
+   		"gasLimit":"0x4000000000000",
+   		"gasUsed":"0x6b90f",
+   		"hash":"0x550e1099d4049e048f12c4bb6b19292bf9c6cc15f0f384003b318b9b3258b519",
+   		"l1BlockNumber":"0xfd6304",
+   		"logsBloom":"0x00040000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080200000000000000000000000100020000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000",
+   		"miner":"0xa4b000000000000000000073657175656e636572",
+   		"mixHash":"0x000000000000b08a0000000000fd6304000000000000000a0000000000000000",
+   		"nonce":"0x000000000007483f",
+   		"number":"0x3938700",
+   		"parentHash":"0x0e0045e45209dc804d0d94638cb5894884bce84c007c1119cab2123c3ca497b1",
+   		"receiptsRoot":"0x0fd071fc5a20b101c0840b2ca6b05eaf35f6c1c327aaf2f55d73d1069fd830fd",
+   		"sendCount":"0xb08a",
+   		"sendRoot":"0xc9e8ac1498b67eb1b6146d45200732408801569883d2dc824902c280b00a0542",
+   		"sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+   		"size":"0x3d5",
+   		"stateRoot":"0x85757572d117f7139e90f8c0832e93cc8a176ab7aa823892af7cf8f09047de0b",
+   		"timestamp":"0x63e79ea6",
+   		"totalDifficulty":"0x240a9b8",
+   		"transactions":[
+      		{
+				"blockHash":"0x550e1099d4049e048f12c4bb6b19292bf9c6cc15f0f384003b318b9b3258b519",
+				"blockNumber":"0x3938700",	
+				"from":"0x23be9230b9f470b94a0a5952dd40f9ef6b67344c",
+         		"gas":"0x8db3c",
+         		"gasPrice":"0x5f5e100",
+         		"maxFeePerGas":"0x5f5e100",
+         		"maxPriorityFeePerGas":"0x5f5e100",
+         		"hash":"0x299e5d56538897f3c4906844a7ead0d1d17362a963010624f5dc6f13c5953225",
+         		"input":"0xa397ea540000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000155ee13fb4b72a6cf027b45bb6c000000000000000000000000000000000000004b0bfb49c90c0b0f999e500000000000000000000000000000000000000000000000000000000000000000000000",
+         		"nonce":"0x3c",
+         		"to":"0x09f77e8a13de9a35a7231028187e9fd5db8a2acb",
+         		"transactionIndex":"0x1",
+         		"value":"0x0",
+         		"type":"0x2",
+         		"accessList":[],
+         		"chainId":"0xa4b1",
+         		"v":"0x1",
+         		"r":"0x3d971af90fe50a748a8b962706e6b0348664f738146cd1fb3cb635fad28996c1",
+         		"s":"0x6ce0cf2da788587ac430bab10d61561c1810bfdf14622ae98b7cee9b3bf3ac30"
+      		}
+   		],
+   		"transactionsRoot":"0x2fc880b4a7c8bcc23c06221cda9c6dcf19ecb5c60472b7cef7af6729833b9997",
+   		"uncles":[]
+	}`)
+
 	fixtureHeaderProofOfStake = []byte(`
 	{
 		"difficulty": "0x0",
@@ -248,6 +346,107 @@ var (
 		],
 		"transactionsRoot": "0xa51bb99d8781b463f59eee11c403a7a03ecc0154a52745ade4faec521fa9cb7d",
     	"uncles": []
+	}`)
+
+	fixtureReceiptOptimism = []byte(`
+	{
+	    "blockHash": "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+	    "blockNumber": "0x1",
+	    "contractAddress": null,
+	    "cumulativeGasUsed": "0x3183d",
+	  	"from": "0x70b17c0fe982ab4a7ac17a4c25485643151a1f2d",
+	  	"gasUsed": "0x3183d",
+	  	"l1Fee": "0x1c23",
+	  	"l1FeeScalar": "1.5",
+	  	"l1GasPrice": "0x1",
+	  	"l1GasUsed": "0x12c2",
+	  	"logs": [
+			{
+		  		"address": "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+		  		"topics": [
+					"0x0109fc6f55cf40689f02fbaad7af7fe7bbac8a3d2186600afc7d3e10cac60271",
+					"0x0000000000000000000000000000000000000000000000000000000000014218",
+					"0x00000000000000000000000070b17c0fe982ab4a7ac17a4c25485643151a1f2d"
+		  		],
+		  		"data": "0x00000000000000000000000000000000000000000000000000000000618d8837",
+		  		"blockNumber": "0x1",
+		  		"transactionHash": "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+		  		"transactionIndex": "0x0",
+		  		"blockHash": "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+		  		"logIndex": "0x0",
+		  		"removed": false
+			},
+			{
+			  	"address": "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+			  	"topics": [
+					"0x92e98423f8adac6e64d0608e519fd1cefb861498385c6dee70d58fc926ddc68c",
+					"0x00000000000000000000000000000000000000000000000000000000d0e3ebf0",
+					"0x0000000000000000000000000000000000000000000000000000000000014218",
+					"0x00000000000000000000000070b17c0fe982ab4a7ac17a4c25485643151a1f2d"
+			  	],
+			  	"data": "0x",
+			  	"blockNumber": "0x1",
+			  	"transactionHash": "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+			  	"transactionIndex": "0x0",
+			  	"blockHash": "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+			  	"logIndex": "0x1",
+			  	"removed": false
+			},
+			{
+		  		"address": "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+		  		"topics": [
+					"0xfe25c73e3b9089fac37d55c4c7efcba6f04af04cebd2fc4d6d7dbb07e1e5234f",
+					"0x00000000000000000000000000000000000000000000007edc6ca0bb68348000"
+		 		 ],
+		  		"data": "0x",
+		  		"blockNumber": "0x1",
+		  		"transactionHash": "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+		  		"transactionIndex": "0x0",
+		  		"blockHash": "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+		  		"logIndex": "0x2",
+		  		"removed": false
+			}
+	  	],
+	  	"logsBloom": "0x00000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000400000000000100000000000000200000000002000000000000001000000000000000000004000000000000000000000000000040000400000100400000000000000100000000000000000000000000000020000000000000000000000000000000000000000000000001000000000000000000000100000000000000000000000000000000000000000000000000000000000000088000000080000000000010000000000000000000000000000800008000120000000000000000000000000000000002000",
+	  	"status": "0x1",
+	  	"to": "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+	  	"transactionHash": "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+	  	"transactionIndex": "0x0"
+	}`)
+
+	fixtureReceiptArbitrum = []byte(`
+	{
+   		"blockHash":"0x550e1099d4049e048f12c4bb6b19292bf9c6cc15f0f384003b318b9b3258b519",
+   		"blockNumber":"0x3938700",
+   		"contractAddress":null,
+   		"cumulativeGasUsed":"0x6b90f",
+   		"effectiveGasPrice":"0x5f5e100",
+   		"from":"0x23be9230b9f470b94a0a5952dd40f9ef6b67344c",
+   		"gasUsed":"0x6b90f",
+   		"gasUsedForL1":"0x5fa8f",
+   		"l1BlockNumber":"0xfd6304",
+   		"logs":[
+      		{
+         		"address":"0x09f77e8a13de9a35a7231028187e9fd5db8a2acb",
+         		"topics":[
+            		"0x75781255bc71c83f89f29e5a2599f2c174a562d2cd8f2e818a47f132e7280498",
+            		"0x00000000000000000000000023be9230b9f470b94a0a5952dd40f9ef6b67344c"
+         		],
+         		"data":"0x0000000000000000000000000000000000000000000000000000000000000006000000000000000000000000ff970a61a04b1ca14834a43f5de4533ebddb5cc8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000082af49447d8a07e3bd95bd0d56f35241523fbab100000000000000000000000000000000000155ee13fb4b72a6cf027b45bb6c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004b0bfb49c90c0b0f999e500000000000000000000000000000000000000000000000000000000000000000000000",
+         		"blockNumber":"0x3938700",
+         		"transactionHash":"0x299e5d56538897f3c4906844a7ead0d1d17362a963010624f5dc6f13c5953225",
+         		"transactionIndex":"0x1",
+         		"blockHash":"0x550e1099d4049e048f12c4bb6b19292bf9c6cc15f0f384003b318b9b3258b519",
+         		"logIndex":"0x0",
+         		"removed":false
+      		}
+   		],
+   		"logsBloom":"0x00040000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080200000000000000000000000100020000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000",
+   		"status":"0x1",
+   		"to":"0x09f77e8a13de9a35a7231028187e9fd5db8a2acb",
+   		"transactionHash":"0x299e5d56538897f3c4906844a7ead0d1d17362a963010624f5dc6f13c5953225",
+   		"transactionIndex":"0x1",
+   		"type":"0x2"
 	}`)
 
 	fixtureLargeLogDataReceipt = []byte(`
@@ -567,6 +766,68 @@ var (
 				"value": "0x1"
 			}
 		]
+	}`)
+
+	fixtureTracesOptimism = []byte(`{
+		"type":"CALL",
+		"from":"0x70b17c0fe982ab4a7ac17a4c25485643151a1f2d",
+		"to":"0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+		"value":"0x0",
+		"gas":"0x74d84",
+		"gasUsed":"0x2c4a1",
+		"input":"0x202ee0ed000000000000000000000000000000000000000000000000000000000001421800000000000000000000000000000000000000000000000000000000d0e3ebf0",
+		"output":"0x",
+		"time":"18.589746ms",
+		"calls":[
+	   		{
+		  		"type":"DELEGATECALL",
+		  		"from":"0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+		  		"to":"0x971dc14055cbc313a536f9ffd048e07530bd75df",
+		  		"gas":"0x71b1d",
+		  		"gasUsed":"0x2aef3",
+		  		"input":"0x202ee0ed000000000000000000000000000000000000000000000000000000000001421800000000000000000000000000000000000000000000000000000000d0e3ebf0",
+		  		"output":"0x"
+	   		}
+		]
+ 	}`)
+
+	fixtureTracesArbitrum = []byte(`{
+   		"beforeEVMTransfers":[
+      		{
+        		 "purpose":"feePayment",
+         		"from":"0x23bE9230B9F470B94A0a5952DD40f9Ef6B67344c",
+         		"to":null,
+         		"value":"0x34c9c51bbc00"
+      		}
+   		],
+   		"afterEVMTransfers":[
+     		 {
+         		"purpose":"gasRefund",
+         		"from":null,
+        		 "to":"0x23bE9230B9F470B94A0a5952DD40f9Ef6B67344c",
+         		"value":"0xcb7761a8d00"
+      		},
+      		{
+        		 "purpose":"feeCollection",
+         		"from":null,
+         		"to":"0xD345e41aE2cb00311956aA7109fC801Ae8c81a52",
+         		"value":"0x46f77ee8000"
+      		},
+      		{
+         		"purpose":"feeCollection",
+         		"from":null,
+         		"to":"0xa4B00000000000000000000000000000000000F6",
+         		"value":"0x23a2d712af00"
+      		}
+   		],
+   		"type":"CALL",
+   		"from":"0x23be9230b9f470b94a0a5952dd40f9ef6b67344c",
+   		"to":"0x09f77e8a13de9a35a7231028187e9fd5db8a2acb",
+   		"value":"0x0",
+   		"gas":"0x28aad",
+   		"gasUsed":"0x7370",
+   		"input":"0xa397ea540000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000155ee13fb4b72a6cf027b45bb6c000000000000000000000000000000000000004b0bfb49c90c0b0f999e500000000000000000000000000000000000000000000000000000000000000000000000",
+   		"output":"0x"
 	}`)
 
 	fixtureInvalidHeader = []byte(`
@@ -1112,6 +1373,79 @@ func TestParseEthereumBigQuantity_InvalidInput(t *testing.T) {
 			var envelope Envelope
 			err := json.Unmarshal([]byte(data), &envelope)
 			require.Error(err, envelope.Gas.Value())
+		})
+	}
+}
+
+func TestMarshalEthereumBigFloat(t *testing.T) {
+	require := testutil.Require(t)
+	type Envelope struct {
+		L1FeeScalar EthereumBigFloat `json:"l1FeeScalar"`
+	}
+
+	envelope := Envelope{
+		L1FeeScalar: EthereumBigFloat(*big.NewFloat(1.23)),
+	}
+	data, err := json.Marshal(envelope)
+	require.NoError(err)
+	require.Equal(`{"l1FeeScalar":"1.23"}`, string(data))
+}
+
+func TestParseEthereumBigFloat(t *testing.T) {
+	type Envelope struct {
+		L1FeeScalar EthereumBigFloat `json:"l1FeeScalar"`
+	}
+
+	tests := []struct {
+		name          string
+		expected      string
+		input         string
+		expectedError bool
+	}{
+		{
+			name:     "happy",
+			expected: "1.234",
+			input:    "1.234",
+		},
+		{
+			name:     "happyNegative",
+			expected: "-1.234",
+			input:    "-1.234",
+		},
+		{
+			name:     "empty",
+			expected: "0",
+			input:    "",
+		},
+		{
+			name:     "zero",
+			expected: "0",
+			input:    "0",
+		},
+		{
+			name:     "losePrecision",
+			expected: "1.23456789",
+			input:    "1.2345678901234567890",
+		},
+		{
+			name:          "notFloat",
+			input:         `"abc"`,
+			expectedError: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := testutil.Require(t)
+
+			data := fmt.Sprintf(`{"l1FeeScalar": "%v"}`, test.input)
+			var envelope Envelope
+			err := json.Unmarshal([]byte(data), &envelope)
+			if test.expectedError {
+				require.Error(err, envelope.L1FeeScalar.Value())
+			} else {
+				require.NoError(err)
+				require.Equal(test.expected, envelope.L1FeeScalar.Value())
+			}
 		})
 	}
 }
@@ -2627,4 +2961,199 @@ func TestParseEthereumBlock_LargeGasPrice_Testnet(t *testing.T) {
 	require.NotNil(native.GetEthereum())
 	require.Equal(native.Network, common.Network_NETWORK_ETHEREUM_GOERLI)
 	require.Equal(native.GetEthereum().Transactions[0].GetGasPrice(), uint64(math.MaxUint64))
+}
+
+func TestParseOptimismBlock(t *testing.T) {
+	require := testutil.Require(t)
+
+	block := &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_OPTIMISM,
+		Network:    common.Network_NETWORK_OPTIMISM_MAINNET,
+		Metadata:   ethereumMetadata,
+		Blobdata: &api.Block_Ethereum{
+			Ethereum: &api.EthereumBlobdata{
+				Header:              fixtureHeaderOptimism,
+				TransactionReceipts: [][]byte{fixtureReceiptOptimism},
+				TransactionTraces:   [][]byte{fixtureTracesOptimism},
+			},
+		},
+	}
+
+	expectedReceipts := []*api.EthereumTransactionReceipt{
+		{
+			TransactionHash:   "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+			TransactionIndex:  0x0,
+			BlockHash:         "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+			BlockNumber:       0x1,
+			From:              "0x70b17c0fe982ab4a7ac17a4c25485643151a1f2d",
+			To:                "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+			CumulativeGasUsed: 0x3183d,
+			GasUsed:           0x3183d,
+			Logs: []*api.EthereumEventLog{
+				{
+					Removed:          false,
+					LogIndex:         0x0,
+					TransactionHash:  "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+					TransactionIndex: 0x0,
+					BlockHash:        "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+					BlockNumber:      0x1,
+					Address:          "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+					Data:             "0x00000000000000000000000000000000000000000000000000000000618d8837",
+					Topics: []string{
+						"0x0109fc6f55cf40689f02fbaad7af7fe7bbac8a3d2186600afc7d3e10cac60271",
+						"0x0000000000000000000000000000000000000000000000000000000000014218",
+						"0x00000000000000000000000070b17c0fe982ab4a7ac17a4c25485643151a1f2d",
+					},
+				},
+
+				{
+					Removed:          false,
+					LogIndex:         0x1,
+					TransactionHash:  "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+					TransactionIndex: 0x0,
+					BlockHash:        "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+					BlockNumber:      0x1,
+					Address:          "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+					Data:             "0x",
+					Topics: []string{
+						"0x92e98423f8adac6e64d0608e519fd1cefb861498385c6dee70d58fc926ddc68c",
+						"0x00000000000000000000000000000000000000000000000000000000d0e3ebf0",
+						"0x0000000000000000000000000000000000000000000000000000000000014218",
+						"0x00000000000000000000000070b17c0fe982ab4a7ac17a4c25485643151a1f2d",
+					},
+				},
+
+				{
+					Removed:          false,
+					LogIndex:         0x2,
+					TransactionHash:  "0x5e77a04531c7c107af1882d76cbff9486d0a9aa53701c30888509d4f5f2b003a",
+					TransactionIndex: 0x0,
+					BlockHash:        "0xbee7192e575af30420cae0c7776304ac196077ee72b048970549e4f08e875453",
+					BlockNumber:      0x1,
+					Address:          "0x8ce8c13d816fe6daf12d6fd9e4952e1fc88850af",
+					Data:             "0x",
+					Topics: []string{
+						"0xfe25c73e3b9089fac37d55c4c7efcba6f04af04cebd2fc4d6d7dbb07e1e5234f",
+						"0x00000000000000000000000000000000000000000000007edc6ca0bb68348000",
+					},
+				},
+			},
+			LogsBloom: "0x00000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000400000000000100000000000000200000000002000000000000001000000000000000000004000000000000000000000000000040000400000100400000000000000100000000000000000000000000000020000000000000000000000000000000000000000000000001000000000000000000000100000000000000000000000000000000000000000000000000000000000000088000000080000000000010000000000000000000000000000800008000120000000000000000000000000000000002000",
+			OptionalStatus: &api.EthereumTransactionReceipt_Status{
+				Status: 1,
+			},
+			EffectiveGasPrice: 0x1,
+			OptionalL1FeeInfo: &api.EthereumTransactionReceipt_L1FeeInfo_{
+				L1FeeInfo: &api.EthereumTransactionReceipt_L1FeeInfo{
+					L1GasPrice:  0x1,
+					L1GasUsed:   0x12c2,
+					L1Fee:       0x1c23,
+					L1FeeScalar: "1.5",
+				},
+			},
+		},
+	}
+
+	var parser Parser
+	app := testapp.New(
+		t,
+		Module,
+		fx.Populate(&parser),
+	)
+	defer app.Close()
+	require.NotNil(parser)
+
+	nativeBlock, err := parser.ParseNativeBlock(context.Background(), block)
+	require.NoError(err)
+	require.Equal(common.Blockchain_BLOCKCHAIN_OPTIMISM, nativeBlock.Blockchain)
+	require.Equal(common.Network_NETWORK_OPTIMISM_MAINNET, nativeBlock.Network)
+
+	actual := nativeBlock.GetEthereum()
+	require.NotNil(actual)
+
+	require.Equal(len(expectedReceipts), len(actual.Transactions))
+	for i, expectedReceipt := range expectedReceipts {
+		require.Equal(expectedReceipt, actual.Transactions[i].Receipt)
+	}
+}
+
+func TestParseArbitrumBlock(t *testing.T) {
+	require := testutil.Require(t)
+
+	block := &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ARBITRUM,
+		Network:    common.Network_NETWORK_ARBITRUM_MAINNET,
+		Metadata:   ethereumMetadata,
+		Blobdata: &api.Block_Ethereum{
+			Ethereum: &api.EthereumBlobdata{
+				Header:              fixtureHeaderArbitrum,
+				TransactionReceipts: [][]byte{fixtureReceiptArbitrum},
+				TransactionTraces:   [][]byte{fixtureTracesArbitrum},
+			},
+		},
+	}
+
+	expectedReceipts := []*api.EthereumTransactionReceipt{
+		{
+			TransactionHash:   "0x299e5d56538897f3c4906844a7ead0d1d17362a963010624f5dc6f13c5953225",
+			TransactionIndex:  0x1,
+			BlockHash:         "0x550e1099d4049e048f12c4bb6b19292bf9c6cc15f0f384003b318b9b3258b519",
+			BlockNumber:       0x3938700,
+			From:              "0x23be9230b9f470b94a0a5952dd40f9ef6b67344c",
+			To:                "0x09f77e8a13de9a35a7231028187e9fd5db8a2acb",
+			CumulativeGasUsed: 0x6b90f,
+			GasUsed:           0x6b90f,
+			Type:              0x2,
+			Logs: []*api.EthereumEventLog{
+				{
+					Removed:          false,
+					LogIndex:         0x0,
+					TransactionHash:  "0x299e5d56538897f3c4906844a7ead0d1d17362a963010624f5dc6f13c5953225",
+					TransactionIndex: 0x1,
+					BlockHash:        "0x550e1099d4049e048f12c4bb6b19292bf9c6cc15f0f384003b318b9b3258b519",
+					BlockNumber:      0x3938700,
+					Address:          "0x09f77e8a13de9a35a7231028187e9fd5db8a2acb",
+					Data:             "0x0000000000000000000000000000000000000000000000000000000000000006000000000000000000000000ff970a61a04b1ca14834a43f5de4533ebddb5cc8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000082af49447d8a07e3bd95bd0d56f35241523fbab100000000000000000000000000000000000155ee13fb4b72a6cf027b45bb6c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004b0bfb49c90c0b0f999e500000000000000000000000000000000000000000000000000000000000000000000000",
+					Topics: []string{
+						"0x75781255bc71c83f89f29e5a2599f2c174a562d2cd8f2e818a47f132e7280498",
+						"0x00000000000000000000000023be9230b9f470b94a0a5952dd40f9ef6b67344c",
+					},
+				},
+			},
+			LogsBloom: "0x00040000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080200000000000000000000000100020000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000",
+			OptionalStatus: &api.EthereumTransactionReceipt_Status{
+				Status: 1,
+			},
+			EffectiveGasPrice: 0x5f5e100,
+			OptionalL1FeeInfo: &api.EthereumTransactionReceipt_L1FeeInfo_{
+				L1FeeInfo: &api.EthereumTransactionReceipt_L1FeeInfo{
+					L1GasPrice: 0,
+					L1GasUsed:  0x5fa8f,
+					L1Fee:      0,
+				},
+			},
+		},
+	}
+
+	var parser Parser
+	app := testapp.New(
+		t,
+		Module,
+		fx.Populate(&parser),
+	)
+	defer app.Close()
+	require.NotNil(parser)
+
+	nativeBlock, err := parser.ParseNativeBlock(context.Background(), block)
+	require.NoError(err)
+	require.Equal(common.Blockchain_BLOCKCHAIN_ARBITRUM, nativeBlock.Blockchain)
+	require.Equal(common.Network_NETWORK_ARBITRUM_MAINNET, nativeBlock.Network)
+
+	actual := nativeBlock.GetEthereum()
+	require.NotNil(actual)
+
+	require.Equal(len(expectedReceipts), len(actual.Transactions))
+	for i, expectedReceipt := range expectedReceipts {
+		require.Equal(expectedReceipt, actual.Transactions[i].Receipt)
+	}
 }
