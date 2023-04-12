@@ -167,6 +167,12 @@ message EthereumTransaction {
 }
 
 message EthereumTransactionReceipt {
+  message L1FeeInfo {
+    uint64 l1_gas_used = 1;
+    uint64 l1_gas_price = 2;
+    uint64 l1_fee = 3;
+    string l1_fee_scalar = 4;
+  }
   string transaction_hash = 1;
   uint64 transaction_index = 2;
   string block_hash = 3;
@@ -185,6 +191,9 @@ message EthereumTransactionReceipt {
   }
   uint64 type = 15;
   uint64 effective_gas_price = 16;
+  oneof optional_l1_fee_info {
+    L1FeeInfo l1_fee_info = 17;
+  }
 }
 
 message EthereumEventLog {
