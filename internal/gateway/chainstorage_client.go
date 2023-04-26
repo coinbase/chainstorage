@@ -15,6 +15,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/coinbase/chainstorage/internal/config"
+
 	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -91,7 +93,7 @@ func NewChainstorageClient(params Params) (Client, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(sendMsgSize), grpc.MaxCallRecvMsgSize(recvMsgSize)),
 	}
 
-	if strings.HasPrefix(address, "http://") || strings.Contains(address, "localhost") {
+	if params.Config.Env() == config.EnvLocal || strings.HasPrefix(address, "http://") || strings.Contains(address, "localhost") {
 		opts = append(opts, grpc.WithInsecure())
 	} else {
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))

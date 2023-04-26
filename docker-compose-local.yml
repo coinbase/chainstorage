@@ -4,6 +4,71 @@ volumes:
   dynamodb_data:
 
 services:
+  admin:
+    command: [ "-c", "trap : INT TERM QUIT; sleep infinity & wait" ]
+    entrypoint: /bin/bash
+    image: coinbase/chainstorage
+    environment:
+      - AWS_ENDPOINT_OVERRIDE=http://localstack:4566
+      - CADENCE_ENDPOINT_OVERRIDE=temporal:7233
+    restart: always
+    depends_on:
+      - localstack
+      - temporal
+      - api
+  cron:
+    command: [ "./cron" ]
+    image: coinbase/chainstorage
+    environment:
+      - AWS_ENDPOINT_OVERRIDE=http://localstack:4566
+      - CADENCE_ENDPOINT_OVERRIDE=temporal:7233
+      - SDK_ENDPOINT_OVERRIDE=api:9090
+# Only use CLIENT_CONFIG_OVERRIDE for testing purposes if the config files could not be set up
+#      - 'CLIENT_CONFIG_OVERRIDE={
+#                                    "chain": {
+#                                        "client": {
+#                                            "master": {
+#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
+#                                            },
+#                                            "slave": {
+#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
+#                                            }
+#                                        }
+#                                    }
+#                                }'
+    restart: always
+    depends_on:
+      - api
+  api:
+    command: [ "./server" ]
+    image: coinbase/chainstorage
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 9090:9090
+    environment:
+      - CHAINSTORAGE_ENVIRONMENT=local
+      - CHAINSTORAGE_CONFIG=ethereum-mainnet
+      - AWS_ENDPOINT_OVERRIDE=http://localstack:4566
+      - CADENCE_ENDPOINT_OVERRIDE=temporal:7233
+# Only use CLIENT_CONFIG_OVERRIDE for testing purposes if the config files could not be set up
+#      - 'CLIENT_CONFIG_OVERRIDE={
+#                                    "chain": {
+#                                        "client": {
+#                                            "master": {
+#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
+#                                            },
+#                                            "slave": {
+#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
+#                                            }
+#                                        }
+#                                    }
+#                                }'
+    restart: always
+    depends_on:
+      - localstack
+      - temporal
   localstack:
     image: localstack/localstack:0.11.6
     ports:

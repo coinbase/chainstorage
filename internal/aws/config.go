@@ -23,7 +23,7 @@ func NewConfig(params ConfigParams) *aws.Config {
 	if params.Config.AWS.IsLocalStack {
 		cfg.Credentials = credentials.NewStaticCredentials("THESE", "ARE", "IGNORED")
 		cfg.S3ForcePathStyle = aws.Bool(true)
-		cfg.Endpoint = aws.String("http://localhost:4566")
+		cfg.Endpoint = aws.String(params.Config.AWS.Endpoint)
 	}
 	return cfg
 }

@@ -323,22 +323,13 @@ make functional TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygo
 
 ### Running Server
 
-Start the dockers by the docker-compose file from project root folder:
+Update `CHAINSTORAGE_ENVIRONMENT` and `CHAINSTORAGE_CONFIG` environment variables for the `api` service in the [docker-compose](/docker-compose-local.yml).
 
+If you want to start testnet (goerli) server, configure `CHAINSTORAGE_CONFIG=ethereum-goerli`.
+
+Start the all dockers by the [docker-compose](/docker-compose-local.yml) file from project root folder:
 ```shell
 make localstack
-```
-
-The next step is to start the server locally:
-
-```shell
-# Ethereum Mainnet
-# Use aws local stack
-make server
-
-# If want to start testnet (goerli) server
-# Use aws local stack
-make server CHAINSTORAGE_CONFIG=ethereum_goerli
 ```
 
 ### AWS localstack
@@ -366,28 +357,33 @@ aws sqs --no-sign-request --region local --endpoint-url http://localhost:4566/00
 Open Temporal UI in a browser by entering the
 URL: http://localhost:8088/namespaces/chainstorage-ethereum-mainnet/workflows
 
+Connect to the admin docker container:
+```shell
+docker exec -it chainstorage-_api_1 /bin/sh
+```
+
 Start the backfill workflow:
 
 ```shell
-go run ./cmd/admin workflow start --workflow backfiller --input '{"StartHeight": 11000000, "EndHeight": 11000100, "NumConcurrentExtractors": 24}' --blockchain ethereum --network mainnet --env local
+./admin workflow start --workflow backfiller --input '{"StartHeight": 11000000, "EndHeight": 11000100, "NumConcurrentExtractors": 24}' --blockchain ethereum --network mainnet --env local
 ```
 
 Start the benchmarker workflow:
 
 ```shell
-go run ./cmd/admin workflow start --workflow benchmarker --input '{"StartHeight": 1, "EndHeight": 12000000, "NumConcurrentExtractors": 24, "StepSize":1000000, "SamplesToTest":500}' --blockchain ethereum --network mainnet --env local
+./admin workflow start --workflow benchmarker --input '{"StartHeight": 1, "EndHeight": 12000000, "NumConcurrentExtractors": 24, "StepSize":1000000, "SamplesToTest":500}' --blockchain ethereum --network mainnet --env local
 ```
 
 Start the monitor workflow:
 
 ```shell
-go run ./cmd/admin workflow start --workflow monitor --input '{"StartHeight": 0, "Tag": 0}' --blockchain ethereum --network mainnet --env local
+./admin workflow start --workflow monitor --input '{"StartHeight": 0, "Tag": 0}' --blockchain ethereum --network mainnet --env local
 ```
 
 Start the poller workflow:
 
 ```shell
-go run ./cmd/admin workflow start --workflow poller --input '{"Tag": 0, "MaxBlocksToSync": 200, "Parallelism":32}' --blockchain ethereum --network mainnet --env local
+./admin workflow start --workflow poller --input '{"Tag": 0, "MaxBlocksToSync": 200, "Parallelism":32}' --blockchain ethereum --network mainnet --env local
 ```
 
 NOTE: the recommended value for "parallelism" depend on the capacity of your node provider. If you are not sure what
@@ -396,13 +392,13 @@ value should be used, just drop it from the command.
 Start the streamer workflow:
 
 ```shell
-go run ./cmd/admin workflow start --workflow streamer --input '{}' --blockchain ethereum --network goerli --env local
+./admin workflow start --workflow streamer --input '{}' --blockchain ethereum --network goerli --env local
 ```
 
 Stop the monitor workflow:
 
 ```shell
-go run ./cmd/admin workflow stop --workflow monitor --input '' --blockchain ethereum --network mainnet --env local
+./admin workflow stop --workflow monitor --input '' --blockchain ethereum --network mainnet --env local
 ```
 
 ### Checking Workflow Statuses

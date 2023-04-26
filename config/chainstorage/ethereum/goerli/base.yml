@@ -59,7 +59,7 @@ sdk:
   num_workers: 10
   restful: true
 server:
-  bind_address: localhost:9090
+  bind_address: 0.0.0.0:9090
 sla:
   block_height_delta: 40
   block_time_delta: 10m
