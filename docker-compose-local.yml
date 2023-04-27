@@ -48,7 +48,6 @@ services:
     ports:
       - 9090:9090
     environment:
-      - CHAINSTORAGE_ENVIRONMENT=local
       - CHAINSTORAGE_CONFIG=ethereum-mainnet
       - AWS_ENDPOINT_OVERRIDE=http://localstack:4566
       - CADENCE_ENDPOINT_OVERRIDE=temporal:7233
