@@ -319,6 +319,82 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 	})
 }
 
+func TestConfig_AWSEndpointOverride(t *testing.T) {
+	require := testutil.Require(t)
+
+	err := os.Setenv(config.EnvVarAWSEndpointOverride, "foobar")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarAWSEndpointOverride)
+
+	err = os.Setenv(config.EnvVarEnvironment, "local")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarEnvironment)
+
+	cfg, err := config.New()
+	require.NoError(err)
+	require.Equal("foobar", cfg.AWS.Endpoint)
+}
+
+func TestConfig_CadenceEndpointOverride(t *testing.T) {
+	require := testutil.Require(t)
+
+	err := os.Setenv(config.EnvVarCadenceEndpointOverride, "foobar")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarCadenceEndpointOverride)
+
+	err = os.Setenv(config.EnvVarEnvironment, "local")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarEnvironment)
+
+	cfg, err := config.New()
+	require.NoError(err)
+	require.Equal("foobar", cfg.Cadence.Address)
+}
+
+func TestConfig_SDKEndpointOverride(t *testing.T) {
+	require := testutil.Require(t)
+
+	err := os.Setenv(config.EnvVarSDKEndpointOverride, "foobar")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarSDKEndpointOverride)
+
+	err = os.Setenv(config.EnvVarEnvironment, "local")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarEnvironment)
+
+	cfg, err := config.New()
+	require.NoError(err)
+	require.Equal("foobar", cfg.SDK.ChainstorageAddress)
+}
+
+func TestConfig_ClientConfigOverride(t *testing.T) {
+	require := testutil.Require(t)
+	clientConfig := "{\"chain\":{\"client\":{\"master\":{\"endpoint_group\":\"{\\n  \\\"endpoints\\\": [\\n    {\\n      \\\"name\\\": \\\"master_endpoint_name\\\",\\n      \\\"url\\\": \\\"master_endpoint_url\\\",\\n      \\\"weight\\\": 1\\n    }\\n  ]\\n}\\n\"},\"slave\":{\"endpoint_group\":\"{\\n  \\\"endpoints\\\": [\\n    {\\n      \\\"name\\\": \\\"slave_endpoint_name\\\",\\n      \\\"url\\\": \\\"slave_endpoint_url\\\",\\n      \\\"weight\\\": 2\\n    }\\n  ]\\n}\\n\"}}}}"
+
+	err := os.Setenv(config.EnvVarClientConfigOverride, clientConfig)
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarClientConfigOverride)
+
+	err = os.Setenv(config.EnvVarEnvironment, "local")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarEnvironment)
+
+	cfg, err := config.New()
+	require.NoError(err)
+
+	require.Equal([]config.Endpoint{{
+		Name:   "master_endpoint_name",
+		Url:    "master_endpoint_url",
+		Weight: 1,
+	}}, cfg.Chain.Client.Master.EndpointGroup.Endpoints)
+
+	require.Equal([]config.Endpoint{{
+		Name:   "slave_endpoint_name",
+		Url:    "slave_endpoint_url",
+		Weight: 2,
+	}}, cfg.Chain.Client.Slave.EndpointGroup.Endpoints)
+}
+
 func TestEndpointParsing(t *testing.T) {
 	require := testutil.Require(t)
 
