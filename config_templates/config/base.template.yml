@@ -12,6 +12,7 @@ aws:
     delay_secs: 900
     name: example_chainstorage_blocks_{{blockchain}}_{{network}}_dlq
     visibility_timeout_secs: 600
+  endpoint: ""
   dynamodb:
     block_table: example_chainstorage_blocks_{{blockchain}}_{{network}}
     event_table: example_chainstorage_block_events_{{blockchain}}_{{network}}

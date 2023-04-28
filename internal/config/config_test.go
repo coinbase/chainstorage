@@ -125,8 +125,13 @@ func TestConfig(t *testing.T) {
 			VersionedEventTableBlockIndex: fmt.Sprintf("example_chainstorage_versioned_block_events_by_block_id_%v", configName),
 		}
 
+		endpoint := "http://localhost:4566"
+		if cfg.Env() != config.EnvLocal {
+			endpoint = ""
+		}
 		expectedAWS := config.AwsConfig{
 			Region:                 "us-east-1",
+			Endpoint:               endpoint,
 			Bucket:                 fmt.Sprintf("example-chainstorage-%v-%v", normalizedConfigName, cfg.AwsEnv()),
 			DynamoDB:               dynamoDB,
 			IsLocalStack:           true,
@@ -322,9 +327,9 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 func TestConfig_AWSEndpointOverride(t *testing.T) {
 	require := testutil.Require(t)
 
-	err := os.Setenv(config.EnvVarAWSEndpointOverride, "foobar")
+	err := os.Setenv("CHAINSTORAGE_AWS_ENDPOINT", "foobar")
 	require.NoError(err)
-	defer os.Unsetenv(config.EnvVarAWSEndpointOverride)
+	defer os.Unsetenv("CHAINSTORAGE_AWS_ENDPOINT")
 
 	err = os.Setenv(config.EnvVarEnvironment, "local")
 	require.NoError(err)
@@ -338,9 +343,9 @@ func TestConfig_AWSEndpointOverride(t *testing.T) {
 func TestConfig_CadenceEndpointOverride(t *testing.T) {
 	require := testutil.Require(t)
 
-	err := os.Setenv(config.EnvVarCadenceEndpointOverride, "foobar")
+	err := os.Setenv("CHAINSTORAGE_CADENCE_ADDRESS", "foobar")
 	require.NoError(err)
-	defer os.Unsetenv(config.EnvVarCadenceEndpointOverride)
+	defer os.Unsetenv("CHAINSTORAGE_CADENCE_ADDRESS")
 
 	err = os.Setenv(config.EnvVarEnvironment, "local")
 	require.NoError(err)
@@ -354,9 +359,9 @@ func TestConfig_CadenceEndpointOverride(t *testing.T) {
 func TestConfig_SDKEndpointOverride(t *testing.T) {
 	require := testutil.Require(t)
 
-	err := os.Setenv(config.EnvVarSDKEndpointOverride, "foobar")
+	err := os.Setenv("CHAINSTORAGE_SDK_CHAINSTORAGE_ADDRESS", "foobar")
 	require.NoError(err)
-	defer os.Unsetenv(config.EnvVarSDKEndpointOverride)
+	defer os.Unsetenv("CHAINSTORAGE_SDK_CHAINSTORAGE_ADDRESS")
 
 	err = os.Setenv(config.EnvVarEnvironment, "local")
 	require.NoError(err)
@@ -365,34 +370,6 @@ func TestConfig_SDKEndpointOverride(t *testing.T) {
 	cfg, err := config.New()
 	require.NoError(err)
 	require.Equal("foobar", cfg.SDK.ChainstorageAddress)
-}
-
-func TestConfig_ClientConfigOverride(t *testing.T) {
-	require := testutil.Require(t)
-	clientConfig := "{\"chain\":{\"client\":{\"master\":{\"endpoint_group\":\"{\\n  \\\"endpoints\\\": [\\n    {\\n      \\\"name\\\": \\\"master_endpoint_name\\\",\\n      \\\"url\\\": \\\"master_endpoint_url\\\",\\n      \\\"weight\\\": 1\\n    }\\n  ]\\n}\\n\"},\"slave\":{\"endpoint_group\":\"{\\n  \\\"endpoints\\\": [\\n    {\\n      \\\"name\\\": \\\"slave_endpoint_name\\\",\\n      \\\"url\\\": \\\"slave_endpoint_url\\\",\\n      \\\"weight\\\": 2\\n    }\\n  ]\\n}\\n\"}}}}"
-
-	err := os.Setenv(config.EnvVarClientConfigOverride, clientConfig)
-	require.NoError(err)
-	defer os.Unsetenv(config.EnvVarClientConfigOverride)
-
-	err = os.Setenv(config.EnvVarEnvironment, "local")
-	require.NoError(err)
-	defer os.Unsetenv(config.EnvVarEnvironment)
-
-	cfg, err := config.New()
-	require.NoError(err)
-
-	require.Equal([]config.Endpoint{{
-		Name:   "master_endpoint_name",
-		Url:    "master_endpoint_url",
-		Weight: 1,
-	}}, cfg.Chain.Client.Master.EndpointGroup.Endpoints)
-
-	require.Equal([]config.Endpoint{{
-		Name:   "slave_endpoint_name",
-		Url:    "slave_endpoint_url",
-		Weight: 2,
-	}}, cfg.Chain.Client.Slave.EndpointGroup.Endpoints)
 }
 
 func TestEndpointParsing(t *testing.T) {

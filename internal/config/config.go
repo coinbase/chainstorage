@@ -335,20 +335,14 @@ var (
 		AWSAccountDevelopment: "dev",
 		AWSAccountProduction:  "prod",
 	}
-
-	EnvConfigs = []string{EnvVarClientConfigOverride}
 )
 
 const (
-	EnvVarNamespace               = "CHAINSTORAGE_NAMESPACE"
-	EnvVarConfigName              = "CHAINSTORAGE_CONFIG"
-	EnvVarEnvironment             = "CHAINSTORAGE_ENVIRONMENT"
-	EnvVarTestType                = "TEST_TYPE"
-	EnvVarCI                      = "CI"
-	EnvVarClientConfigOverride    = "CLIENT_CONFIG_OVERRIDE"
-	EnvVarCadenceEndpointOverride = "CADENCE_ENDPOINT_OVERRIDE"
-	EnvVarAWSEndpointOverride     = "AWS_ENDPOINT_OVERRIDE"
-	EnvVarSDKEndpointOverride     = "SDK_ENDPOINT_OVERRIDE"
+	EnvVarNamespace   = "CHAINSTORAGE_NAMESPACE"
+	EnvVarConfigName  = "CHAINSTORAGE_CONFIG"
+	EnvVarEnvironment = "CHAINSTORAGE_ENVIRONMENT"
+	EnvVarTestType    = "TEST_TYPE"
+	EnvVarCI          = "CI"
 
 	CurrentFileName = "/internal/config/config.go"
 
@@ -376,11 +370,8 @@ const (
 )
 
 const (
-	cadenceAddressLocal = "localhost:7233"
-	awsAddressLocal     = "http://localhost:4566"
-)
-
-const (
+	awsAddressLocal          = "http://localhost:4566"
+	cadenceAddressLocal      = "localhost:7233"
 	chainstorageAddressLocal = "http://localhost:9090"
 )
 
@@ -443,11 +434,6 @@ func New(opts ...ConfigOption) (*Config, error) {
 		return nil, xerrors.Errorf("failed to merge in %v config: %w", envSecrets, err)
 	}
 
-	// Merge in config defined with environment variables
-	if err := mergeInEnvConfig(v); err != nil {
-		return nil, xerrors.Errorf("failed to merge in config from environment variables: %w", envSecrets, err)
-	}
-
 	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
 		mapstructure.TextUnmarshallerHookFunc(),
 		mapstructure.StringToTimeDurationHookFunc(),
@@ -498,20 +484,6 @@ func mergeInConfig(v *viper.Viper, configOpts *configOptions, env Env) error {
 			return xerrors.Errorf("failed to merge config %v: %w", env, err)
 		}
 	}
-	return nil
-}
-
-func mergeInEnvConfig(v *viper.Viper) error {
-	for _, EnvConfig := range EnvConfigs {
-		if configString := os.Getenv(EnvConfig); configString != "" {
-			configBytes := []byte(configString)
-			data := bytes.NewBuffer(configBytes)
-			if err := v.MergeConfig(data); err != nil {
-				return xerrors.Errorf("failed to merge config: %w", err)
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -972,8 +944,8 @@ func (c *AwsConfig) DeriveConfig(cfg *Config) {
 		c.Bucket = fmt.Sprintf(s3BucketFormat, normalizedConfigName, cfg.AwsEnv())
 	}
 
-	if endpointOverride := os.Getenv(EnvVarAWSEndpointOverride); endpointOverride != "" {
-		c.Endpoint = endpointOverride
+	if c.Endpoint == "" && cfg.Env() == EnvLocal {
+		c.Endpoint = awsAddressLocal
 	}
 }
 
@@ -981,16 +953,10 @@ func (c *CadenceConfig) DeriveConfig(cfg *Config) {
 	if c.Address == "" && cfg.Env() == EnvLocal {
 		c.Address = cadenceAddressLocal
 	}
-
-	if addressOverride := os.Getenv(EnvVarCadenceEndpointOverride); addressOverride != "" {
-		c.Address = addressOverride
-	}
 }
 
 func (c *SDKConfig) DeriveConfig(cfg *Config) {
-	c.ChainstorageAddress = awsAddressLocal
-
-	if addressOverride := os.Getenv(EnvVarSDKEndpointOverride); addressOverride != "" {
-		c.ChainstorageAddress = addressOverride
+	if c.ChainstorageAddress == "" && cfg.Env() == EnvLocal {
+		c.ChainstorageAddress = chainstorageAddressLocal
 	}
 }

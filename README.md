@@ -323,7 +323,7 @@ make functional TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygo
 
 ### Running Server
 
-Update `CHAINSTORAGE_ENVIRONMENT` and `CHAINSTORAGE_CONFIG` environment variables for the `api` service in the [docker-compose](/docker-compose-local.yml).
+Update `CHAINSTORAGE_CONFIG` environment variable for the `api` service in the [docker-compose](/docker-compose-local.yml).
 
 If you want to start testnet (goerli) server, configure `CHAINSTORAGE_CONFIG=ethereum-goerli`.
 

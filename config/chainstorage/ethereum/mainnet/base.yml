@@ -19,6 +19,7 @@ aws:
     event_table_height_index: example_chainstorage_block_events_by_height_ethereum_mainnet
     versioned_event_table: example_chainstorage_versioned_block_events_ethereum_mainnet
     versioned_event_table_block_index: example_chainstorage_versioned_block_events_by_block_id_ethereum_mainnet
+  endpoint: ""
   presigned_url_expiration: 30m
   region: us-east-1
   storage:

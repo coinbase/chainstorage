@@ -9,8 +9,8 @@ services:
     entrypoint: /bin/bash
     image: coinbase/chainstorage
     environment:
-      - AWS_ENDPOINT_OVERRIDE=http://localstack:4566
-      - CADENCE_ENDPOINT_OVERRIDE=temporal:7233
+      - CHAINSTORAGE_AWS_ENDPOINT=http://localstack:4566
+      - CHAINSTORAGE_CADENCE_ADDRESS=temporal:7233
     restart: always
     depends_on:
       - localstack
@@ -20,22 +20,12 @@ services:
     command: [ "./cron" ]
     image: coinbase/chainstorage
     environment:
-      - AWS_ENDPOINT_OVERRIDE=http://localstack:4566
-      - CADENCE_ENDPOINT_OVERRIDE=temporal:7233
-      - SDK_ENDPOINT_OVERRIDE=api:9090
-# Only use CLIENT_CONFIG_OVERRIDE for testing purposes if the config files could not be set up
-#      - 'CLIENT_CONFIG_OVERRIDE={
-#                                    "chain": {
-#                                        "client": {
-#                                            "master": {
-#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
-#                                            },
-#                                            "slave": {
-#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
-#                                            }
-#                                        }
-#                                    }
-#                                }'
+      - CHAINSTORAGE_AWS_ENDPOINT=http://localstack:4566
+      - CHAINSTORAGE_CADENCE_ADDRESS=temporal:7233
+      - CHAINSTORAGE_SDK_CHAINSTORAGE_ADDRESS=api:9090
+# Only use node config override for testing purposes if the config files could not be set up
+#      - 'CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP={"endpoints": [{"name": "master", "url": "master_url"}], "endpoints_failover": [{"name": "master_failover", "url": "master_failover_url"}], "use_failover": false}'
+#      - 'CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP={"endpoints": [{"name": "slave", "url": "slave_url"}], "endpoints_failover": [{"name": "slave_failover", "url": "slave_failover_url"}], "use_failover": false}'
     restart: always
     depends_on:
       - api
@@ -49,21 +39,11 @@ services:
       - 9090:9090
     environment:
       - CHAINSTORAGE_CONFIG=ethereum-mainnet
-      - AWS_ENDPOINT_OVERRIDE=http://localstack:4566
-      - CADENCE_ENDPOINT_OVERRIDE=temporal:7233
-# Only use CLIENT_CONFIG_OVERRIDE for testing purposes if the config files could not be set up
-#      - 'CLIENT_CONFIG_OVERRIDE={
-#                                    "chain": {
-#                                        "client": {
-#                                            "master": {
-#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
-#                                            },
-#                                            "slave": {
-#                                                "endpoint_group": "{\n  \"endpoints\": [\n    {\n      \"name\": \"endpoint_name\",\n      \"url\": \"endpoint_url\",\n      \"weight\": 1\n    }\n  ]\n}\n"
-#                                            }
-#                                        }
-#                                    }
-#                                }'
+      - CHAINSTORAGE_AWS_ENDPOINT=http://localstack:4566
+      - CHAINSTORAGE_CADENCE_ADDRESS=temporal:7233
+# Only use node config override for testing purposes if the config files could not be set up
+#      - 'CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP={"endpoints": [{"name": "master", "url": "master_url"}], "endpoints_failover": [{"name": "master_failover", "url": "master_failover_url"}], "use_failover": false}'
+#      - 'CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP={"endpoints": [{"name": "slave", "url": "slave_url"}], "endpoints_failover": [{"name": "slave_failover", "url": "slave_failover_url"}], "use_failover": false}'
     restart: always
     depends_on:
       - localstack
