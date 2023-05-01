@@ -359,7 +359,7 @@ URL: http://localhost:8088/namespaces/chainstorage-ethereum-mainnet/workflows
 
 Connect to the admin docker container:
 ```shell
-docker exec -it chainstorage-_api_1 /bin/sh
+docker exec -it chainstorage_admin_1 /bin/sh
 ```
 
 Start the backfill workflow:
