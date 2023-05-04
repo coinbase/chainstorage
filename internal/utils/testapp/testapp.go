@@ -14,11 +14,11 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
-	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/internal/tracer"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (

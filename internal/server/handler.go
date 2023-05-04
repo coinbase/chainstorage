@@ -26,7 +26,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/s3"
-	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
@@ -38,6 +37,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (

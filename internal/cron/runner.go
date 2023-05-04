@@ -9,9 +9,9 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 
-	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/log"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (

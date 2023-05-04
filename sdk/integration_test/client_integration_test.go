@@ -13,13 +13,13 @@ import (
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/server"
-	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/coinbase/chainstorage/sdk"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type SDKTestSuite struct {

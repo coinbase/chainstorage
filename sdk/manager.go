@@ -5,7 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/coinbase/chainstorage/internal/services"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (

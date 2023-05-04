@@ -15,11 +15,11 @@ import (
 	"github.com/coinbase/chainstorage/internal/dlq"
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/s3"
-	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/tally"
 	"github.com/coinbase/chainstorage/internal/tracer"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 func main() {
