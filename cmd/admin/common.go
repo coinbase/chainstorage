@@ -18,8 +18,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 
-	"github.com/coinbase/chainstorage/sdk/services"
-
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq"
 	"github.com/coinbase/chainstorage/internal/gateway"
@@ -29,6 +27,7 @@ import (
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/coinbase/chainstorage/sdk"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 const (

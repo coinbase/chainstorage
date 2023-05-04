@@ -15,12 +15,11 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/coinbase/chainstorage/sdk/services"
-
 	metastoragemocks "github.com/coinbase/chainstorage/internal/storage/metastorage/mocks"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (

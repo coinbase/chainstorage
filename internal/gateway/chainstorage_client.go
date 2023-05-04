@@ -15,11 +15,10 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/coinbase/chainstorage/sdk/services"
-
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/log"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (

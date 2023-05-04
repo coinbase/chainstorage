@@ -9,8 +9,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/coinbase/chainstorage/sdk/services"
-
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
@@ -21,6 +19,7 @@ import (
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/coinbase/chainstorage/sdk"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type SDKTestSuite struct {

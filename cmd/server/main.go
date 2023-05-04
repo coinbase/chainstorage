@@ -4,8 +4,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/coinbase/chainstorage/sdk/services"
-
 	"github.com/coinbase/chainstorage/internal/aws"
 	"github.com/coinbase/chainstorage/internal/blockchain"
 	"github.com/coinbase/chainstorage/internal/cadence"
@@ -20,6 +18,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/workflow"
 	"github.com/coinbase/chainstorage/sdk"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 func main() {

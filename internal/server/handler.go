@@ -22,8 +22,6 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
-	"github.com/coinbase/chainstorage/sdk/services"
-
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
@@ -39,6 +37,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (
