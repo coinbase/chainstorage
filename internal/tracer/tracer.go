@@ -4,8 +4,9 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/fx"
 
+	"github.com/coinbase/chainstorage/sdk/services"
+
 	"github.com/coinbase/chainstorage/internal/config"
-	"github.com/coinbase/chainstorage/internal/services"
 )
 
 type (

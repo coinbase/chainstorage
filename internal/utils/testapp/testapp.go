@@ -10,11 +10,12 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/zap"
 
+	services2 "github.com/coinbase/chainstorage/sdk/services"
+
 	"github.com/coinbase/chainstorage/internal/aws"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
-	"github.com/coinbase/chainstorage/internal/services"
 	"github.com/coinbase/chainstorage/internal/tracer"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -67,7 +68,7 @@ var (
 )
 
 func New(t testing.TB, opts ...fx.Option) TestApp {
-	manager := services.NewMockSystemManager()
+	manager := services2.NewMockSystemManager()
 
 	var cfg *config.Config
 	opts = append(
@@ -82,7 +83,7 @@ func New(t testing.TB, opts ...fx.Option) TestApp {
 		fx.Provide(func() testing.TB { return t }),
 		fx.Provide(func() *zap.Logger { return manager.Logger() }),
 		fx.Provide(func() tally.Scope { return tally.NoopScope }),
-		fx.Provide(func() services.SystemManager { return manager }),
+		fx.Provide(func() services2.SystemManager { return manager }),
 		fx.Populate(&cfg),
 	)
 
