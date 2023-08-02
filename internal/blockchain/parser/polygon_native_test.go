@@ -552,7 +552,7 @@ func (s *polygonParserTestSuite) TestParsePolygonBlock_WithAuthor() {
 				TransactionReceipts: [][]byte{fixtureReceipt},
 				TransactionTraces:   [][]byte{fixtureTraces},
 				ExtraData: &api.EthereumBlobdata_Polygon{
-					Polygon: &api.PolygonBlobdata{
+					Polygon: &api.PolygonExtraData{
 						Author: []byte(blockAuthor),
 					},
 				},

@@ -85,7 +85,7 @@ func (s *polygonRosettaParserTestSuite) TestPolygonRosettaParser() {
 				TransactionReceipts: [][]byte{fixturePolygonReceipt, fixturePolygonBorReceipt},
 				TransactionTraces:   [][]byte{fixturePolygonTraces},
 				ExtraData: &api.EthereumBlobdata_Polygon{
-					Polygon: &api.PolygonBlobdata{
+					Polygon: &api.PolygonExtraData{
 						Author: []byte(`"0x160cdef60e786295728a6ea334c091238e474e01"`),
 					},
 				},
@@ -395,7 +395,7 @@ func (s *polygonRosettaParserTestSuite) TestPolygonRosettaParser_HopProtocol() {
 				TransactionReceipts: [][]byte{fixturePolygonHopProtocolReceipt},
 				TransactionTraces:   [][]byte{},
 				ExtraData: &api.EthereumBlobdata_Polygon{
-					Polygon: &api.PolygonBlobdata{
+					Polygon: &api.PolygonExtraData{
 						Author: []byte(`"0x160cdef60e786295728a6ea334c091238e474e01"`),
 					},
 				},
@@ -436,7 +436,7 @@ func (s *polygonRosettaParserTestSuite) TestPolygonRosettaParser_MPL() {
 				TransactionReceipts: [][]byte{fixturePolygonMPLReceipt},
 				TransactionTraces:   [][]byte{},
 				ExtraData: &api.EthereumBlobdata_Polygon{
-					Polygon: &api.PolygonBlobdata{
+					Polygon: &api.PolygonExtraData{
 						Author: []byte(`"0x160cdef60e786295728a6ea334c091238e474e01"`),
 					},
 				},
@@ -540,7 +540,7 @@ func (s *polygonRosettaParserTestSuite) TestPolygonRosettaParser_PolygonTestnet(
 				TransactionReceipts: [][]byte{fixturePolygonReceipt, fixturePolygonBorReceipt},
 				TransactionTraces:   [][]byte{fixturePolygonTraces},
 				ExtraData: &api.EthereumBlobdata_Polygon{
-					Polygon: &api.PolygonBlobdata{
+					Polygon: &api.PolygonExtraData{
 						Author: []byte(`"0x160cdef60e786295728a6ea334c091238e474e01"`),
 					},
 				},

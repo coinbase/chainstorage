@@ -53,11 +53,11 @@ message EthereumBlobdata {
   repeated bytes transaction_traces = 3;
   repeated bytes uncles = 4;
   oneof extra_data {
-    PolygonBlobdata polygon = 100;
+    PolygonExtraData polygon = 100;
   }
 }
 
-message PolygonBlobdata {
+message PolygonExtraData {
   bytes author = 1;
 }
 
