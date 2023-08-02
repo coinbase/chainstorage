@@ -469,7 +469,7 @@ func (c *EthereumClient) getBlockFromHeader(ctx context.Context, tag uint32, hea
 		}
 
 		block.GetEthereum().ExtraData = &api.EthereumBlobdata_Polygon{
-			Polygon: &api.PolygonBlobdata{
+			Polygon: &api.PolygonExtraData{
 				Author: author,
 			},
 		}
@@ -1158,7 +1158,7 @@ func (c *EthereumClient) UpgradeBlock(ctx context.Context, block *api.Block, new
 			// For Polygon prod - update tag, author and traces
 			block.Metadata.Tag = newTag
 			blobdata.ExtraData = &api.EthereumBlobdata_Polygon{
-				Polygon: &api.PolygonBlobdata{
+				Polygon: &api.PolygonExtraData{
 					Author: author,
 				},
 			}

@@ -49,7 +49,8 @@ type Block struct {
 	// The timestamp of the block since the Unix Epoch. The rosetta spec only
 	// support timestamp in milliseconds granularity.
 	// (-- api-linter: core::0142::time-field-names=disabled
-	//     go/aip/not-precedent: This field was called timestamp in rosetta spec. --)
+	//
+	//	go/aip/not-precedent: This field was called timestamp in rosetta spec. --)
 	Timestamp *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	// Transactions within the block.
 	Transactions []*Transaction `protobuf:"bytes,5,rep,name=transactions,proto3" json:"transactions,omitempty"`
