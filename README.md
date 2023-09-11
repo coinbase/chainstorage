@@ -509,22 +509,22 @@ export CHAINSTORAGE_SDK_AUTH_TOKEN=****
 
 curl -s -X POST \
   -H "content-type: application/json" \
-  -H "cb-nft-api-token: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
-  https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetLatestBlock | jq
+  -H "x-apikey: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \  
+  https://launchpad.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetLatestBlock | jq
 
 curl -s -X POST \
   -H "content-type: application/json" \
-  -H "cb-nft-api-token: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
+  -H "x-apikey: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
   -d '{"height": 16000000}' \
-  https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetNativeBlock | jq
+  https://launchpad.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetNativeBlock | jq
 
 curl -s -X POST \
   -H "content-type: application/json" \
-  -H "cb-nft-api-token: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
+  -H "x-apikey: ${CHAINSTORAGE_SDK_AUTH_TOKEN}" \
   -d '{"start_height": 16000000, "end_height": 16000005}' \
-  https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetNativeBlocksByRange | jq
+  https://launchpad.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1/coinbase.chainstorage.ChainStorage/GetNativeBlocksByRange | jq
 ```
 
 ## Contact Us
 
-We will set up a discord server soon. Stay tuned!
+We have set up a Discord server soon. Here is the link to join (limited 10) https://discord.com/channels/1079683467018764328/1079683467786334220.
