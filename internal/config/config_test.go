@@ -57,6 +57,8 @@ func TestConfig(t *testing.T) {
 
 		require.Equal(fmt.Sprintf("chainstorage-%v", normalizedConfigName), cfg.Cadence.Domain)
 		require.NotEmpty(cfg.Cadence.RetentionPeriod)
+		require.NotEmpty(cfg.Cadence.TLSConfig)
+		require.True(cfg.Cadence.TLSConfig.Enabled)
 		// Cadence workflow config validation
 		require.NotEmpty(cfg.Workflows.Backfiller)
 		require.False(cfg.Workflows.Backfiller.Enabled)

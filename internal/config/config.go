@@ -117,9 +117,18 @@ type (
 	}
 
 	CadenceConfig struct {
-		Address         string `mapstructure:"address" validate:"required"`
-		Domain          string `mapstructure:"domain" validate:"required"`
-		RetentionPeriod int32  `mapstructure:"retention_period" validate:"required"`
+		Address         string           `mapstructure:"address" validate:"required"`
+		Domain          string           `mapstructure:"domain" validate:"required"`
+		RetentionPeriod int32            `mapstructure:"retention_period" validate:"required"`
+		TLSConfig       CadenceTLSConfig `mapstructure:"tls" validate:"required"`
+	}
+
+	CadenceTLSConfig struct {
+		Enabled              bool   `mapstructure:"enabled" validate:"required"`
+		ValidateHostname     bool   `mapstructure:"validate_hostname" validate:"required"`
+		CertificateAuthority string `mapstructure:"certificate_authority"`
+		ClientCertificate    string `mapstructure:"client_certificate"`
+		ClientPrivateKey     string `mapstructure:"client_private_key"`
 	}
 
 	WorkflowsConfig struct {

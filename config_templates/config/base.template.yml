@@ -26,6 +26,9 @@ cadence:
   address: ""
   retention_period: 7
   domain: chainstorage-{{blockchain}}-{{network}}
+  tls:
+    enabled: true
+    validate_hostname: true
 chain:
   block_start_height: 0
   blockchain: BLOCKCHAIN_{{BLOCKCHAIN}}
