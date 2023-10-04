@@ -1,3 +1,3 @@
 sdk:
   chainstorage_address: localhost:9090
-  restful: false
+  restful: true

@@ -5,9 +5,10 @@ volumes:
 
 services:
   localstack:
-    image: localstack/localstack:0.11.6
+    image: localstack/localstack:latest
     ports:
       - 4566:4566
+      - 4510-4559:4510-4559  # external services port range
     environment:
       - SERVICES=s3,dynamodb,sqs
       - DEBUG=1

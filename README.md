@@ -5,6 +5,8 @@
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+  - [Dependency overview](#dependency-overview)
+  - [Template location and generated config](#template-location-and-generated-config)
   - [Environment Variables](#environment-variables)
   - [Creating New Configurations](#creating-new-configurations)
   - [Template Format and Inheritance](#template-format-and-inheritance)
@@ -40,13 +42,9 @@ ChainStorage is inspired by the Change Data Capture paradigm, commonly used in t
 replicates the changes (i.e. new blocks) on the blockchain, and acts like a distributed file system for the blockchain.
 
 It aims to provide an efficient and flexible way to access the on-chain data:
-* Efficiency is optimized by storing data in horizontally-scalable storage with a key-value schema. At Coinbase's
-  production environment, ChainStorage can serve up to 1,500 blocks per second, enabling teams to build various indexers
-  in a cost-effective manner.
-* Flexibility is improved by decoupling data interpretation from data ingestion. ChainStorage stores the raw data and
-  the parsing is deferred until the data is consumed. The parsers are shipped as part of the SDK and run on the consumer
-  side. Thanks to the ELT (Extract, Load, Transform) architecture, we can easily iterate on the parser without ingesting
-  the data from blockchain again.
+
+- Efficiency is optimized by storing data in horizontally-scalable storage with a key-value schema. At Coinbase's production environment, ChainStorage can serve up to 1,500 blocks per second, enabling teams to build various indexers cost-effectively.
+- Flexibility is improved by decoupling data interpretation from data ingestion. ChainStorage stores the raw data, and the parsing is deferred until the data is consumed. The parsers are shipped as part of the SDK and run on the consumer side. Thanks to the ELT (Extract, Load, Transform) architecture, we can quickly iterate on the parser without ingesting the data from the blockchain again.
 
 ## Quick Start
 
@@ -76,6 +74,19 @@ make build
 ```
 
 ## Configuration
+
+### Dependency overview
+
+To understand the structure and elements of ChainStorage's config, it's important to comprehend its dependencies.
+
+- **Temporal**: Temporal is a workflow engine that orchestrates the data ingestion workflow. It calls ChainStorage service endpoint to complete various of tasks.
+- **Blob storage** - current implementation is on AWS S3, and the local service is provied by localstack
+- **Key value storage** - current implemnentation is based on dynamodb and the local service is provied by localstack
+- **Dead Letter queue** - current implementation is on SQS and the local service is provied by localstack
+
+### Template location and generated config
+
+The config template directory is in `config_templates/config`, which `make config` reads this directory and generates the config into the `config/chainstorage` directory.
 
 ### Environment Variables
 
@@ -163,14 +174,13 @@ Endpoint group is an abstraction for one or more JSON-RPC endpoints.
 client-side routing to the node provider.
 
 ChainStorage utilizes two endpoint groups to speed up data ingestion:
-* master: This endpoint group is used to resolve the canonical chain and determine what blocks to ingest next.
-  Typically, sticky session is turned on for this group to ensure stronger data consistency between the requests.
-* slave: This endpoint group is used to ingest the data from the blockchain. During data ingestion, the new blocks are
-  ingested in parallel and out of order. Typically, the endpoints are selected in a round-robin fashion, but you may
-  increase the weights to send more traffic to certain endpoints.
+
+- master: This endpoint group is used to resolve the canonical chain and determine what blocks to ingest next. Typically, sticky session is turned on for this group to ensure stronger data consistency between the requests.
+- slave: This endpoint group is used to ingest the data from the blockchain. During data ingestion, the new blocks are ingested in parallel and out of order. Typically, the endpoints are selected in a round-robin fashion, but you may increase the weights to send more traffic to certain endpoints.
 
 If your node provider, e.g. QuickNode, already has built-in load balancing, your endpoint group may contain only one
 endpoint, as illustrated by the following configuration:
+
 ```yaml
 chain:
   client:
@@ -207,8 +217,9 @@ You may override any configuration using an environment variable. The environmen
 "CHAINSTORAGE_". For nested dictionary, use underscore to separate the keys.
 
 For example, you may override the endpoint group config at runtime by injecting the following environment variables:
-* master: CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP
-* slave: CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP
+
+- master: CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP
+- slave: CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP
 
 Alternatively, you may override the configuration by creating `secrets.yml` within the same directory. Its attributes
 will be merged into the runtime configuration and take the highest precedence. Note that this file may contain
@@ -345,20 +356,22 @@ make server CHAINSTORAGE_CONFIG=ethereum_goerli
 
 Check S3 files:
 
+You can checkout the config from `config/chainstorage/{{Blockchain}}/{{network}}/{{evironment}}`  for the value of S3 bucket name, dynamoDB tables, and SQS name.
+
 ```shell
-aws s3 --no-sign-request --region local --endpoint-url http://localhost:4566 ls --recursive cba-chainstore-eth-dev/
+aws s3 --no-sign-request --region local --endpoint-url http://localhost:4566 ls --recursive example-chainstorage-ethereum-mainnet-dev/
 ```
 
 Check DynamoDB rows:
 
 ```shell
-aws dynamodb --no-sign-request --region local --endpoint-url http://localhost:4566 scan --table-name cba_chainstore_blocks_eth_main
+aws dynamodb --no-sign-request --region local --endpoint-url http://localhost:4566 scan --table-name example_chainstorage_blocks_ethereum_mainnet
 ```
 
 Check DLQ:
 
 ```shell
-aws sqs --no-sign-request --region local --endpoint-url http://localhost:4566/000000000000/cba_chainstore_blocks_eth_main_dlq receive-message --queue-url "http://localhost:4566/000000000000/cba_chainstore_blocks_eth_main_dlq" --max-number-of-messages 10 --visibility-timeout 2
+aws sqs --no-sign-request --region local --endpoint-url http://localhost:4566/000000000000/example_chainstorage_blocks_ethereum_mainnet_dlq receive-message --queue-url "http://localhost:4566/000000000000/example_chainstorage_blocks_ethereum_mainnet_dlq" --max-number-of-messages 10 --visibility-timeout 2
 ```
 
 ### Temporal Workflow
