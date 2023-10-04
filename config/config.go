@@ -130,7 +130,7 @@ func configChainstorageArbitrumMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/base.yml", size: 4266, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -150,7 +150,7 @@ func configChainstorageArbitrumMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/development.yml", size: 265, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -170,7 +170,7 @@ func configChainstorageArbitrumMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -190,7 +190,7 @@ func configChainstorageArbitrumMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/production.yml", size: 223, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/arbitrum/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -210,7 +210,7 @@ func configChainstorageAvacchainMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/avacchain/mainnet/base.yml", size: 4319, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/avacchain/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -230,7 +230,7 @@ func configChainstorageAvacchainMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/avacchain/mainnet/development.yml", size: 334, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/avacchain/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -250,7 +250,7 @@ func configChainstorageAvacchainMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/avacchain/mainnet/production.yml", size: 224, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/avacchain/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -270,7 +270,7 @@ func configChainstorageBitcoinMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/base.yml", size: 4270, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -290,7 +290,7 @@ func configChainstorageBitcoinMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/development.yml", size: 308, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -310,7 +310,7 @@ func configChainstorageBitcoinMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -330,7 +330,7 @@ func configChainstorageBitcoinMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/production.yml", size: 222, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bitcoin/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -350,7 +350,7 @@ func configChainstorageBscMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/base.yml", size: 4297, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -370,7 +370,7 @@ func configChainstorageBscMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/development.yml", size: 222, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -390,7 +390,7 @@ func configChainstorageBscMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -410,7 +410,7 @@ func configChainstorageBscMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/production.yml", size: 218, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/bsc/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -430,7 +430,7 @@ func configChainstorageDogecoinMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/base.yml", size: 4395, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -450,7 +450,7 @@ func configChainstorageDogecoinMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/development.yml", size: 227, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -470,7 +470,7 @@ func configChainstorageDogecoinMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -490,7 +490,7 @@ func configChainstorageDogecoinMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/production.yml", size: 286, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/dogecoin/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -510,7 +510,7 @@ func configChainstorageEthereumGoerliBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/base.yml", size: 4318, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -530,7 +530,7 @@ func configChainstorageEthereumGoerliDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/development.yml", size: 263, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -550,7 +550,7 @@ func configChainstorageEthereumGoerliLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -570,7 +570,7 @@ func configChainstorageEthereumGoerliProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/production.yml", size: 222, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/goerli/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -590,7 +590,7 @@ func configChainstorageEthereumMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/base.yml", size: 4411, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -610,7 +610,7 @@ func configChainstorageEthereumMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/development.yml", size: 261, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -630,7 +630,7 @@ func configChainstorageEthereumMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -650,7 +650,7 @@ func configChainstorageEthereumMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/production.yml", size: 223, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/ethereum/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -670,7 +670,7 @@ func configChainstorageOptimismMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/base.yml", size: 4224, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -690,7 +690,7 @@ func configChainstorageOptimismMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/development.yml", size: 265, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -710,7 +710,7 @@ func configChainstorageOptimismMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -730,7 +730,7 @@ func configChainstorageOptimismMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/production.yml", size: 223, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/optimism/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -750,7 +750,7 @@ func configChainstoragePolygonMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/base.yml", size: 4446, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -770,7 +770,7 @@ func configChainstoragePolygonMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/development.yml", size: 287, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -790,7 +790,7 @@ func configChainstoragePolygonMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -810,7 +810,7 @@ func configChainstoragePolygonMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/production.yml", size: 285, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/polygon/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -830,7 +830,7 @@ func configChainstorageSolanaMainnetBaseYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/base.yml", size: 4270, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/base.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -850,7 +850,7 @@ func configChainstorageSolanaMainnetDevelopmentYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/development.yml", size: 451, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/development.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -870,7 +870,7 @@ func configChainstorageSolanaMainnetLocalYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/local.yml", size: 117, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/local.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -890,7 +890,7 @@ func configChainstorageSolanaMainnetProductionYml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/production.yml", size: 221, mode: os.FileMode(420), modTime: time.Unix(1640048354, 0)}
+	info := bindataFileInfo{name: "config/chainstorage/solana/mainnet/production.yml", size: 0, mode: os.FileMode(0), modTime: time.Unix(1640048354, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
