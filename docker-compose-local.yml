@@ -9,6 +9,7 @@ services:
     image: localstack/localstack:2.3.2
     ports:
       - 4566:4566
+      - 4510-4559:4510-4559  # external services port range
     environment:
       - SERVICES=s3,dynamodb,sqs
       - DEBUG=1
