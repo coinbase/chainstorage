@@ -1,0 +1,18 @@
+name: "Setup"
+description: "setup environment"
+runs:
+  using: "composite"
+  steps:
+    - name: Set up go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.21.2
+    - name: Install asdf & tools
+      uses: asdf-vm/actions/setup@v2
+    - name: Setup
+      shell: bash
+      run: |
+        asdf plugin-add protoc https://github.com/paxosglobal/asdf-protoc.git
+        asdf install protoc 24.4
+        asdf global protoc 24.4
+        make bootstrap

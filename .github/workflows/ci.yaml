@@ -1,0 +1,33 @@
+name: ChainStorage CI
+on: [push]
+concurrency:
+  group: "ci-${{ github.ref_name }}"
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: "Setup environment"
+        uses: ./.github/workflows/setup
+      - name: Build
+        run: make build
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: "Setup environment"
+        uses: ./.github/workflows/setup
+      - name: Build
+        run: make test
+  integration:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: "Setup environment"
+        uses: ./.github/workflows/setup
+      - name: Build
+        run: make integration
