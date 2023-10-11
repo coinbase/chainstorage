@@ -239,6 +239,7 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 			DiscardUnknown: true,
 		}
 
+		proto.Reset(response)
 		if err := unmarshaler.Unmarshal(body, response); err != nil {
 			return retry.Retryable(xerrors.Errorf("failed to decode response: %w", err))
 		}
