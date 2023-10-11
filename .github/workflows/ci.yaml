@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v3
       - name: "Setup environment"
         uses: ./.github/workflows/setup
-      - name: Build
+      - name: Test
         run: make test
   integration:
     runs-on: ubuntu-22.04
@@ -29,5 +29,8 @@ jobs:
         uses: actions/checkout@v3
       - name: "Setup environment"
         uses: ./.github/workflows/setup
-      - name: Build
-        run: make integration
+      - name: Integration Tests
+        shell: bash
+        run: |
+          docker compose -f docker-compose-testing.yml up -d --force-recreate
+          make integration
