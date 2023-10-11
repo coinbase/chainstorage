@@ -337,7 +337,13 @@ make functional TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygo
 Start the dockers by the docker-compose file from project root folder:
 
 ```shell
-make localstack
+make localstack 
+``` 
+
+OR
+
+```shell
+make localstack2 # the `localstack2` uses more modern version of docker containers, paving the path for temporal upgrade
 ```
 
 The next step is to start the server locally:
@@ -377,7 +383,7 @@ aws sqs --no-sign-request --region local --endpoint-url http://localhost:4566/00
 ### Temporal Workflow
 
 Open Temporal UI in a browser by entering the
-URL: http://localhost:8088/namespaces/chainstorage-ethereum-mainnet/workflows
+URL: http://localhost:**8088** (or port number is **8080** for localstack2), and the namespace is chainstorage/{blockchain}/{network}/
 
 Start the backfill workflow:
 

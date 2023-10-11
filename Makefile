@@ -102,6 +102,10 @@ cron:
 localstack:
 	docker-compose -f docker-compose-local.yml down && docker-compose -f docker-compose-local.yml up
 
+.PHONY: localstack2
+localstack2:
+	docker-compose -f docker-compose-local-v2.yml down && docker-compose -f docker-compose-local-v2.yml up
+
 .PHONY: docker-run
 docker-run:
 	docker run --rm --network host --name chainstorage coinbase/chainstorage
