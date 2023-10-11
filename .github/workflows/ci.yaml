@@ -1,0 +1,48 @@
+name: ChainStorage CI
+on: [push]
+concurrency:
+  group: "ci-${{ github.ref_name }}"
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: "Setup environment"
+        uses: ./.github/workflows/setup
+      - name: Build
+        run: make build
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: "Setup environment"
+        uses: ./.github/workflows/setup
+      - name: Test
+        run: make test
+  integration:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: "Setup environment"
+        uses: ./.github/workflows/setup
+      - name: Run localstack
+        shell: bash
+        run: |
+          docker compose -f docker-compose-testing.yml up -d --force-recreate
+          echo "Waiting for localstack to be ready..."
+          for i in $(seq 1 999); do
+            if [ "$(curl -s http://localhost:4566/_localstack/health | jq -r '.services.s3')" = "available" ]; then
+              break
+            fi
+            sleep 0.3
+            if [ $(($i % 30)) -eq 0 ]; then
+              echo .
+            fi 
+          done
+          echo "localstack ready"
+      - name: Integration Tests
+        run: make integration
