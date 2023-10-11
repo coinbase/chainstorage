@@ -1,10 +1,10 @@
 package types
 
 import (
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Int64Deref dereferences a int64 pointer
@@ -36,8 +36,8 @@ func StringRef(v string) *string {
 }
 
 // ConvertMillisecondsToTimestamp converts milliseconds to timestamp
-func ConvertMillisecondsToTimestamp(milliseconds int64) *timestamp.Timestamp {
-	return &timestamp.Timestamp{
+func ConvertMillisecondsToTimestamp(milliseconds int64) *timestamppb.Timestamp {
+	return &timestamppb.Timestamp{
 		Seconds: milliseconds / 1000,
 		Nanos:   int32(milliseconds%1000) * 1000000,
 	}

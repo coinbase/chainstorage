@@ -3,7 +3,7 @@ package testutil
 import (
 	"time"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func MustTime(value string) time.Time {
@@ -14,9 +14,9 @@ func MustTime(value string) time.Time {
 	return t
 }
 
-func MustTimestamp(value string) *timestamp.Timestamp {
+func MustTimestamp(value string) *timestamppb.Timestamp {
 	t := MustTime(value)
-	return &timestamp.Timestamp{
+	return &timestamppb.Timestamp{
 		Seconds: t.Unix(),
 		Nanos:   int32(t.Nanosecond()),
 	}

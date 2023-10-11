@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/golang/protobuf/proto"
-
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/aws"
 	"github.com/coinbase/chainstorage/internal/blockchain/client"

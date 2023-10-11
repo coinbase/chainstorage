@@ -9,9 +9,9 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/go-playground/validator/v10"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/utils/log"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -338,7 +338,7 @@ func (b *BitcoinBlock) GetApiBitcoinHeader() *api.BitcoinHeader {
 		NumberOfTransactions: b.NTx.Value(),
 		PreviousBlockHash:    b.PreviousBlockHash.Value(),
 		NextBlockHash:        b.NextBlockHash.Value(),
-		Timestamp: &timestamp.Timestamp{
+		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(b.Time.Value()),
 		},
 	}

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/finalizer"
@@ -194,14 +194,15 @@ func (c *restClient) GetVersionedChainEvent(ctx context.Context, request *api.Ge
 
 func (c *restClient) makeRequest(ctx context.Context, method string, request proto.Message, response proto.Message) error {
 	return c.retry.Retry(ctx, func(ctx context.Context) error {
-		marshaler := jsonpb.Marshaler{}
-		var requestBody bytes.Buffer
-		if err := marshaler.Marshal(&requestBody, request); err != nil {
+		marshaler := protojson.MarshalOptions{}
+		var requestBody []byte
+		var err error
+		if requestBody, err = marshaler.Marshal(request); err != nil {
 			return xerrors.Errorf("failed to marshal request: %w", err)
 		}
 
 		url := c.getURL(method)
-		httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &requestBody)
+		httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(requestBody))
 		if err != nil {
 			return xerrors.Errorf("failed to create request: %w", err)
 		}
@@ -225,8 +226,9 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 		finalizer := finalizer.WithCloser(httpResponse.Body)
 		defer finalizer.Finalize()
 
+		var body []byte
 		if statusCode := httpResponse.StatusCode; statusCode != http.StatusOK {
-			body, _ := ioutil.ReadAll(httpResponse.Body)
+			body, _ = ioutil.ReadAll(httpResponse.Body)
 
 			if statusCode == 429 || statusCode >= 500 {
 				return retry.Retryable(xerrors.Errorf("received retryable status code %v: %v", statusCode, string(body)))
@@ -235,11 +237,11 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 			return xerrors.Errorf("received non-retryable status code %v: %v", statusCode, string(body))
 		}
 
-		unmarshaler := jsonpb.Unmarshaler{
-			AllowUnknownFields: true,
+		unmarshaler := protojson.UnmarshalOptions{
+			DiscardUnknown: true,
 		}
-		response.Reset()
-		if err := unmarshaler.Unmarshal(httpResponse.Body, response); err != nil {
+
+		if err := unmarshaler.Unmarshal(body, response); err != nil {
 			return retry.Retryable(xerrors.Errorf("failed to decode response: %w", err))
 		}
 

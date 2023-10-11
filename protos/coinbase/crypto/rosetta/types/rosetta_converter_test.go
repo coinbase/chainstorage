@@ -4,16 +4,16 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	sdk "github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/structpb"
 	"log"
 	"math/big"
 	"testing"
 	"time"
+
+	sdk "github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestFromSDKBlock(t *testing.T) {
@@ -90,18 +90,18 @@ func TestToSDKOperation(t *testing.T) {
 			Address: "DMr3fEiVrPWFpoCWS958zNtqgnFb7QWn9D",
 			SubAccount: &SubAccountIdentifier{
 				Address:  "DMr3fEiVrP",
-				Metadata: map[string]*any.Any{},
+				Metadata: map[string]*anypb.Any{},
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		},
 		Amount: &Amount{
 			Value: "1000000000000",
 			Currency: &Currency{
 				Symbol:   "DOGE",
 				Decimals: 8,
-				Metadata: map[string]*any.Any{},
+				Metadata: map[string]*anypb.Any{},
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		},
 		CoinChange: &CoinChange{
 			CoinIdentifier: &CoinIdentifier{
@@ -109,7 +109,7 @@ func TestToSDKOperation(t *testing.T) {
 			},
 			CoinAction: CoinChange_COIN_CREATED,
 		},
-		Metadata: map[string]*any.Any{},
+		Metadata: map[string]*anypb.Any{},
 	}
 
 	expectedOp := &sdk.Operation{
@@ -226,7 +226,7 @@ func TestToSDKTransaction(t *testing.T) {
 				Direction: RelatedTransaction_FORWARD,
 			},
 		},
-		Metadata: map[string]*any.Any{
+		Metadata: map[string]*anypb.Any{
 			"size": sizeToAny,
 		},
 	}
@@ -323,9 +323,9 @@ func mustTime(value string) time.Time {
 	return t
 }
 
-func mustTimestamp(value string) *timestamp.Timestamp {
+func mustTimestamp(value string) *timestamppb.Timestamp {
 	t := mustTime(value)
-	return &timestamp.Timestamp{
+	return &timestamppb.Timestamp{
 		Seconds: t.Unix(),
 		Nanos:   int32(t.Nanosecond()),
 	}
@@ -466,7 +466,7 @@ func block(t *testing.T) (*sdk.Block, *Block) {
 						},
 						Type:     "COINBASE",
 						Status:   "SUCCESS",
-						Metadata: map[string]*any.Any{},
+						Metadata: map[string]*anypb.Any{},
 					},
 					{
 						OperationIdentifier: &OperationIdentifier{
@@ -480,18 +480,18 @@ func block(t *testing.T) (*sdk.Block, *Block) {
 							Address: "DMr3fEiVrPWFpoCWS958zNtqgnFb7QWn9D",
 							SubAccount: &SubAccountIdentifier{
 								Address:  "DMr3fEiVrP",
-								Metadata: map[string]*any.Any{},
+								Metadata: map[string]*anypb.Any{},
 							},
-							Metadata: map[string]*any.Any{},
+							Metadata: map[string]*anypb.Any{},
 						},
 						Amount: &Amount{
 							Value: "1000000000000",
 							Currency: &Currency{
 								Symbol:   "DOGE",
 								Decimals: 8,
-								Metadata: map[string]*any.Any{},
+								Metadata: map[string]*anypb.Any{},
 							},
-							Metadata: map[string]*any.Any{},
+							Metadata: map[string]*anypb.Any{},
 						},
 						CoinChange: &CoinChange{
 							CoinIdentifier: &CoinIdentifier{
@@ -499,7 +499,7 @@ func block(t *testing.T) (*sdk.Block, *Block) {
 							},
 							CoinAction: CoinChange_COIN_CREATED,
 						},
-						Metadata: map[string]*any.Any{},
+						Metadata: map[string]*anypb.Any{},
 					},
 				},
 				RelatedTransactions: []*RelatedTransaction{
@@ -514,7 +514,7 @@ func block(t *testing.T) (*sdk.Block, *Block) {
 						Direction: RelatedTransaction_FORWARD,
 					},
 				},
-				Metadata: map[string]*any.Any{},
+				Metadata: map[string]*anypb.Any{},
 			},
 			{
 				TransactionIdentifier: &TransactionIdentifier{
@@ -522,10 +522,10 @@ func block(t *testing.T) (*sdk.Block, *Block) {
 				},
 				RelatedTransactions: []*RelatedTransaction{},
 				Operations:          []*Operation{},
-				Metadata:            map[string]*any.Any{},
+				Metadata:            map[string]*anypb.Any{},
 			},
 		},
-		Metadata: map[string]*any.Any{
+		Metadata: map[string]*anypb.Any{
 			"difficulty": difficultyToAny,
 			"bits":       bitsToAny,
 		},
