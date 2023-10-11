@@ -226,7 +226,10 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 		finalizer := finalizer.WithCloser(httpResponse.Body)
 		defer finalizer.Finalize()
 
-		body, _ := ioutil.ReadAll(httpResponse.Body)
+		body, err := ioutil.ReadAll(httpResponse.Body)
+		if err != nil {
+			return retry.Retryable(xerrors.Errorf("failed to read from http response: %w", err))
+		}
 		if statusCode := httpResponse.StatusCode; statusCode != http.StatusOK {
 			if statusCode == 429 || statusCode >= 500 {
 				return retry.Retryable(xerrors.Errorf("received retryable status code %v: %v", statusCode, string(body)))
