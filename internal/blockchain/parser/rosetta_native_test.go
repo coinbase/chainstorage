@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/protobuf/ptypes/any"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -267,7 +266,7 @@ func TestParseRosettaNativeBlock(t *testing.T) {
 				Metadata: map[string]*anypb.Any{},
 			},
 		},
-		Metadata: map[string]*any.Any{
+		Metadata: map[string]*anypb.Any{
 			"difficulty": difficultyToAny,
 			"bits":       bitsToAny,
 		},

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -11,12 +10,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
 	"github.com/uber-go/tally"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq"
@@ -228,13 +227,11 @@ func logBlock(metadata *api.BlockMetadata, block proto.Message, out string) erro
 		}
 	} else {
 		// Defaults to json format.
-		var buf bytes.Buffer
-		marshaler := jsonpb.Marshaler{Indent: "  "}
-		err := marshaler.Marshal(&buf, block)
+		marshaler := protojson.MarshalOptions{Indent: "  "}
+		data, err = marshaler.Marshal(block)
 		if err != nil {
 			return xerrors.Errorf("failed to marshal block in json format: %w", err)
 		}
-		data = buf.Bytes()
 	}
 
 	if err := ioutil.WriteFile(out, data, 0644); /* #nosec G306 */ err != nil {

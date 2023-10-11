@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/golang/protobuf/ptypes/any"
 	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -124,7 +123,7 @@ func convertCSTransactionToRosettaOps(transaction *api.EthereumTransaction, curr
 	destroyedAccounts := map[string]*big.Int{}
 
 	for _, trace := range flattenedTraces {
-		metadata := map[string]*any.Any{}
+		metadata := map[string]*anypb.Any{}
 		opStatus := opStatusSuccess
 		if len(trace.Error) > 0 {
 			opStatus = opStatusFailure
@@ -261,7 +260,7 @@ func convertCSTransactionToRosettaOps(transaction *api.EthereumTransaction, curr
 				Value:    new(big.Int).Neg(value).String(),
 				Currency: currency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		})
 	}
 

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -177,8 +177,8 @@ func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.B
 	}, nil
 }
 
-func (p *solanaNativeParserImpl) parseTimestamp(ts int64) *timestamp.Timestamp {
-	return &timestamp.Timestamp{
+func (p *solanaNativeParserImpl) parseTimestamp(ts int64) *timestamppb.Timestamp {
+	return &timestamppb.Timestamp{
 		Seconds: ts,
 	}
 }

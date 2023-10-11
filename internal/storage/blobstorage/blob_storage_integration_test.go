@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/fx"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"

@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"

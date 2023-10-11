@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -25,17 +25,17 @@ func ParseCompression(compression string) (api.Compression, error) {
 	return api.Compression(parsedCompression), nil
 }
 
-func ToTimestamp(seconds int64) *timestamp.Timestamp {
+func ToTimestamp(seconds int64) *timestamppb.Timestamp {
 	if seconds == 0 {
 		return nil
 	}
 
-	return &timestamp.Timestamp{
+	return &timestamppb.Timestamp{
 		Seconds: seconds,
 	}
 }
 
-func SinceTimestamp(timestamp *timestamp.Timestamp) time.Duration {
+func SinceTimestamp(timestamp *timestamppb.Timestamp) time.Duration {
 	var res time.Duration
 	if timestamp.GetSeconds() > 0 || timestamp.GetNanos() > 0 {
 		if t := timestamp.AsTime(); !t.IsZero() {

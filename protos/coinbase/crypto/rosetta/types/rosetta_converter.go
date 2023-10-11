@@ -4,7 +4,7 @@ import (
 	"golang.org/x/xerrors"
 
 	sdk "github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/golang/protobuf/ptypes/any"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 var (
@@ -393,8 +393,8 @@ func FromSDKCoinIdentifier(coinIdentifier *sdk.CoinIdentifier) *CoinIdentifier {
 }
 
 // FromSDKMetadata converts metadata from rosetta sdk type to proto type
-func FromSDKMetadata(metadata map[string]interface{}) (map[string]*any.Any, error) {
-	result := make(map[string]*any.Any, len(metadata))
+func FromSDKMetadata(metadata map[string]interface{}) (map[string]*anypb.Any, error) {
+	result := make(map[string]*anypb.Any, len(metadata))
 	for k, v := range metadata {
 		value, err := MarshalToAny(v)
 		if err != nil {
@@ -651,7 +651,7 @@ func ToSDKAmount(amount *Amount) (*sdk.Amount, error) {
 }
 
 // ToSDKMetadata converts metadata from proto type to rosetta sdk type
-func ToSDKMetadata(metadata map[string]*any.Any) (map[string]interface{}, error) {
+func ToSDKMetadata(metadata map[string]*anypb.Any) (map[string]interface{}, error) {
 	result := make(map[string]interface{}, len(metadata))
 	for k, v := range metadata {
 		value, err := UnmarshalToInterface(v)

@@ -12,10 +12,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/go-playground/validator/v10"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/types"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -625,7 +625,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 			Index:          transaction.Index.Value(),
 			Value:          transaction.Value.Value(),
 			Type:           transaction.Type.Value(),
-			BlockTimestamp: &timestamp.Timestamp{Seconds: int64(block.Timestamp.Value())},
+			BlockTimestamp: &timestamppb.Timestamp{Seconds: int64(block.Timestamp.Value())},
 		}
 		gasPrice, err := transaction.GasPrice.Uint64()
 		if err != nil {
@@ -690,7 +690,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 		Hash:             block.Hash.Value(),
 		ParentHash:       block.ParentHash.Value(),
 		Number:           block.Number.Value(),
-		Timestamp:        &timestamp.Timestamp{Seconds: int64(block.Timestamp.Value())},
+		Timestamp:        &timestamppb.Timestamp{Seconds: int64(block.Timestamp.Value())},
 		Transactions:     transactionHashes,
 		Nonce:            block.Nonce.Value(),
 		Sha3Uncles:       block.Sha3Uncles.Value(),
