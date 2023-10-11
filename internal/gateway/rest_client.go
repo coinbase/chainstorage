@@ -195,9 +195,8 @@ func (c *restClient) GetVersionedChainEvent(ctx context.Context, request *api.Ge
 func (c *restClient) makeRequest(ctx context.Context, method string, request proto.Message, response proto.Message) error {
 	return c.retry.Retry(ctx, func(ctx context.Context) error {
 		marshaler := protojson.MarshalOptions{}
-		var requestBody []byte
-		var err error
-		if requestBody, err = marshaler.Marshal(request); err != nil {
+		requestBody, err := marshaler.Marshal(request)
+		if err != nil {
 			return xerrors.Errorf("failed to marshal request: %w", err)
 		}
 
