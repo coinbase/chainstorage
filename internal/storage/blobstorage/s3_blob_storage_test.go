@@ -22,7 +22,7 @@ import (
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
-func TestBlobStorage_NoCompression(t *testing.T) {
+func TestS3BlobStorage_NoCompression(t *testing.T) {
 	const expectedObjectKey = "BLOCKCHAIN_ETHEREUM/NETWORK_ETHEREUM_MAINNET/1/12345/0xabcde"
 	const expectedObjectSize = int64(12432)
 
@@ -58,7 +58,7 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 	var storage BlobStorage
 	app := testapp.New(
 		t,
-		Module,
+		fx.Provide(NewS3BlobStorage),
 		fx.Provide(func() s3.Downloader { return downloader }),
 		fx.Provide(func() s3.Uploader { return uploader }),
 		fx.Populate(&storage),
@@ -89,13 +89,13 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 	require.NotNil(block)
 }
 
-func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
+func TestS3BlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 	require := testutil.Require(t)
 
 	var storage BlobStorage
 	app := testapp.New(
 		t,
-		Module,
+		fx.Provide(NewS3BlobStorage),
 		fx.Provide(func() s3.Downloader { return nil }),
 		fx.Provide(func() s3.Uploader { return nil }),
 		fx.Populate(&storage),
@@ -125,7 +125,7 @@ func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 	}, block)
 }
 
-func TestBlobStorage_DownloadErrRequestCanceled(t *testing.T) {
+func TestS3BlobStorage_DownloadErrRequestCanceled(t *testing.T) {
 	require := testutil.Require(t)
 
 	ctrl := gomock.NewController(t)
@@ -137,7 +137,7 @@ func TestBlobStorage_DownloadErrRequestCanceled(t *testing.T) {
 	var blobStorage BlobStorage
 	app := testapp.New(
 		t,
-		Module,
+		fx.Provide(NewS3BlobStorage),
 		fx.Provide(func() s3.Downloader { return downloader }),
 		fx.Provide(func() s3.Uploader { return uploader }),
 		fx.Populate(&blobStorage),
