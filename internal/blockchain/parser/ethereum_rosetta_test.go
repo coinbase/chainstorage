@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
 
@@ -187,7 +187,7 @@ func (s *ethereumRosettaParserTestSuite) TestEthereumRosettaParser() {
 				Index: 11321999,
 				Hash:  "0xb91edf64c8c47f199398050a1d18efc3b00725d866b875e340198f563a000575",
 			},
-			Timestamp: &timestamp.Timestamp{
+			Timestamp: &timestamppb.Timestamp{
 				Seconds: 1606234041,
 			},
 			Transactions: []*rosetta.Transaction{

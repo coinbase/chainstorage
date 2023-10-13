@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
 
@@ -77,7 +77,7 @@ func (s *optimismParserTestSuite) TestParseOptimismBlock() {
 			Hash:             "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
 			ParentHash:       "0xb91edf64c8c47f199398050a1d18efc3b00725d866b875e340198f563a000575",
 			Number:           0xacc290,
-			Timestamp:        &timestamp.Timestamp{Seconds: int64(1606234041)},
+			Timestamp:        &timestamppb.Timestamp{Seconds: int64(1606234041)},
 			Transactions:     []string{"0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8"},
 			Nonce:            "0xc83f6d8ab7e58888",
 			Sha3Uncles:       "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
@@ -108,7 +108,7 @@ func (s *optimismParserTestSuite) TestParseOptimismBlock() {
 				Index:          0,
 				Value:          "10",
 				Type:           uint64(0),
-				BlockTimestamp: &timestamp.Timestamp{Seconds: int64(1606234041)},
+				BlockTimestamp: &timestamppb.Timestamp{Seconds: int64(1606234041)},
 				OptionalTransactionAccessList: &api.EthereumTransaction_TransactionAccessList{
 					TransactionAccessList: &api.EthereumTransactionAccessList{
 						AccessList: []*api.EthereumTransactionAccess{

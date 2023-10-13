@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
@@ -58,17 +58,17 @@ func TestParseCompressionUnknown(t *testing.T) {
 func TestToTimestamp(t *testing.T) {
 	require := require.New(t)
 	require.Nil(ToTimestamp(0))
-	require.Equal(&timestamp.Timestamp{Seconds: 123456789}, ToTimestamp(123456789))
+	require.Equal(&timestamppb.Timestamp{Seconds: 123456789}, ToTimestamp(123456789))
 }
 
 func TestSinceTimestamp(t *testing.T) {
 	require := require.New(t)
 	duration := SinceTimestamp(nil)
 	require.Zero(duration)
-	duration = SinceTimestamp(&timestamp.Timestamp{Seconds: 0})
+	duration = SinceTimestamp(&timestamppb.Timestamp{Seconds: 0})
 	require.Zero(duration)
 
-	ts := &timestamp.Timestamp{Seconds: time.Now().Unix() - 1}
+	ts := &timestamppb.Timestamp{Seconds: time.Now().Unix() - 1}
 	duration = SinceTimestamp(ts)
 	require.NotZero(duration)
 	require.Less(duration, time.Second*2)

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/protobuf/ptypes/any"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/bootstrap"
 
@@ -208,7 +208,7 @@ func (p *ethereumRosettaParserImpl) createBlockRewardTransaction(block *api.Ethe
 			Value:    strconv.FormatInt(minerReward, 10),
 			Currency: &ethereumRosettaCurrency,
 		},
-		Metadata: map[string]*any.Any{},
+		Metadata: map[string]*anypb.Any{},
 	}
 
 	ops = append(ops, miningRewardOp)
@@ -237,7 +237,7 @@ func (p *ethereumRosettaParserImpl) createBlockRewardTransaction(block *api.Ethe
 				Value:    uncleRewardBlock.String(),
 				Currency: &ethereumRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		}
 		ops = append(ops, uncleRewardOp)
 	}
@@ -247,7 +247,7 @@ func (p *ethereumRosettaParserImpl) createBlockRewardTransaction(block *api.Ethe
 			Hash: block.Header.Hash,
 		},
 		Operations: ops,
-		Metadata:   map[string]*any.Any{},
+		Metadata:   map[string]*anypb.Any{},
 	}
 }
 
@@ -275,7 +275,7 @@ func (p *ethereumRosettaParserImpl) feeOps(transaction *api.EthereumTransaction,
 				Value:    new(big.Int).Neg(minerEarnedAmount).String(),
 				Currency: &ethereumRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		},
 		{
 			OperationIdentifier: &rosetta.OperationIdentifier{
@@ -295,7 +295,7 @@ func (p *ethereumRosettaParserImpl) feeOps(transaction *api.EthereumTransaction,
 				Value:    minerEarnedAmount.String(),
 				Currency: &ethereumRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		},
 	}
 
@@ -349,7 +349,7 @@ func (p *ethereumRosettaParserImpl) getGenesisTransactions(allocations []*bootst
 				Value:    allo.Value,
 				Currency: &ethereumRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		}
 
 		txnIdentifier := fmt.Sprintf("GENESIS_%s", addressLower[2:])
@@ -358,7 +358,7 @@ func (p *ethereumRosettaParserImpl) getGenesisTransactions(allocations []*bootst
 				Hash: txnIdentifier,
 			},
 			Operations: []*rosetta.Operation{genesisOp},
-			Metadata:   map[string]*any.Any{},
+			Metadata:   map[string]*anypb.Any{},
 		}
 
 		genesisTxns = append(genesisTxns, txn)
