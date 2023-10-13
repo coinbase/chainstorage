@@ -1,6 +1,6 @@
 module github.com/coinbase/chainstorage
 
-go 1.18
+go 1.21
 
 require (
 	github.com/VividCortex/ewma v1.2.0
