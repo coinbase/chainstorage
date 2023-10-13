@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )

@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/fx"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
 
@@ -1622,7 +1622,7 @@ func TestParseEthereumBlock(t *testing.T) {
 			Hash:             "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
 			ParentHash:       "0xb91edf64c8c47f199398050a1d18efc3b00725d866b875e340198f563a000575",
 			Number:           0xacc290,
-			Timestamp:        &timestamp.Timestamp{Seconds: int64(1606234041)},
+			Timestamp:        &timestamppb.Timestamp{Seconds: int64(1606234041)},
 			Transactions:     []string{"0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8"},
 			Nonce:            "0xc83f6d8ab7e58888",
 			Sha3Uncles:       "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
@@ -1653,7 +1653,7 @@ func TestParseEthereumBlock(t *testing.T) {
 				Index:          0,
 				Value:          "10",
 				Type:           uint64(0),
-				BlockTimestamp: &timestamp.Timestamp{Seconds: int64(1606234041)},
+				BlockTimestamp: &timestamppb.Timestamp{Seconds: int64(1606234041)},
 				OptionalTransactionAccessList: &api.EthereumTransaction_TransactionAccessList{
 					TransactionAccessList: &api.EthereumTransactionAccessList{
 						AccessList: []*api.EthereumTransactionAccess{
@@ -1937,7 +1937,7 @@ func TestParseEthereumBlock_LargeEventLogData(t *testing.T) {
 			Hash:             "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
 			ParentHash:       "0xb91edf64c8c47f199398050a1d18efc3b00725d866b875e340198f563a000575",
 			Number:           0xacc290,
-			Timestamp:        &timestamp.Timestamp{Seconds: int64(1606234041)},
+			Timestamp:        &timestamppb.Timestamp{Seconds: int64(1606234041)},
 			Transactions:     []string{"0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8"},
 			Nonce:            "0xc83f6d8ab7e58888",
 			Sha3Uncles:       "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
@@ -1968,7 +1968,7 @@ func TestParseEthereumBlock_LargeEventLogData(t *testing.T) {
 				Index:          0,
 				Value:          "10",
 				Type:           uint64(0),
-				BlockTimestamp: &timestamp.Timestamp{Seconds: int64(1606234041)},
+				BlockTimestamp: &timestamppb.Timestamp{Seconds: int64(1606234041)},
 				OptionalTransactionAccessList: &api.EthereumTransaction_TransactionAccessList{
 					TransactionAccessList: &api.EthereumTransactionAccessList{
 						AccessList: []*api.EthereumTransactionAccess{
@@ -2109,7 +2109,7 @@ func TestParseEthereumBlock_EmptyStatus(t *testing.T) {
 			Hash:             "0xbaa42c87b7c764c548fa37e61e9764415fd4a79d7e073d4f92a456698002016b",
 			ParentHash:       "0xb91edf64c8c47f199398050a1d18efc3b00725d866b875e340198f563a000575",
 			Number:           0xacc290,
-			Timestamp:        &timestamp.Timestamp{Seconds: int64(1606234041)},
+			Timestamp:        &timestamppb.Timestamp{Seconds: int64(1606234041)},
 			Transactions:     []string{"0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8"},
 			Nonce:            "0xc83f6d8ab7e58888",
 			Sha3Uncles:       "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
@@ -2140,7 +2140,7 @@ func TestParseEthereumBlock_EmptyStatus(t *testing.T) {
 				Index:          0,
 				Value:          "10",
 				Type:           uint64(0),
-				BlockTimestamp: &timestamp.Timestamp{Seconds: int64(1606234041)},
+				BlockTimestamp: &timestamppb.Timestamp{Seconds: int64(1606234041)},
 				OptionalTransactionAccessList: &api.EthereumTransaction_TransactionAccessList{
 					TransactionAccessList: &api.EthereumTransactionAccessList{
 						AccessList: []*api.EthereumTransactionAccess{
@@ -2375,7 +2375,7 @@ func TestParseEthereumBlock_PostLondon(t *testing.T) {
 			Hash:             "0x75ba53b1d5e77b849c669880a4c1bb758a3ffefe9410c6bc1c61306312c9ee61",
 			ParentHash:       "0x938e07a85b9903c5ddb49181b6bf6a35352f7726c4bd879ab8543b7e68000db2",
 			Number:           0xc5d824,
-			Timestamp:        &timestamp.Timestamp{Seconds: int64(1628179593)},
+			Timestamp:        &timestamppb.Timestamp{Seconds: int64(1628179593)},
 			Transactions:     []string{"0x256697702d7a60ef603e5261d6bc8f1916de05bebafa79e8519e2e360d02bfa2"},
 			Nonce:            "0x2682202d6780632a",
 			Sha3Uncles:       "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
@@ -2409,7 +2409,7 @@ func TestParseEthereumBlock_PostLondon(t *testing.T) {
 				Index:          0x177,
 				Value:          "1",
 				Type:           uint64(2),
-				BlockTimestamp: &timestamp.Timestamp{Seconds: int64(1628179593)},
+				BlockTimestamp: &timestamppb.Timestamp{Seconds: int64(1628179593)},
 				OptionalMaxFeePerGas: &api.EthereumTransaction_MaxFeePerGas{
 					MaxFeePerGas: 0x1e5d85f6cc,
 				},
@@ -2537,7 +2537,7 @@ func TestParseEthereumBlock_PostLondon_LegacyTransaction(t *testing.T) {
 			Hash:             "0x6d39744339b781ecaa5a86732c8db2b81a24ddb2f0b74f0e08e39ccab765abdb",
 			ParentHash:       "0x3dbb07f300342df11c0db6ada1720be2a2945c4e3f1e31ce47ad03286049d6b2",
 			Number:           0xce19cf,
-			Timestamp:        &timestamp.Timestamp{Seconds: int64(1635441253)},
+			Timestamp:        &timestamppb.Timestamp{Seconds: int64(1635441253)},
 			Transactions:     []string{"0x389fc3e9b76a2a873f3bd6068286cc0f60b4a39791d9c55a36f91887d5b69106"},
 			Nonce:            "0x2682202d6780632a",
 			Sha3Uncles:       "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
@@ -2571,7 +2571,7 @@ func TestParseEthereumBlock_PostLondon_LegacyTransaction(t *testing.T) {
 				Index:          0xb3,
 				Value:          "0",
 				Type:           uint64(0),
-				BlockTimestamp: &timestamp.Timestamp{Seconds: int64(1635441253)},
+				BlockTimestamp: &timestamppb.Timestamp{Seconds: int64(1635441253)},
 				OptionalPriorityFeePerGas: &api.EthereumTransaction_PriorityFeePerGas{
 					PriorityFeePerGas: 0x31a36fcb,
 				},

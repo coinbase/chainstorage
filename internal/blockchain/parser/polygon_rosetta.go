@@ -10,9 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/golang/protobuf/ptypes/any"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/bootstrap"
 
@@ -181,7 +181,7 @@ func (p *polygonRosettaParserImpl) feeOps(transaction *api.EthereumTransaction, 
 				Value:    new(big.Int).Neg(minerEarnedAmount).String(),
 				Currency: &polygonRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		},
 		{
 			OperationIdentifier: &rosetta.OperationIdentifier{
@@ -201,7 +201,7 @@ func (p *polygonRosettaParserImpl) feeOps(transaction *api.EthereumTransaction, 
 				Value:    minerEarnedAmount.String(),
 				Currency: &polygonRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		},
 	}
 
@@ -388,7 +388,7 @@ func (p *polygonRosettaParserImpl) getLogTransferTxOps(transaction *api.Ethereum
 						Value:    new(big.Int).Neg(value).String(),
 						Currency: &polygonRosettaCurrency,
 					},
-					Metadata: map[string]*any.Any{},
+					Metadata: map[string]*anypb.Any{},
 				})
 
 				operations = append(operations, &rosetta.Operation{
@@ -404,7 +404,7 @@ func (p *polygonRosettaParserImpl) getLogTransferTxOps(transaction *api.Ethereum
 						Value:    value.String(),
 						Currency: &polygonRosettaCurrency,
 					},
-					Metadata: map[string]*any.Any{},
+					Metadata: map[string]*anypb.Any{},
 				})
 			}
 		}
@@ -457,7 +457,7 @@ func (p *polygonRosettaParserImpl) getHopProtocolTxOps(transaction *api.Ethereum
 				Value:    value.String(),
 				Currency: &polygonRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		},
 		)
 	}
@@ -506,7 +506,7 @@ func (p *polygonRosettaParserImpl) getStateSyncTracesOpsFn(transaction *api.Ethe
 						Value:    value.String(),
 						Currency: &polygonRosettaCurrency,
 					},
-					Metadata: map[string]*any.Any{},
+					Metadata: map[string]*anypb.Any{},
 				}
 
 				operations = append(operations, operation)
@@ -540,7 +540,7 @@ func (p *polygonRosettaParserImpl) getGenesisTransactions(allocations []*bootstr
 				Value:    allo.Value,
 				Currency: &polygonRosettaCurrency,
 			},
-			Metadata: map[string]*any.Any{},
+			Metadata: map[string]*anypb.Any{},
 		}
 
 		txnIdentifier := fmt.Sprintf("GENESIS_%s", addressLower[2:])
@@ -549,7 +549,7 @@ func (p *polygonRosettaParserImpl) getGenesisTransactions(allocations []*bootstr
 				Hash: txnIdentifier,
 			},
 			Operations: []*rosetta.Operation{genesisOp},
-			Metadata:   map[string]*any.Any{},
+			Metadata:   map[string]*anypb.Any{},
 		}
 
 		genesisTxns = append(genesisTxns, txn)

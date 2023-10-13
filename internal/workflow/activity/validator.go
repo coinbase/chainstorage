@@ -3,13 +3,13 @@ package activity
 import (
 	"context"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/uber-go/tally"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"

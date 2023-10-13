@@ -1,16 +1,16 @@
-version: '3'
+version: "3"
 
 volumes:
-  dynamodb_data:
+  localstack_data: {}
+  postgres_data: {}
 
 services:
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:2.3.2
     ports:
       - 4566:4566
       - 4510-4559:4510-4559  # external services port range
     environment:
-      - SERVICES=s3,dynamodb,sqs
       - DEBUG=1
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AWS_DEFAULT_REGION=us-east-1
@@ -20,24 +20,22 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./bin/localstack:/docker-entrypoint-initaws.d
       - ./bin/localstack/policies:/policies
+      - localstack_data:/var/lib/localstack
   postgresql:
-    image: postgres:11.2
+    image: postgres:15.4-alpine
     ports:
-      - 5432:5432
+      - ${CHAINSTORAGE_TEMPORAL_POSTGRES_PORT:-5432}:5432
     environment:
       - POSTGRES_USER=temporal
       - POSTGRES_PASSWORD=temporal
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
   temporal:
-    image: temporalio/auto-setup:1.12.4
+    image: temporalio/auto-setup:1.22.0
     depends_on:
       - postgresql
-    command: ['autosetup']
     ports:
       - 7233:7233
-      - 7234:7234
-      - 7235:7235
     labels:
       service_group: temporal
     environment:
@@ -46,16 +44,24 @@ services:
       - POSTGRES_USER=temporal
       - POSTGRES_PWD=temporal
       - POSTGRES_SEEDS=postgresql
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
       - USE_HOSTNAME_IP=true
     restart: always
-  temporal-web:
-    image: temporalio/web:1.12.0
+  temporal-ui:
+    image: temporalio/ui:2.18.2
     ports:
-      - 8088:8088
+      - 8088:8080
     labels:
       service_group: temporal-web
     environment:
-      - TEMPORAL_GRPC_ENDPOINT=temporal:7233
+      - TEMPORAL_ADDRESS=temporal:7233
     depends_on:
       - temporal
+  temporal-admin-tools:
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    image: temporalio/admin-tools:1.22.0
+    stdin_open: true
+    tty: true

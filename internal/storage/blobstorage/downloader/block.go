@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/proto"
 	tracehttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 
 	"github.com/coinbase/chainstorage/internal/config"
