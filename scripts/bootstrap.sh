@@ -4,8 +4,10 @@ set -exo pipefail
 
 # Use asdf if it's available
 if [ -x "$(command -v asdf)" ]; then
-  if ! asdf plugin-list | grep -e '^golang$' &> /dev/null; then
-    asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
+  if ! [ -x "$(command -v go)" ]; then
+    if ! asdf plugin-list | grep -e '^golang$' &> /dev/null; then
+      asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
+    fi
   fi
   if ! asdf plugin-list | grep -e '^yq$' &> /dev/null; then
     asdf plugin-add yq https://github.com/sudermanjr/asdf-yq.git
