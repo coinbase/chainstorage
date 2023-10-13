@@ -8,7 +8,7 @@ if [ -x "$(command -v asdf)" ]; then
     asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
   fi
   if ! asdf plugin-list | grep -e '^yq$' &> /dev/null; then
-    asdf plugin-add yq https://github.com/beardix/asdf-yq.git
+    asdf plugin-add yq https://github.com/sudermanjr/asdf-yq.git
   fi
   if ! asdf plugin-list | grep -e '^protoc$' &> /dev/null; then
     asdf plugin-add protoc https://github.com/paxosglobal/asdf-protoc.git
