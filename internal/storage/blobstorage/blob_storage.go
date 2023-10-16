@@ -6,6 +6,7 @@ import (
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
+	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
@@ -37,11 +38,12 @@ func WithBlobStorageFactory() fx.Option {
 }
 
 func NewBlobStorage(factories BlobStorageFactories) (BlobStorage, error) {
-	// TODO make it enum and read from config, e.g. factories.Config.BlobStorageType
-	block_storage_type := "s3"
-	switch block_storage_type {
-	case "s3":
+	switch factories.Config.StorageType.BlobStorageType {
+	// If it's unspecified, defaults to S3
+	case config.BlobStorageType_UNSPECIFIED, config.BlobStorageType_S3:
 		return factories.S3.Create(), nil
 	}
-	return nil, xerrors.Errorf("blob storage type is not implemented: %v ", block_storage_type)
+	return nil, xerrors.Errorf(
+		"blob storage type is not implemented: %v",
+		factories.Config.StorageType.BlobStorageType)
 }

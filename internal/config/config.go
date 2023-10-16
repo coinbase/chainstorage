@@ -27,6 +27,7 @@ import (
 type (
 	Config struct {
 		ConfigName     string               `mapstructure:"config_name" validate:"required"`
+		StorageType    StorageType          `mapstructure:"storage_type"`
 		Chain          ChainConfig          `mapstructure:"chain"`
 		AWS            AwsConfig            `mapstructure:"aws"`
 		Cadence        CadenceConfig        `mapstructure:"cadence"`
@@ -41,6 +42,12 @@ type (
 		namespace string
 		env       Env
 	}
+
+	StorageType struct {
+		BlobStorageType BlobStorageType `mapstructure:"blob"`
+	}
+
+	BlobStorageType int32
 
 	ChainConfig struct {
 		Blockchain           common.Blockchain `mapstructure:"blockchain" validate:"required"`
@@ -342,6 +349,15 @@ var (
 		AWSAccountDevelopment: "dev",
 		AWSAccountProduction:  "prod",
 	}
+
+	BlobStorageType_name = map[int32]string{
+		0: "UNSPECIFIED",
+		1: "S3",
+	}
+	BlobStorageType_value = map[string]int32{
+		"UNSPECIFIED": 0,
+		"S3":          1,
+	}
 )
 
 const (
@@ -361,6 +377,9 @@ const (
 	EnvDevelopment Env = "development"
 	EnvProduction  Env = "production"
 	envSecrets     Env = "secrets" // secrets.yml is merged into the env-specific config
+
+	BlobStorageType_UNSPECIFIED BlobStorageType = 0
+	BlobStorageType_S3          BlobStorageType = 1
 
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
@@ -447,6 +466,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 		mapstructure.TextUnmarshallerHookFunc(),
 		mapstructure.StringToTimeDurationHookFunc(),
 		mapstructure.StringToSliceHookFunc(","),
+		stringToBlobStorageTypeHookFunc(),
 		stringToBlockchainHookFunc(),
 		stringToNetworkHookFunc(),
 		stringToCompressionHookFunc(),
@@ -719,6 +739,34 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 	return bytes.NewBuffer((data)), nil
 }
 
+func stringToBlobStorageTypeHookFunc() mapstructure.DecodeHookFunc {
+	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+
+		if t != reflect.TypeOf(BlobStorageType_UNSPECIFIED) {
+			return data, nil
+		}
+
+		v, ok := BlobStorageType_value[data.(string)]
+		if !ok {
+			keys := make([]string, 0, len(BlobStorageType_value))
+			for k, v := range BlobStorageType_value {
+				if v == 0 {
+					continue
+				}
+				keys = append(keys, k)
+			}
+			return nil, xerrors.Errorf(
+				"invalid blob storage type: %v, possible values are: %v",
+				data, strings.Join(keys, ", "))
+		}
+
+		return v, nil
+	}
+}
+
 func stringToBlockchainHookFunc() mapstructure.DecodeHookFunc {
 	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
 		if f.Kind() != reflect.String {
@@ -780,11 +828,7 @@ func (f *FunctionalTestConfig) UnmarshalText(text []byte) error {
 }
 
 func (f *FunctionalTestConfig) Empty() bool {
-	if len(f.SkipFunctionalTest) == 0 {
-		return true
-	}
-
-	return false
+	return len(f.SkipFunctionalTest) == 0
 }
 
 func (c *ClientConfig) Empty() bool {
