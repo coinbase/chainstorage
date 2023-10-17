@@ -1,6 +1,7 @@
 *.swp
 *.swo
 *.tmp
+.github
 
 # OS ignores
 .DS_Store
@@ -12,7 +13,7 @@
 # Ignore all VSCode settings
 /.vscode/
 
-# Auto generated config file for local execution
+# Auto-generated config file for local execution
 /config/**/**/**/secrets.yml
 
 # Build output
@@ -20,3 +21,9 @@
 /tmp/
 /.buildkite-caches/
 /gomock_reflect_*
+
+# ignore ALL .log files
+*.log
+
+# pg 
+postgres_*
