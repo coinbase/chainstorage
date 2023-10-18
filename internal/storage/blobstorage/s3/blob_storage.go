@@ -1,4 +1,4 @@
-package blobstorage
+package s3
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/s3"
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	storage_utils "github.com/coinbase/chainstorage/internal/storage/utils"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -64,19 +65,19 @@ const (
 	blobSizeMetricName      = "blob_size"
 )
 
-var _ BlobStorage = (*s3BlobStorageImpl)(nil)
+var _ internal.BlobStorage = (*s3BlobStorageImpl)(nil)
 
-func NewS3BlobStorageFactory(params S3BlobStorageParams) BlobStorageFactory {
+func NewS3BlobStorageFactory(params S3BlobStorageParams) internal.BlobStorageFactory {
 	return &s3BlobStorageFactory{params}
 }
 
 // Create implements BlobStorageFactory.
-func (f *s3BlobStorageFactory) Create() BlobStorage {
+func (f *s3BlobStorageFactory) Create() internal.BlobStorage {
 	instance, _ := NewS3BlobStorage(f.params)
 	return instance
 }
 
-func NewS3BlobStorage(params S3BlobStorageParams) (BlobStorage, error) {
+func NewS3BlobStorage(params S3BlobStorageParams) (internal.BlobStorage, error) {
 	metrics := params.Metrics.SubScope("blob_storage")
 	return &s3BlobStorageImpl{
 		logger:             log.WithPackage(params.Logger),

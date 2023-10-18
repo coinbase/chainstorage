@@ -1,4 +1,4 @@
-package blobstorage
+package s3
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/s3"
 	s3mocks "github.com/coinbase/chainstorage/internal/s3/mocks"
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -55,7 +56,7 @@ func TestS3BlobStorage_NoCompression(t *testing.T) {
 			return &s3manager.UploadOutput{}, nil
 		})
 
-	var storage BlobStorage
+	var storage internal.BlobStorage
 	app := testapp.New(
 		t,
 		fx.Provide(NewS3BlobStorage),
@@ -92,7 +93,7 @@ func TestS3BlobStorage_NoCompression(t *testing.T) {
 func TestS3BlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 	require := testutil.Require(t)
 
-	var storage BlobStorage
+	var storage internal.BlobStorage
 	app := testapp.New(
 		t,
 		fx.Provide(NewS3BlobStorage),
@@ -134,7 +135,7 @@ func TestS3BlobStorage_DownloadErrRequestCanceled(t *testing.T) {
 	uploader := s3mocks.NewMockUploader(ctrl)
 	downloader := s3manager.NewDownloader(unit.Session)
 
-	var blobStorage BlobStorage
+	var blobStorage internal.BlobStorage
 	app := testapp.New(
 		t,
 		fx.Provide(NewS3BlobStorage),
