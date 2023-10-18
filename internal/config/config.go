@@ -16,6 +16,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/config"
@@ -751,16 +752,9 @@ func stringToBlobStorageTypeHookFunc() mapstructure.DecodeHookFunc {
 
 		v, ok := BlobStorageType_value[data.(string)]
 		if !ok {
-			keys := make([]string, 0, len(BlobStorageType_value))
-			for k, v := range BlobStorageType_value {
-				if v == 0 {
-					continue
-				}
-				keys = append(keys, k)
-			}
 			return nil, xerrors.Errorf(
 				"invalid blob storage type: %v, possible values are: %v",
-				data, strings.Join(keys, ", "))
+				data, strings.Join(maps.Keys(BlobStorageType_value), ", "))
 		}
 
 		return v, nil
