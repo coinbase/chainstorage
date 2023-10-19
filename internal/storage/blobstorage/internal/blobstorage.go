@@ -22,6 +22,6 @@ type (
 	BlobStorageFactories struct {
 		fx.In
 		fxparams.Params
-		S3 BlobStorageFactory `name:"s3"`
+		S3 BlobStorageFactory `name:"blobstorage/s3"`
 	}
 )

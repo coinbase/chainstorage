@@ -15,7 +15,7 @@ import (
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
-func TestIntegrationS3BlobStorage(t *testing.T) {
+func TestIntegrationBlobStorage(t *testing.T) {
 	const expectedObjectKey = "BLOCKCHAIN_ETHEREUM/NETWORK_ETHEREUM_MAINNET/1/12345/0xabcde"
 
 	require := testutil.Require(t)
@@ -24,7 +24,7 @@ func TestIntegrationS3BlobStorage(t *testing.T) {
 	app := testapp.New(
 		t,
 		testapp.WithIntegration(),
-		fx.Provide(NewS3BlobStorage),
+		fx.Provide(New),
 		s3.Module,
 		fx.Populate(&storage),
 	)
@@ -58,7 +58,7 @@ func TestIntegrationS3BlobStorage(t *testing.T) {
 	require.True(proto.Equal(block, downloadedBlock))
 }
 
-func TestIntegrationS3BlobStorageIntegration_GzipFormat(t *testing.T) {
+func TestIntegrationBlobStorageIntegration_GzipFormat(t *testing.T) {
 	const expectedObjectKey = "BLOCKCHAIN_SOLANA/NETWORK_SOLANA_MAINNET/1/12345/0xabcde.gzip"
 
 	require := testutil.Require(t)
@@ -68,7 +68,7 @@ func TestIntegrationS3BlobStorageIntegration_GzipFormat(t *testing.T) {
 		t,
 		testapp.WithIntegration(),
 		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_SOLANA, common.Network_NETWORK_SOLANA_MAINNET),
-		fx.Provide(NewS3BlobStorage),
+		fx.Provide(New),
 		s3.Module,
 		fx.Populate(&storage),
 	)

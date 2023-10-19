@@ -6,7 +6,7 @@ import (
 
 var Module = fx.Options(
 	fx.Provide(fx.Annotated{
-		Name:   "s3",
-		Target: NewS3BlobStorageFactory,
+		Name:   "blobstorage/s3",
+		Target: NewFactory,
 	}),
 )

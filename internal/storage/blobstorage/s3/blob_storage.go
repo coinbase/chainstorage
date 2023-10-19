@@ -31,29 +31,29 @@ import (
 )
 
 type (
-	S3BlobStorageParams struct {
+	BlobStorageParams struct {
 		fx.In
 		fxparams.Params
 		Downloader s3.Downloader
 		Uploader   s3.Uploader
 	}
 
-	s3BlobStorageFactory struct {
-		params S3BlobStorageParams
+	blobStorageFactory struct {
+		params BlobStorageParams
 	}
 
-	s3BlobStorageImpl struct {
+	blobStorageImpl struct {
 		logger             *zap.Logger
 		config             *config.Config
 		bucket             string
 		downloader         s3.Downloader
 		uploader           s3.Uploader
-		blobStorageMetrics *s3BlobStorageMetrics
+		blobStorageMetrics *blobStorageMetrics
 		instrumentUpload   instrument.Call
 		instrumentDownload instrument.Call
 	}
 
-	s3BlobStorageMetrics struct {
+	blobStorageMetrics struct {
 		blobDownloadedSize tally.Timer
 		blobUploadedSize   tally.Timer
 	}
@@ -65,21 +65,21 @@ const (
 	blobSizeMetricName      = "blob_size"
 )
 
-var _ internal.BlobStorage = (*s3BlobStorageImpl)(nil)
+var _ internal.BlobStorage = (*blobStorageImpl)(nil)
 
-func NewS3BlobStorageFactory(params S3BlobStorageParams) internal.BlobStorageFactory {
-	return &s3BlobStorageFactory{params}
+func NewFactory(params BlobStorageParams) internal.BlobStorageFactory {
+	return &blobStorageFactory{params}
 }
 
 // Create implements BlobStorageFactory.
-func (f *s3BlobStorageFactory) Create() internal.BlobStorage {
-	instance, _ := NewS3BlobStorage(f.params)
+func (f *blobStorageFactory) Create() internal.BlobStorage {
+	instance, _ := New(f.params)
 	return instance
 }
 
-func NewS3BlobStorage(params S3BlobStorageParams) (internal.BlobStorage, error) {
+func New(params BlobStorageParams) (internal.BlobStorage, error) {
 	metrics := params.Metrics.SubScope("blob_storage")
-	return &s3BlobStorageImpl{
+	return &blobStorageImpl{
 		logger:             log.WithPackage(params.Logger),
 		config:             params.Config,
 		bucket:             params.Config.AWS.Bucket,
@@ -91,14 +91,14 @@ func NewS3BlobStorage(params S3BlobStorageParams) (internal.BlobStorage, error) 
 	}, nil
 }
 
-func newBlobStorageMetrics(scope tally.Scope) *s3BlobStorageMetrics {
-	return &s3BlobStorageMetrics{
+func newBlobStorageMetrics(scope tally.Scope) *blobStorageMetrics {
+	return &blobStorageMetrics{
 		blobDownloadedSize: scope.SubScope(blobDownloaderScopeName).Timer(blobSizeMetricName),
 		blobUploadedSize:   scope.SubScope(blobUploaderScopeName).Timer(blobSizeMetricName),
 	}
 }
 
-func (s *s3BlobStorageImpl) Upload(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
+func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 	var key string
 	if err := s.instrumentUpload.Instrument(ctx, func(ctx context.Context) error {
 		defer s.logDuration("upload", time.Now())
@@ -160,7 +160,7 @@ func (s *s3BlobStorageImpl) Upload(ctx context.Context, block *api.Block, compre
 	return key, nil
 }
 
-func (s *s3BlobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetadata) (*api.Block, error) {
+func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetadata) (*api.Block, error) {
 	var block api.Block
 	if err := s.instrumentDownload.Instrument(ctx, func(ctx context.Context) error {
 		defer s.logDuration("download", time.Now())
@@ -216,7 +216,7 @@ func (s *s3BlobStorageImpl) Download(ctx context.Context, metadata *api.BlockMet
 	return &block, nil
 }
 
-func (s *s3BlobStorageImpl) logDuration(method string, start time.Time) {
+func (s *blobStorageImpl) logDuration(method string, start time.Time) {
 	s.logger.Debug(
 		"blob_storage",
 		zap.String("method", method),

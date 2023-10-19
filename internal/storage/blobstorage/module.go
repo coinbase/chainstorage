@@ -8,7 +8,7 @@ import (
 )
 
 var Module = fx.Options(
-	fx.Provide(NewBlobStorage),
+	fx.Provide(New),
 	s3.Module,
 	downloader.Module,
 )

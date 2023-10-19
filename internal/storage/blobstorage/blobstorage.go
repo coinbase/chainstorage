@@ -13,13 +13,14 @@ type (
 	BlobStorageFactories = internal.BlobStorageFactories
 )
 
-func NewBlobStorage(factories BlobStorageFactories) (BlobStorage, error) {
+func New(factories BlobStorageFactories) (BlobStorage, error) {
 	switch factories.Config.StorageType.BlobStorageType {
 	// If it's unspecified, defaults to S3
 	case config.BlobStorageType_UNSPECIFIED, config.BlobStorageType_S3:
 		return factories.S3.Create(), nil
+	default:
+		return nil, xerrors.Errorf(
+			"blob storage type is not implemented: %v",
+			factories.Config.StorageType.BlobStorageType)
 	}
-	return nil, xerrors.Errorf(
-		"blob storage type is not implemented: %v",
-		factories.Config.StorageType.BlobStorageType)
 }
