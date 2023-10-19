@@ -79,8 +79,6 @@ sla:
   out_of_sync_node_distance: 10
   tier: 2
   time_since_last_block: 1h
-storage_type:
-  blob: S3
 workflows:
   backfiller:
     activity_retry_maximum_attempts: 3

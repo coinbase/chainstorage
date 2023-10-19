@@ -5,8 +5,6 @@ api:
   streaming_batch_size: 50
   streaming_interval: 1s
   streaming_max_no_event_time: 10m
-storage_type:
-  blob: "S3"
 aws:
   aws_account: development
   bucket: ""
