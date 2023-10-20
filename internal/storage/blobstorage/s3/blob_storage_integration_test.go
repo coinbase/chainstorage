@@ -1,4 +1,4 @@
-package blobstorage
+package s3
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/s3"
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -19,11 +20,11 @@ func TestIntegrationBlobStorage(t *testing.T) {
 
 	require := testutil.Require(t)
 
-	var storage BlobStorage
+	var storage internal.BlobStorage
 	app := testapp.New(
 		t,
 		testapp.WithIntegration(),
-		Module,
+		fx.Provide(New),
 		s3.Module,
 		fx.Populate(&storage),
 	)
@@ -62,12 +63,12 @@ func TestIntegrationBlobStorageIntegration_GzipFormat(t *testing.T) {
 
 	require := testutil.Require(t)
 
-	var storage BlobStorage
+	var storage internal.BlobStorage
 	app := testapp.New(
 		t,
 		testapp.WithIntegration(),
 		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_SOLANA, common.Network_NETWORK_SOLANA_MAINNET),
-		Module,
+		fx.Provide(New),
 		s3.Module,
 		fx.Populate(&storage),
 	)

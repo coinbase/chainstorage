@@ -1,4 +1,4 @@
-package blobstorage
+package s3
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/s3"
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	storage_utils "github.com/coinbase/chainstorage/internal/storage/utils"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -30,16 +31,15 @@ import (
 )
 
 type (
-	BlobStorage interface {
-		Upload(ctx context.Context, block *api.Block, compression api.Compression) (string, error)
-		Download(ctx context.Context, metadata *api.BlockMetadata) (*api.Block, error)
-	}
-
 	BlobStorageParams struct {
 		fx.In
 		fxparams.Params
 		Downloader s3.Downloader
 		Uploader   s3.Uploader
+	}
+
+	blobStorageFactory struct {
+		params BlobStorageParams
 	}
 
 	blobStorageImpl struct {
@@ -65,9 +65,18 @@ const (
 	blobSizeMetricName      = "blob_size"
 )
 
-var _ BlobStorage = (*blobStorageImpl)(nil)
+var _ internal.BlobStorage = (*blobStorageImpl)(nil)
 
-func New(params BlobStorageParams) (BlobStorage, error) {
+func NewFactory(params BlobStorageParams) internal.BlobStorageFactory {
+	return &blobStorageFactory{params}
+}
+
+// Create implements BlobStorageFactory.
+func (f *blobStorageFactory) Create() (internal.BlobStorage, error) {
+	return New(f.params)
+}
+
+func New(params BlobStorageParams) (internal.BlobStorage, error) {
 	metrics := params.Metrics.SubScope("blob_storage")
 	return &blobStorageImpl{
 		logger:             log.WithPackage(params.Logger),

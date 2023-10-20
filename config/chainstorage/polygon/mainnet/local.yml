@@ -2,3 +2,5 @@
 sdk:
   chainstorage_address: localhost:9090
   restful: false
+storage_type:
+  blob: S3
