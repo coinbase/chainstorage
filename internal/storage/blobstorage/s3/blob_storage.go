@@ -72,9 +72,8 @@ func NewFactory(params BlobStorageParams) internal.BlobStorageFactory {
 }
 
 // Create implements BlobStorageFactory.
-func (f *blobStorageFactory) Create() internal.BlobStorage {
-	instance, _ := New(f.params)
-	return instance
+func (f *blobStorageFactory) Create() (internal.BlobStorage, error) {
+	return New(f.params)
 }
 
 func New(params BlobStorageParams) (internal.BlobStorage, error) {

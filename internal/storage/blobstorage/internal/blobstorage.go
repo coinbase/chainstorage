@@ -16,10 +16,10 @@ type (
 	}
 
 	BlobStorageFactory interface {
-		Create() BlobStorage
+		Create() (BlobStorage, error)
 	}
 
-	BlobStorageFactories struct {
+	BlobStorageFactoryParams struct {
 		fx.In
 		fxparams.Params
 		S3 BlobStorageFactory `name:"blobstorage/s3"`
