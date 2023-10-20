@@ -1,5 +1,8 @@
 name: ChainStorage CI
-on: [push]
+on:
+  push: {}
+  pull_request:
+    types: [synchronize]
 concurrency:
   group: "ci-${{ github.ref_name }}"
   cancel-in-progress: true
