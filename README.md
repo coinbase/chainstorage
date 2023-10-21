@@ -48,12 +48,12 @@ It aims to provide an efficient and flexible way to access the on-chain data:
 
 ## Quick Start
 
-If you're not using [asdf](https://asdf-vm.com/), then make sure your local go version is 1.21.3 by running the following commands:
+If you're not using [asdf](https://asdf-vm.com/), then make sure your local go version is 1.20+ by running the following commands:
 
 ```shell
-brew install go@1.21.3
+brew install go@1.20.10
 brew unlink go
-brew link go@1.21.3
+brew link go@1.20.10
 
 brew install protobuf@3.21.12
 brew unlink protobuf

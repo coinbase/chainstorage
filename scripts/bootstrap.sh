@@ -7,8 +7,8 @@ if [ -x "$(command -v asdf)" ]; then
   if ! [ -x "$(command -v go)" ]; then
     if ! asdf plugin-list | grep -e '^golang$' &> /dev/null; then
       asdf plugin add golang https://github.com/asdf-community/asdf-golang.git
-      asdf install golang 1.21.3
-      asdf global golang 1.21.3
+      asdf install golang 1.20.10
+      asdf global golang 1.20.10
     fi
   fi
   if ! asdf plugin-list | grep -e '^yq$' &> /dev/null; then
