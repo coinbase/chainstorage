@@ -107,7 +107,7 @@ func TestCastVersionedItemToDDBEntry(t *testing.T) {
 		EventTag:     2,
 	}
 
-	expectedDDBEntry := &internal.EventEntry{
+	expectedDDBEntry := &model.EventDDBEntry{
 		EventId:      101,
 		EventType:    api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight:  100,
@@ -137,7 +137,7 @@ func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 		EventTag:    2,
 	}
 
-	expectedEntry := &internal.EventEntry{
+	expectedEntry := &model.EventDDBEntry{
 		EventId:     -1,
 		EventType:   api.BlockchainEvent_UNKNOWN,
 		BlockHeight: blockHeightForWatermark,

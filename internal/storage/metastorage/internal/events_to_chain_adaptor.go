@@ -52,7 +52,7 @@ func (e *EventsToChainAdaptor) AppendEvents(events []*EventEntry) error {
 		if lastItem != nil {
 			lastEvent, ok := castItemToEventEntry(lastItem.Value)
 			if !ok {
-				return xerrors.Errorf("failed to cast {%+v} to *model.EventDDBEntry", lastItem.Value)
+				return xerrors.Errorf("failed to cast {%+v} to *model.EventEntry", lastItem.Value)
 			}
 			if lastEvent.EventType == event.EventType {
 				if event.EventType == api.BlockchainEvent_BLOCK_ADDED {
