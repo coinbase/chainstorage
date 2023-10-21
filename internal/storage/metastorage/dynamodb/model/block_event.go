@@ -2,7 +2,6 @@ package model
 
 import (
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -35,7 +34,7 @@ type (
 	}
 )
 
-func newEventDDBEntry(eventTag uint32, eventId int64, inputEvent *model.BlockEvent) *EventDDBEntry {
+func newEventDDBEntry(eventTag uint32, eventId int64, inputEvent *internal.BlockEvent) *EventDDBEntry {
 	return &EventDDBEntry{
 		EventId:        eventId,
 		EventType:      inputEvent.EventType,
@@ -75,8 +74,8 @@ func CastItemToDDBEntry(outputItem interface{}) (*EventDDBEntry, bool) {
 	return eventDDBEntry, true
 }
 
-func CastEventDDBEntryToEventEntry(entry *EventDDBEntry) *model.EventEntry {
-	return &model.EventEntry{
+func IntoEventEntry(entry *EventDDBEntry) *internal.EventEntry {
+	return &internal.EventEntry{
 		EventId:        entry.EventId,
 		EventType:      entry.EventType,
 		BlockHash:      entry.BlockHash,
@@ -90,7 +89,15 @@ func CastEventDDBEntryToEventEntry(entry *EventDDBEntry) *model.EventEntry {
 	}
 }
 
-func CastEventEntryToEventDDBEntry(entry *internal.EventEntry) *EventDDBEntry {
+func IntoEventEntries(ddbEvents []*EventDDBEntry) []*internal.EventEntry {
+	events := make([]*internal.EventEntry, len(ddbEvents))
+	for i := range ddbEvents {
+		events[i] = IntoEventEntry(ddbEvents[i])
+	}
+	return events
+}
+
+func FromEventEntry(entry *internal.EventEntry) *EventDDBEntry {
 	return &EventDDBEntry{
 		EventId:        entry.EventId,
 		EventType:      entry.EventType,
@@ -103,6 +110,14 @@ func CastEventEntryToEventDDBEntry(entry *internal.EventEntry) *EventDDBEntry {
 		BlockSkipped:   entry.BlockSkipped,
 		EventTag:       entry.EventTag,
 	}
+}
+
+func FromEventEntries(eventEntries []*internal.EventEntry) []*EventDDBEntry {
+	ddbEvents := make([]*EventDDBEntry, len(eventEntries))
+	for i := range eventEntries {
+		ddbEvents[i] = FromEventEntry(eventEntries[i])
+	}
+	return ddbEvents
 }
 
 func CastVersionedItemToVersionedDDBEntry(outputItem interface{}) (*VersionedEventDDBEntry, bool) {
