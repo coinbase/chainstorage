@@ -1,11 +1,12 @@
-package metastorage
+package dynamodb
 
 import (
 	"testing"
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 )
 
@@ -106,12 +107,12 @@ func TestCastVersionedItemToDDBEntry(t *testing.T) {
 		EventTag:     2,
 	}
 
-	expectedDDBEntry := &model.EventDDBEntry{
+	expectedDDBEntry := &internal.EventEntry{
 		EventId:      101,
 		EventType:    api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight:  100,
 		BlockHash:    "aaa",
-		Tag:          model.DefaultBlockTag,
+		Tag:          internal.DefaultBlockTag,
 		ParentHash:   "bbb",
 		MaxEventId:   0,
 		BlockSkipped: false,
@@ -126,7 +127,7 @@ func TestCastVersionedItemToDDBEntry(t *testing.T) {
 func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 	require := testutil.Require(t)
 
-	versionedDDBEntry := &model.VersionedEventDDBEntry{
+	versionedEntry := &model.VersionedEventDDBEntry{
 		EventId:     "2-latest",
 		Sequence:    101,
 		BlockId:     "2-latest",
@@ -136,7 +137,7 @@ func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 		EventTag:    2,
 	}
 
-	expectedDDBEntry := &model.EventDDBEntry{
+	expectedEntry := &internal.EventEntry{
 		EventId:     -1,
 		EventType:   api.BlockchainEvent_UNKNOWN,
 		BlockHeight: blockHeightForWatermark,
@@ -145,7 +146,7 @@ func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 		EventTag:    2,
 	}
 
-	actualDDBEntry, err := castVersionedItemToDDBEntry(versionedDDBEntry)
+	actualEntry, err := castVersionedItemToDDBEntry(versionedEntry)
 	require.True(err)
-	require.Equal(expectedDDBEntry, actualDDBEntry)
+	require.Equal(expectedEntry, actualEntry)
 }

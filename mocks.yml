@@ -4,6 +4,8 @@ gomocks:
       - MetaStorage
       - EventStorage
       - BlockStorage
+  - package: internal/storage/metastorage/dynamodb
+    interfaces:
       - DynamoAPI
   - package: internal/storage/blobstorage
     interfaces:

@@ -18,7 +18,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
@@ -288,7 +287,7 @@ func (v *Validator) validateLatestBlock(ctx context.Context, logger *zap.Logger,
 }
 
 func (v *Validator) validateEvents(ctx context.Context, eventTag uint32, startEventId int64, maxEvents uint64) (int64, uint64, error) {
-	var events []*model.EventDDBEntry
+	var events []*metastorage.EventEntry
 	if err := v.metrics.instrumentValidateEvents.Instrument(ctx, func(ctx context.Context) error {
 		// fetch some extra events from earlier ids so we can better test continuity
 		startEventId = startEventId - numOfExtraPrevEventsToValidate

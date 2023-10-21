@@ -13,7 +13,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
 	metastoragemocks "github.com/coinbase/chainstorage/internal/storage/metastorage/mocks"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/internal/workflow/activity"
@@ -71,25 +70,25 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_NoSkip() {
 	forkHeight := uint64(80)
 	hashMismatchBlocks := uint64(10)
 	maxEventId := int64(forkHeight + hashMismatchBlocks)
-	eventDDBEntries := testutil.MakeBlockEventDDBEntries(
+	eventEntries := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		s.eventTag, int64(forkHeight), 0, forkHeight+1, s.tag,
 	)
-	hashMismatchEvents := testutil.MakeBlockEventDDBEntries(
+	hashMismatchEvents := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		s.eventTag, maxEventId, forkHeight+1, forkHeight+hashMismatchBlocks+1, s.tag,
 		testutil.WithBlockHashFormat("streamer_TestHashMismatch0x%s"),
 	)
-	hashMismatchEvents[0].ParentHash = eventDDBEntries[len(eventDDBEntries)-1].BlockHash
-	eventDDBEntries = append(eventDDBEntries, hashMismatchEvents...)
+	hashMismatchEvents[0].ParentHash = eventEntries[len(eventEntries)-1].BlockHash
+	eventEntries = append(eventEntries, hashMismatchEvents...)
 	blocks := testutil.MakeBlockMetadatasFromStartHeight(0, int(maxHeight)+1, s.tag)
 
 	s.metaStorage.EXPECT().GetMaxEventId(gomock.Any(), gomock.Any()).Times(1).Return(maxEventId, nil)
 	s.metaStorage.EXPECT().GetEventsByEventIdRange(
 		gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 	).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error) {
-			return eventDDBEntries[minEventId:maxEventId], nil
+		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*metastorage.EventEntry, error) {
+			return eventEntries[minEventId:maxEventId], nil
 		})
 
 	s.metaStorage.EXPECT().GetLatestBlock(gomock.Any(), s.tag).Times(1).
@@ -101,9 +100,9 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_NoSkip() {
 			return blocks[startHeight:endHeight], nil
 		})
 
-	seenEvents := make([]*model.BlockEvent, 0, maxHeight)
+	seenEvents := make([]*metastorage.BlockEvent, 0, maxHeight)
 	s.metaStorage.EXPECT().AddEvents(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error {
+		func(ctx context.Context, eventTag uint32, events []*metastorage.BlockEvent) error {
 			for _, event := range events {
 				seenEvents = append(seenEvents, event)
 			}
@@ -122,7 +121,7 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_NoSkip() {
 	require.Equal(int(streamerBatchSize+hashMismatchBlocks), len(seenEvents))
 	for i, seenEvent := range seenEvents {
 		if i < int(hashMismatchBlocks) {
-			expectedEvent := model.NewBlockEventFromAnotherDDBEntry(
+			expectedEvent := activity.NewBlockEventFromAnotherEventEntry(
 				api.BlockchainEvent_BLOCK_REMOVED,
 				hashMismatchEvents[len(hashMismatchEvents)-1-i],
 			)
@@ -130,7 +129,7 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_NoSkip() {
 		} else {
 			expectedHeight := forkHeight + uint64(i) - hashMismatchBlocks + 1
 			block := testutil.MakeBlockMetadata(expectedHeight, s.tag)
-			expectedEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
+			expectedEvent := metastorage.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
 			require.Equal(expectedEvent, seenEvent)
 		}
 	}
@@ -147,29 +146,29 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_ForkBlockSkipped() {
 	forkHeight := uint64(80)
 	hashMismatchBlocks := uint64(10)
 	maxEventId := int64(forkHeight + hashMismatchBlocks)
-	eventDDBEntries := testutil.MakeBlockEventDDBEntries(
+	eventEntries := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		s.eventTag, int64(forkHeight), 0, forkHeight+1, s.tag,
 	)
-	hashMismatchEvents := testutil.MakeBlockEventDDBEntries(
+	hashMismatchEvents := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		s.eventTag, maxEventId, forkHeight+1, forkHeight+hashMismatchBlocks+1, s.tag,
 		testutil.WithBlockHashFormat("streamer_TestHashMismatch0x%s"),
 	)
-	hashMismatchEvents[0].ParentHash = eventDDBEntries[len(eventDDBEntries)-1].BlockHash
-	eventDDBEntries = append(eventDDBEntries, hashMismatchEvents...)
+	hashMismatchEvents[0].ParentHash = eventEntries[len(eventEntries)-1].BlockHash
+	eventEntries = append(eventEntries, hashMismatchEvents...)
 	// skipped blocks
 	skippedHeights := []uint64{0, 3, 5, 6, 79, 80, 83, 87}
 	for _, v := range skippedHeights {
-		eventDDBEntries[v].ParentHash = ""
-		eventDDBEntries[v].BlockHash = ""
-		eventDDBEntries[v].BlockSkipped = true
+		eventEntries[v].ParentHash = ""
+		eventEntries[v].BlockHash = ""
+		eventEntries[v].BlockSkipped = true
 	}
 
 	// some blocks missing parent hash
 	missingParentHashBlockIndexes := []int{7, 15, 81}
 	for _, v := range missingParentHashBlockIndexes {
-		eventDDBEntries[v].ParentHash = ""
+		eventEntries[v].ParentHash = ""
 	}
 
 	blocks := testutil.MakeBlockMetadatasFromStartHeight(0, int(maxHeight)+1, s.tag)
@@ -178,8 +177,8 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_ForkBlockSkipped() {
 	s.metaStorage.EXPECT().GetEventsByEventIdRange(
 		gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 	).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error) {
-			return eventDDBEntries[minEventId:maxEventId], nil
+		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*metastorage.EventEntry, error) {
+			return eventEntries[minEventId:maxEventId], nil
 		})
 
 	s.metaStorage.EXPECT().GetLatestBlock(gomock.Any(), s.tag).Times(1).
@@ -191,9 +190,9 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_ForkBlockSkipped() {
 			return blocks[startHeight:endHeight], nil
 		})
 
-	seenEvents := make([]*model.BlockEvent, 0, maxHeight)
+	seenEvents := make([]*metastorage.BlockEvent, 0, maxHeight)
 	s.metaStorage.EXPECT().AddEvents(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error {
+		func(ctx context.Context, eventTag uint32, events []*metastorage.BlockEvent) error {
 			for _, event := range events {
 				seenEvents = append(seenEvents, event)
 			}
@@ -212,7 +211,7 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_ForkBlockSkipped() {
 	require.Equal(int(streamerBatchSize+hashMismatchBlocks), len(seenEvents))
 	for i, seenEvent := range seenEvents {
 		if i < int(hashMismatchBlocks) {
-			expectedEvent := model.NewBlockEventFromAnotherDDBEntry(
+			expectedEvent := activity.NewBlockEventFromAnotherEventEntry(
 				api.BlockchainEvent_BLOCK_REMOVED,
 				hashMismatchEvents[len(hashMismatchEvents)-1-i],
 			)
@@ -220,7 +219,7 @@ func (s *streamerTestSuite) TestStreamer_HandleReorg_ForkBlockSkipped() {
 		} else {
 			expectedHeight := forkHeight + uint64(i) - hashMismatchBlocks + 1
 			block := testutil.MakeBlockMetadata(expectedHeight, s.tag)
-			expectedEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
+			expectedEvent := metastorage.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
 			require.Equal(expectedEvent, seenEvent)
 		}
 	}
@@ -239,11 +238,11 @@ func (s *streamerTestSuite) TestStreamer_NoReorg_WithSkippedBlocks() {
 		skipped[v] = true
 	}
 
-	eventDDBEntries := testutil.MakeBlockEventDDBEntries(
+	eventEntries := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		s.eventTag, int64(latestEventHeight), 0, latestEventHeight+1, s.tag,
 	)
-	for _, entry := range eventDDBEntries {
+	for _, entry := range eventEntries {
 		if skipped[entry.BlockHeight] {
 			entry.BlockSkipped = true
 			entry.ParentHash = ""
@@ -265,8 +264,8 @@ func (s *streamerTestSuite) TestStreamer_NoReorg_WithSkippedBlocks() {
 	s.metaStorage.EXPECT().GetEventsByEventIdRange(
 		gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 	).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error) {
-			return eventDDBEntries[minEventId:maxEventId], nil
+		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*metastorage.EventEntry, error) {
+			return eventEntries[minEventId:maxEventId], nil
 		})
 
 	s.metaStorage.EXPECT().GetLatestBlock(gomock.Any(), s.tag).Times(1).
@@ -278,9 +277,9 @@ func (s *streamerTestSuite) TestStreamer_NoReorg_WithSkippedBlocks() {
 			return blocks[startHeight:endHeight], nil
 		})
 
-	seenEvents := make([]*model.BlockEvent, 0, maxHeight)
+	seenEvents := make([]*metastorage.BlockEvent, 0, maxHeight)
 	s.metaStorage.EXPECT().AddEvents(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error {
+		func(ctx context.Context, eventTag uint32, events []*metastorage.BlockEvent) error {
 			for _, event := range events {
 				require.Equal(skipped[event.GetBlockHeight()], event.GetBlockSkipped())
 				seenEvents = append(seenEvents, event)
@@ -309,25 +308,25 @@ func (s *streamerTestSuite) TestStreamer_NonDefaultEventTag() {
 	forkHeight := uint64(80)
 	hashMismatchBlocks := uint64(10)
 	maxEventId := int64(forkHeight + hashMismatchBlocks)
-	eventDDBEntries := testutil.MakeBlockEventDDBEntries(
+	eventEntries := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		eventTag, int64(forkHeight), 0, forkHeight+1, s.tag,
 	)
-	hashMismatchEvents := testutil.MakeBlockEventDDBEntries(
+	hashMismatchEvents := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		eventTag, maxEventId, forkHeight+1, forkHeight+hashMismatchBlocks+1, s.tag,
 		testutil.WithBlockHashFormat("streamer_TestHashMismatch0x%s"),
 	)
-	hashMismatchEvents[0].ParentHash = eventDDBEntries[len(eventDDBEntries)-1].BlockHash
-	eventDDBEntries = append(eventDDBEntries, hashMismatchEvents...)
+	hashMismatchEvents[0].ParentHash = eventEntries[len(eventEntries)-1].BlockHash
+	eventEntries = append(eventEntries, hashMismatchEvents...)
 	blocks := testutil.MakeBlockMetadatasFromStartHeight(0, int(maxHeight)+1, s.tag)
 
 	s.metaStorage.EXPECT().GetMaxEventId(gomock.Any(), eventTag).Times(1).Return(maxEventId, nil)
 	s.metaStorage.EXPECT().GetEventsByEventIdRange(
 		gomock.Any(), eventTag, gomock.Any(), gomock.Any(),
 	).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error) {
-			return eventDDBEntries[minEventId:maxEventId], nil
+		func(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*metastorage.EventEntry, error) {
+			return eventEntries[minEventId:maxEventId], nil
 		})
 
 	s.metaStorage.EXPECT().GetLatestBlock(gomock.Any(), s.tag).Times(1).
@@ -339,9 +338,9 @@ func (s *streamerTestSuite) TestStreamer_NonDefaultEventTag() {
 			return blocks[startHeight:endHeight], nil
 		})
 
-	seenEvents := make([]*model.BlockEvent, 0, maxHeight)
+	seenEvents := make([]*metastorage.BlockEvent, 0, maxHeight)
 	s.metaStorage.EXPECT().AddEvents(gomock.Any(), eventTag, gomock.Any()).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error {
+		func(ctx context.Context, eventTag uint32, events []*metastorage.BlockEvent) error {
 			for _, event := range events {
 				seenEvents = append(seenEvents, event)
 			}
@@ -361,7 +360,7 @@ func (s *streamerTestSuite) TestStreamer_NonDefaultEventTag() {
 	require.Equal(int(streamerBatchSize+hashMismatchBlocks), len(seenEvents))
 	for i, seenEvent := range seenEvents {
 		if i < int(hashMismatchBlocks) {
-			expectedEvent := model.NewBlockEventFromAnotherDDBEntry(
+			expectedEvent := activity.NewBlockEventFromAnotherEventEntry(
 				api.BlockchainEvent_BLOCK_REMOVED,
 				hashMismatchEvents[len(hashMismatchEvents)-1-i],
 			)
@@ -369,7 +368,7 @@ func (s *streamerTestSuite) TestStreamer_NonDefaultEventTag() {
 		} else {
 			expectedHeight := forkHeight + uint64(i) - hashMismatchBlocks + 1
 			block := testutil.MakeBlockMetadata(expectedHeight, s.tag)
-			expectedEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
+			expectedEvent := metastorage.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
 			require.Equal(expectedEvent, seenEvent)
 		}
 	}

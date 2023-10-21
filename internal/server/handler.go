@@ -29,7 +29,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	storage_utils "github.com/coinbase/chainstorage/internal/storage/utils"
 	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -973,7 +972,7 @@ func (s *Server) GetVersionedChainEvent(ctx context.Context, req *api.GetVersion
 	// return the event with the largest eventId if there are multiple matches
 	// e.g. +h1 -> +h2 -> +h3 -> -h3 -> +h3 -> ...
 	// should return the second +h3 when finding a matching event for +h3
-	var matchedEvent *model.EventDDBEntry
+	var matchedEvent *metastorage.EventEntry
 	for _, event := range events {
 		if event.BlockHash == fromEvent.BlockHash &&
 			event.ParentHash == fromEvent.ParentHash &&

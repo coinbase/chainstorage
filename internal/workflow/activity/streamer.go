@@ -15,7 +15,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
@@ -71,7 +70,7 @@ type (
 	streamerReorgResult struct {
 		forkBlock               *api.BlockMetadata
 		canonicalChainTipHeight uint64
-		updateEvents            []*model.BlockEvent
+		updateEvents            []*metastorage.BlockEvent
 		eventTag                uint32
 	}
 )
@@ -94,6 +93,18 @@ func newStreamerMetrics(scope tally.Scope) *StreamerMetrics {
 		instrumentHandleReorg: instrument.NewCall(scope, "handle_reorg"),
 		reorgCounter:          scope.Counter("reorg"),
 		reorgDistanceGauge:    scope.Gauge("reorg_distance"),
+	}
+}
+
+func NewBlockEventFromAnotherEventEntry(eventType api.BlockchainEvent_Type, entry *metastorage.EventEntry) *metastorage.BlockEvent {
+	return &metastorage.BlockEvent{
+		EventType:      eventType,
+		BlockHash:      entry.BlockHash,
+		BlockHeight:    entry.BlockHeight,
+		ParentHash:     entry.ParentHash,
+		Tag:            entry.Tag,
+		Skipped:        entry.BlockSkipped,
+		BlockTimestamp: entry.BlockTimestamp,
 	}
 }
 
@@ -155,7 +166,7 @@ func (s *Streamer) execute(ctx context.Context, request *StreamerRequest) (*Stre
 	} else if start == end {
 		// already caught up, no need to do anything
 	} else {
-		events := make([]*model.BlockEvent, 0, end-start)
+		events := make([]*metastorage.BlockEvent, 0, end-start)
 		blocks, err := s.metaStorage.GetBlocksByHeightRange(ctx, tag, start, end)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to get blocks in range [%d, %d): %w", start, end, err)
@@ -166,7 +177,7 @@ func (s *Streamer) execute(ctx context.Context, request *StreamerRequest) (*Stre
 		}
 
 		for _, block := range blocks {
-			event := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
+			event := metastorage.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, block)
 			events = append(events, event)
 		}
 
@@ -214,7 +225,7 @@ func (s *Streamer) populateEventsQueue(ctx context.Context, eventTag uint32, min
 	return nil
 }
 
-func (s *Streamer) getEventForTailBlock(ctx context.Context, eventTag uint32, minEventIdFetched *int64, eventsToChainAdaptor *metastorage.EventsToChainAdaptor) (*model.EventDDBEntry, error) {
+func (s *Streamer) getEventForTailBlock(ctx context.Context, eventTag uint32, minEventIdFetched *int64, eventsToChainAdaptor *metastorage.EventsToChainAdaptor) (*metastorage.EventEntry, error) {
 	numFetches := 0
 	for {
 		headEvent, err := eventsToChainAdaptor.PopEventForTailBlock()
@@ -320,8 +331,8 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 		var minBlockFetchedParentHash string
 		var eventWatermarkHeight *uint64
 		minEventIdFetched := maxEventId + 1
-		var headEvent *model.EventDDBEntry
-		updateEvents := make([]*model.BlockEvent, 0)
+		var headEvent *metastorage.EventEntry
+		updateEvents := make([]*metastorage.BlockEvent, 0)
 		for {
 			headEvent, err = s.getEventForTailBlock(ctx, eventTag, &minEventIdFetched, eventsToChainAdaptor)
 			if err != nil {
@@ -365,7 +376,7 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 				}
 			}
 			// detected diff
-			newEvent := model.NewBlockEventFromAnotherDDBEntry(api.BlockchainEvent_BLOCK_REMOVED, headEvent)
+			newEvent := NewBlockEventFromAnotherEventEntry(api.BlockchainEvent_BLOCK_REMOVED, headEvent)
 			updateEvents = append(updateEvents, newEvent)
 			maxAllowedReorgHeight := req.MaxAllowedReorgHeight
 			if uint64(len(updateEvents)) > maxAllowedReorgHeight {

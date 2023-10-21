@@ -1,4 +1,4 @@
-package metastorage
+package dynamodb
 
 import (
 	"context"
@@ -20,6 +20,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -31,15 +32,15 @@ const (
 
 type blockStorageTestSuite struct {
 	suite.Suite
-	accessor MetaStorage
+	accessor internal.MetaStorage
 	config   *config.Config
 }
 
 func (s *blockStorageTestSuite) SetupTest() {
-	var accessor MetaStorage
+	var accessor internal.MetaStorage
 	app := testapp.New(
 		s.T(),
-		Module,
+		fx.Provide(NewMetaStorage),
 		testapp.WithIntegration(),
 		testapp.WithConfig(s.config),
 		fx.Populate(&accessor),

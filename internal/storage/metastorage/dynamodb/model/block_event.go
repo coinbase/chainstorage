@@ -1,11 +1,9 @@
 package model
 
 import (
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
-)
-
-const (
-	DefaultBlockTag = uint32(1)
 )
 
 type (
@@ -21,6 +19,7 @@ type (
 		EventTag       uint32                   `dynamodbav:"event_tag"`
 		BlockTimestamp int64                    `dynamodbav:"block_timestamp"`
 	}
+
 	VersionedEventDDBEntry struct {
 		EventId        string                   `dynamodbav:"event_id"` // will be formatted as {EventTag}-{Sequence}
 		Sequence       int64                    `dynamodbav:"sequence"`
@@ -34,65 +33,34 @@ type (
 		EventTag       uint32                   `dynamodbav:"event_tag"`
 		BlockTimestamp int64                    `dynamodbav:"block_timestamp"`
 	}
-	BlockEvent struct {
-		eventType      api.BlockchainEvent_Type
-		blockHash      string
-		blockHeight    uint64
-		parentHash     string
-		tag            uint32
-		skipped        bool
-		blockTimestamp int64
-	}
 )
 
-func NewBlockEvent(eventType api.BlockchainEvent_Type, blockHash string, parentHash string, blockHeight uint64, tag uint32, skipped bool, blockTimestamp int64) *BlockEvent {
-	return &BlockEvent{
-		eventType:      eventType,
-		blockHash:      blockHash,
-		blockHeight:    blockHeight,
-		parentHash:     parentHash,
-		tag:            tag,
-		skipped:        skipped,
-		blockTimestamp: blockTimestamp,
-	}
-}
-
-func NewBlockEventFromAnotherDDBEntry(eventType api.BlockchainEvent_Type, ddbEntry *EventDDBEntry) *BlockEvent {
-	return &BlockEvent{
-		eventType:      eventType,
-		blockHash:      ddbEntry.BlockHash,
-		blockHeight:    ddbEntry.BlockHeight,
-		parentHash:     ddbEntry.ParentHash,
-		tag:            ddbEntry.Tag,
-		skipped:        ddbEntry.BlockSkipped,
-		blockTimestamp: ddbEntry.BlockTimestamp,
-	}
-}
-
-func NewBlockEventWithBlockMeta(eventType api.BlockchainEvent_Type, block *api.BlockMetadata) *BlockEvent {
-	return &BlockEvent{
-		eventType:      eventType,
-		blockHash:      block.GetHash(),
-		blockHeight:    block.GetHeight(),
-		parentHash:     block.GetParentHash(),
-		tag:            block.GetTag(),
-		skipped:        block.GetSkipped(),
-		blockTimestamp: block.GetTimestamp().GetSeconds(),
-	}
-}
-
-func NewEventDDBEntry(eventTag uint32, eventId int64, inputEvent *BlockEvent) *EventDDBEntry {
+func newEventDDBEntry(eventTag uint32, eventId int64, inputEvent *model.BlockEvent) *EventDDBEntry {
 	return &EventDDBEntry{
 		EventId:        eventId,
-		EventType:      inputEvent.eventType,
-		BlockHeight:    inputEvent.blockHeight,
-		BlockHash:      inputEvent.blockHash,
-		Tag:            inputEvent.tag,
-		ParentHash:     inputEvent.parentHash,
-		BlockSkipped:   inputEvent.skipped,
+		EventType:      inputEvent.EventType,
+		BlockHeight:    inputEvent.BlockHeight,
+		BlockHash:      inputEvent.BlockHash,
+		Tag:            inputEvent.Tag,
+		ParentHash:     inputEvent.ParentHash,
+		BlockSkipped:   inputEvent.Skipped,
 		EventTag:       eventTag,
-		BlockTimestamp: inputEvent.blockTimestamp,
+		BlockTimestamp: inputEvent.BlockTimestamp,
 	}
+}
+
+func ConvertBlockEventsToEventDDBEntries(blockEvents []*internal.BlockEvent, eventTag uint32, eventId int64) []*EventDDBEntry {
+	eventDDBEntries := make([]*EventDDBEntry, len(blockEvents))
+	if len(blockEvents) == 0 {
+		return eventDDBEntries
+	}
+	for i, inputEvent := range blockEvents {
+		event := newEventDDBEntry(eventTag, eventId, inputEvent)
+		eventDDBEntries[i] = event
+		eventId += 1
+	}
+
+	return eventDDBEntries
 }
 
 func CastItemToDDBEntry(outputItem interface{}) (*EventDDBEntry, bool) {
@@ -102,9 +70,39 @@ func CastItemToDDBEntry(outputItem interface{}) (*EventDDBEntry, bool) {
 	}
 	// switch to defaultTag is not set
 	if eventDDBEntry.Tag == 0 {
-		eventDDBEntry.Tag = DefaultBlockTag
+		eventDDBEntry.Tag = internal.DefaultBlockTag
 	}
 	return eventDDBEntry, true
+}
+
+func CastEventDDBEntryToEventEntry(entry *EventDDBEntry) *model.EventEntry {
+	return &model.EventEntry{
+		EventId:        entry.EventId,
+		EventType:      entry.EventType,
+		BlockHash:      entry.BlockHash,
+		BlockHeight:    entry.BlockHeight,
+		ParentHash:     entry.ParentHash,
+		Tag:            entry.Tag,
+		BlockTimestamp: entry.BlockTimestamp,
+		MaxEventId:     entry.MaxEventId,
+		BlockSkipped:   entry.BlockSkipped,
+		EventTag:       entry.EventTag,
+	}
+}
+
+func CastEventEntryToEventDDBEntry(entry *internal.EventEntry) *EventDDBEntry {
+	return &EventDDBEntry{
+		EventId:        entry.EventId,
+		EventType:      entry.EventType,
+		BlockHash:      entry.BlockHash,
+		BlockHeight:    entry.BlockHeight,
+		ParentHash:     entry.ParentHash,
+		Tag:            entry.Tag,
+		BlockTimestamp: entry.BlockTimestamp,
+		MaxEventId:     entry.MaxEventId,
+		BlockSkipped:   entry.BlockSkipped,
+		EventTag:       entry.EventTag,
+	}
 }
 
 func CastVersionedItemToVersionedDDBEntry(outputItem interface{}) (*VersionedEventDDBEntry, bool) {
@@ -115,15 +113,7 @@ func CastVersionedItemToVersionedDDBEntry(outputItem interface{}) (*VersionedEve
 
 	// switch to defaultTag is not set
 	if versionedEventDDBEntry.Tag == 0 {
-		versionedEventDDBEntry.Tag = DefaultBlockTag
+		versionedEventDDBEntry.Tag = internal.DefaultBlockTag
 	}
 	return versionedEventDDBEntry, true
-}
-
-func (e *BlockEvent) GetBlockHeight() uint64 {
-	return e.blockHeight
-}
-
-func (e *BlockEvent) GetBlockSkipped() bool {
-	return e.skipped
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
+	metastorage "github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -34,24 +34,24 @@ const (
 	blockTimestamp = 0x5fbd2fb9
 )
 
-func MakeBlockEvent(eventType api.BlockchainEvent_Type, height uint64, tag uint32, opts ...Option) *model.BlockEvent {
+func MakeBlockEvent(eventType api.BlockchainEvent_Type, height uint64, tag uint32, opts ...Option) *metastorage.BlockEvent {
 	block := getBlock(height, tag, opts...)
-	return model.NewBlockEvent(eventType, block.Hash, block.ParentHash, height, tag, block.Skipped, block.GetTimestamp().GetSeconds())
+	return metastorage.NewBlockEvent(eventType, block.Hash, block.ParentHash, height, tag, block.Skipped, block.GetTimestamp().GetSeconds())
 }
 
-func MakeBlockEvents(eventType api.BlockchainEvent_Type, startHeight uint64, endHeight uint64, tag uint32, opts ...Option) []*model.BlockEvent {
-	events := make([]*model.BlockEvent, 0, endHeight-startHeight)
+func MakeBlockEvents(eventType api.BlockchainEvent_Type, startHeight uint64, endHeight uint64, tag uint32, opts ...Option) []*metastorage.BlockEvent {
+	events := make([]*metastorage.BlockEvent, 0, endHeight-startHeight)
 	for i := startHeight; i < endHeight; i++ {
 		events = append(events, MakeBlockEvent(eventType, i, tag, opts...))
 	}
 	return events
 }
 
-func MakeBlockEventDDBEntries(eventType api.BlockchainEvent_Type, eventTag uint32, endEventId int64, startHeight uint64, endHeight uint64, tag uint32, opts ...Option) []*model.EventDDBEntry {
+func MakeBlockEventEntries(eventType api.BlockchainEvent_Type, eventTag uint32, endEventId int64, startHeight uint64, endHeight uint64, tag uint32, opts ...Option) []*metastorage.EventEntry {
 	events := MakeBlockEvents(eventType, startHeight, endHeight, tag, opts...)
-	entries := make([]*model.EventDDBEntry, len(events))
+	entries := make([]*metastorage.EventEntry, len(events))
 	for i, event := range events {
-		entries[i] = model.NewEventDDBEntry(eventTag, endEventId+int64(i+1-len(events)), event)
+		entries[i] = metastorage.NewEventEntry(eventTag, endEventId+int64(i+1-len(events)), event)
 	}
 	return entries
 }

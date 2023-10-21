@@ -29,7 +29,6 @@ import (
 	blobstoragemocks "github.com/coinbase/chainstorage/internal/storage/blobstorage/mocks"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
 	metastoragemocks "github.com/coinbase/chainstorage/internal/storage/metastorage/mocks"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	storage_utils "github.com/coinbase/chainstorage/internal/storage/utils"
 	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
@@ -1609,28 +1608,28 @@ func (s *handlerTestSuite) TestStreamBackoff_Expired() {
 	require.Equal(streamingBackoffStop, duration)
 }
 
-func (s *handlerTestSuite) setupMetaStorageForEvents(eventTag uint32, startEventId int64, endEventId int64) []*model.EventDDBEntry {
-	eventDDBEntries := testutil.MakeBlockEventDDBEntries(
+func (s *handlerTestSuite) setupMetaStorageForEvents(eventTag uint32, startEventId int64, endEventId int64) []*metastorage.EventEntry {
+	eventEntries := testutil.MakeBlockEventEntries(
 		api.BlockchainEvent_BLOCK_ADDED,
 		eventTag, endEventId, uint64(startEventId), uint64(endEventId+1), s.tagForTestEvents,
 	)
 
 	require := testutil.Require(s.T())
 	s.metaStorage.EXPECT().GetEventsAfterEventId(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
-		func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventDDBEntry, error) {
+		func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*metastorage.EventEntry, error) {
 			require.Equal(s.config.Api.StreamingBatchSize, maxEvents)
 			start := int(eventId + 1 - startEventId)
-			if start >= len(eventDDBEntries) {
-				return []*model.EventDDBEntry{}, nil
+			if start >= len(eventEntries) {
+				return []*metastorage.EventEntry{}, nil
 			}
 			end := int(eventId + 1 - startEventId + int64(maxEvents))
-			if end > len(eventDDBEntries) {
-				end = len(eventDDBEntries)
+			if end > len(eventEntries) {
+				end = len(eventEntries)
 			}
-			return eventDDBEntries[start:end], nil
+			return eventEntries[start:end], nil
 		},
 	)
-	return eventDDBEntries
+	return eventEntries
 }
 
 func (s *handlerTestSuite) verifyStatusCode(code codes.Code, err error) {
@@ -1928,7 +1927,7 @@ func (s *handlerTestSuite) TestGetVersionedChainEvent_WithFromSequence() {
 	)
 	require := testutil.Require(s.T())
 
-	fromEvent := &model.EventDDBEntry{
+	fromEvent := &metastorage.EventEntry{
 		EventId:     fromEventId,
 		EventType:   api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight: blockHeight,
@@ -1937,13 +1936,13 @@ func (s *handlerTestSuite) TestGetVersionedChainEvent_WithFromSequence() {
 		EventTag:    fromEventTag,
 	}
 	s.metaStorage.EXPECT().GetEventByEventId(gomock.Any(), fromEventTag, fromEventId).Times(1).DoAndReturn(
-		func(ctx context.Context, eventTag uint32, eventId int64) (*model.EventDDBEntry, error) {
+		func(ctx context.Context, eventTag uint32, eventId int64) (*metastorage.EventEntry, error) {
 			return fromEvent, nil
 		},
 	)
 	s.metaStorage.EXPECT().GetEventsByBlockHeight(gomock.Any(), toEventTag, fromEvent.BlockHeight).Times(1).DoAndReturn(
-		func(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventDDBEntry, error) {
-			return []*model.EventDDBEntry{
+		func(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*metastorage.EventEntry, error) {
+			return []*metastorage.EventEntry{
 				{
 					EventId:     toEventId,
 					EventType:   api.BlockchainEvent_BLOCK_ADDED,
@@ -1996,7 +1995,7 @@ func (s *handlerTestSuite) TestGetVersionedChainEvent_WithFromSequenceNum() {
 	)
 	require := testutil.Require(s.T())
 
-	fromEvent := &model.EventDDBEntry{
+	fromEvent := &metastorage.EventEntry{
 		EventId:     fromEventId,
 		EventType:   api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight: blockHeight,
@@ -2005,13 +2004,13 @@ func (s *handlerTestSuite) TestGetVersionedChainEvent_WithFromSequenceNum() {
 		EventTag:    fromEventTag,
 	}
 	s.metaStorage.EXPECT().GetEventByEventId(gomock.Any(), fromEventTag, fromEventId).Times(1).DoAndReturn(
-		func(ctx context.Context, eventTag uint32, eventId int64) (*model.EventDDBEntry, error) {
+		func(ctx context.Context, eventTag uint32, eventId int64) (*metastorage.EventEntry, error) {
 			return fromEvent, nil
 		},
 	)
 	s.metaStorage.EXPECT().GetEventsByBlockHeight(gomock.Any(), toEventTag, fromEvent.BlockHeight).Times(1).DoAndReturn(
-		func(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventDDBEntry, error) {
-			return []*model.EventDDBEntry{
+		func(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*metastorage.EventEntry, error) {
+			return []*metastorage.EventEntry{
 				{
 					EventId:     toEventId,
 					EventType:   api.BlockchainEvent_BLOCK_ADDED,
@@ -2064,7 +2063,7 @@ func (s *handlerTestSuite) TestGetVersionedChainEvent_NoMatchingEvent() {
 	)
 	require := testutil.Require(s.T())
 
-	fromEvent := &model.EventDDBEntry{
+	fromEvent := &metastorage.EventEntry{
 		EventId:     fromEventId,
 		EventType:   api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight: blockHeight,
@@ -2073,13 +2072,13 @@ func (s *handlerTestSuite) TestGetVersionedChainEvent_NoMatchingEvent() {
 		EventTag:    fromEventTag,
 	}
 	s.metaStorage.EXPECT().GetEventByEventId(gomock.Any(), fromEventTag, fromEventId).Times(1).DoAndReturn(
-		func(ctx context.Context, eventTag uint32, eventId int64) (*model.EventDDBEntry, error) {
+		func(ctx context.Context, eventTag uint32, eventId int64) (*metastorage.EventEntry, error) {
 			return fromEvent, nil
 		},
 	)
 	s.metaStorage.EXPECT().GetEventsByBlockHeight(gomock.Any(), toEventTag, fromEvent.BlockHeight).Times(1).DoAndReturn(
-		func(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventDDBEntry, error) {
-			return []*model.EventDDBEntry{
+		func(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*metastorage.EventEntry, error) {
+			return []*metastorage.EventEntry{
 				{
 					EventId:     toEventId,
 					EventType:   api.BlockchainEvent_BLOCK_REMOVED,

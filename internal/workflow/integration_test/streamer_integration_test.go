@@ -11,7 +11,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/internal/workflow"
@@ -78,10 +77,10 @@ func (s *StreamerIntegrationTestSuite) TestStreamerIntegration() {
 	blocks, err := streamerDeps.MetaStorage.GetBlocksByHeightRange(context.TODO(), tag, startHeight, endHeight)
 	require.NoError(err)
 	for i, event := range events {
-		expectedBlockEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, blocks[i])
+		expectedBlockEvent := metastorage.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, blocks[i])
 		expectedEventId := int64(i) + metastorage.EventIdStartValue
-		expectedEventDDBEntry := model.NewEventDDBEntry(eventTag, expectedEventId, expectedBlockEvent)
-		require.Equal(expectedEventDDBEntry, event)
+		expectedEventEntry := metastorage.NewEventEntry(eventTag, expectedEventId, expectedBlockEvent)
+		require.Equal(expectedEventEntry, event)
 	}
 }
 
@@ -130,9 +129,9 @@ func (s *StreamerIntegrationTestSuite) TestStreamerIntegration_NonDefaultEventTa
 	blocks, err := streamerDeps.MetaStorage.GetBlocksByHeightRange(context.TODO(), tag, startHeight, endHeight)
 	require.NoError(err)
 	for i, event := range events {
-		expectedBlockEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, blocks[i])
+		expectedBlockEvent := metastorage.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, blocks[i])
 		expectedEventId := int64(i) + metastorage.EventIdStartValue
-		expectedEventDDBEntry := model.NewEventDDBEntry(eventTag, expectedEventId, expectedBlockEvent)
-		require.Equal(expectedEventDDBEntry, event)
+		expectedEventEntry := metastorage.NewEventEntry(eventTag, expectedEventId, expectedBlockEvent)
+		require.Equal(expectedEventEntry, event)
 	}
 }
