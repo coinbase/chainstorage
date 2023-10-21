@@ -273,14 +273,14 @@ func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, event
 	return e.addEventsWithEntries(ctx, eventTag, eventsToAdd)
 }
 
-func (e *eventStorageImpl) addEventsWithEntries(ctx context.Context, eventTag uint32, eventEntries []*model.EventDDBEntry) error {
+func (e *eventStorageImpl) addEventsWithEntries(ctx context.Context, eventTag uint32, ddbEventEntries []*model.EventDDBEntry) error {
 	if eventTag > e.latestEventTag {
 		return xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
-	startEventId := eventEntries[0].EventId
+	startEventId := ddbEventEntries[0].EventId
 
 	return e.instrumentAddEvents.Instrument(ctx, func(ctx context.Context) error {
-		watermark := makeWatermarkDDBEntry(eventTag, eventEntries[len(eventEntries)-1].EventId)
+		watermark := makeWatermarkDDBEntry(eventTag, ddbEventEntries[len(ddbEventEntries)-1].EventId)
 		var eventsToValidate []*model.EventDDBEntry
 		// fetch some events before startEventId
 		startFetchId := startEventId - addEventsSafePadding
@@ -292,9 +292,9 @@ func (e *eventStorageImpl) addEventsWithEntries(ctx context.Context, eventTag ui
 			if err != nil {
 				return xerrors.Errorf("failed to fetch events: %w", err)
 			}
-			eventsToValidate = append(model.FromEventEntries(beforeEvents), eventEntries...)
+			eventsToValidate = append(model.FromEventEntries(beforeEvents), ddbEventEntries...)
 		} else {
-			eventsToValidate = eventEntries
+			eventsToValidate = ddbEventEntries
 		}
 
 		err := validateEvents(eventsToValidate)
@@ -303,8 +303,8 @@ func (e *eventStorageImpl) addEventsWithEntries(ctx context.Context, eventTag ui
 		}
 
 		if eventTag == defaultEventTag {
-			itemsToWrite := make([]interface{}, len(eventEntries))
-			for i, event := range eventEntries {
+			itemsToWrite := make([]interface{}, len(ddbEventEntries))
+			for i, event := range ddbEventEntries {
 				itemsToWrite[i] = event
 			}
 			err = e.eventTable.WriteItems(ctx, itemsToWrite)
@@ -317,8 +317,8 @@ func (e *eventStorageImpl) addEventsWithEntries(ctx context.Context, eventTag ui
 			}
 			return nil
 		} else {
-			itemsToWrite := make([]interface{}, len(eventEntries))
-			for i, event := range eventEntries {
+			itemsToWrite := make([]interface{}, len(ddbEventEntries))
+			for i, event := range ddbEventEntries {
 				itemsToWrite[i] = castDDBEntryToVersionedDDBEntry(event)
 			}
 			err = e.versionedEventTable.WriteItems(ctx, itemsToWrite)
