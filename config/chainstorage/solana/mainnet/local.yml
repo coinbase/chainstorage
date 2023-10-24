@@ -4,3 +4,4 @@ sdk:
   restful: false
 storage_type:
   blob: S3
+  meta: DYNAMODB

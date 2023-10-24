@@ -16,7 +16,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/maps"
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/config"
@@ -46,9 +45,11 @@ type (
 
 	StorageType struct {
 		BlobStorageType BlobStorageType `mapstructure:"blob"`
+		MetaStorageType MetaStorageType `mapstructure:"meta"`
 	}
 
 	BlobStorageType int32
+	MetaStorageType int32
 
 	ChainConfig struct {
 		Blockchain           common.Blockchain `mapstructure:"blockchain" validate:"required"`
@@ -351,13 +352,14 @@ var (
 		AWSAccountProduction:  "prod",
 	}
 
-	BlobStorageType_name = map[int32]string{
-		0: "UNSPECIFIED",
-		1: "S3",
-	}
 	BlobStorageType_value = map[string]int32{
 		"UNSPECIFIED": 0,
 		"S3":          1,
+	}
+
+	MetaStorageType_value = map[string]int32{
+		"UNSPECIFIED": 0,
+		"DYNAMODB":    1,
 	}
 )
 
@@ -382,25 +384,18 @@ const (
 	BlobStorageType_UNSPECIFIED BlobStorageType = 0
 	BlobStorageType_S3          BlobStorageType = 1
 
+	MetaStorageType_UNSPECIFIED MetaStorageType = 0
+	MetaStorageType_DYNAMODB    MetaStorageType = 1
+
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
 
-	placeholderPassword = "<placeholder>"
-
-	tagBlockchain = "blockchain"
-	tagNetwork    = "network"
-	tagTier       = "tier"
-)
-
-const (
-	s3BucketFormat = "example-chainstorage-%v-%v"
-)
-
-const (
-	cadenceAddressLocal = "localhost:7233"
-)
-
-const (
+	placeholderPassword      = "<placeholder>"
+	tagBlockchain            = "blockchain"
+	tagNetwork               = "network"
+	tagTier                  = "tier"
+	s3BucketFormat           = "example-chainstorage-%v-%v"
+	cadenceAddressLocal      = "localhost:7233"
 	chainstorageAddressLocal = "http://localhost:9090"
 )
 
@@ -468,6 +463,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 		mapstructure.StringToTimeDurationHookFunc(),
 		mapstructure.StringToSliceHookFunc(","),
 		stringToBlobStorageTypeHookFunc(),
+		stringToMetaStorageTypeHookFunc(),
 		stringToBlockchainHookFunc(),
 		stringToNetworkHookFunc(),
 		stringToCompressionHookFunc(),
@@ -740,6 +736,16 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 	return bytes.NewBuffer((data)), nil
 }
 
+func keysWithoutUnspecified[V interface{}](m map[string]V) []string {
+	var keys []string
+	for k := range m {
+		if k != "UNSPECIFIED" {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
 func stringToBlobStorageTypeHookFunc() mapstructure.DecodeHookFunc {
 	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
 		if f.Kind() != reflect.String {
@@ -754,7 +760,28 @@ func stringToBlobStorageTypeHookFunc() mapstructure.DecodeHookFunc {
 		if !ok {
 			return nil, xerrors.Errorf(
 				"invalid blob storage type: %v, possible values are: %v",
-				data, strings.Join(maps.Keys(BlobStorageType_value), ", "))
+				data, strings.Join(keysWithoutUnspecified(BlobStorageType_value), ", "))
+		}
+
+		return v, nil
+	}
+}
+
+func stringToMetaStorageTypeHookFunc() mapstructure.DecodeHookFunc {
+	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+
+		if t != reflect.TypeOf(MetaStorageType_UNSPECIFIED) {
+			return data, nil
+		}
+
+		v, ok := MetaStorageType_value[data.(string)]
+		if !ok {
+			return nil, xerrors.Errorf(
+				"invalid blob storage type: %v, possible values are: %v",
+				data, strings.Join(keysWithoutUnspecified(MetaStorageType_value), ", "))
 		}
 
 		return v, nil
