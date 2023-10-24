@@ -32,6 +32,20 @@ type (
 		EventStorage EventStorage
 		MetaStorage  MetaStorage
 	}
+
+	MetaStorageFactory interface {
+		Create() (Result, error)
+	}
+
+	MetaStorageFactoryParams struct {
+		fx.In
+		fxparams.Params
+		DynamoDB MetaStorageFactory `name:"metastorage/dynamodb"`
+	}
+
+	metaStorageFactory struct {
+		params Params
+	}
 )
 
 func NewMetaStorage(params Params) (Result, error) {
@@ -55,4 +69,13 @@ func NewMetaStorage(params Params) (Result, error) {
 		EventStorage: eventStorage,
 		MetaStorage:  metaStorage,
 	}, nil
+}
+
+// Create implements internal.MetaStorageFactory.
+func (f *metaStorageFactory) Create() (Result, error) {
+	return NewMetaStorage(f.params)
+}
+
+func NewFactory(params Params) MetaStorageFactory {
+	return &metaStorageFactory{params}
 }
