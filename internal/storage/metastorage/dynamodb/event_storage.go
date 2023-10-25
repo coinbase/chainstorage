@@ -1,7 +1,6 @@
-package metastorage
+package dynamodb
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"math"
@@ -13,6 +12,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -28,25 +28,11 @@ const (
 	versionedIdFormat       = "%d-%v"
 	pkeyValueForWatermark   = int64(-1)
 	blockHeightForWatermark = uint64(0)
-	EventIdStartValue       = int64(1)
-	EventIdDeleted          = int64(0)
 	addEventsSafePadding    = int64(20)
 	defaultEventTag         = uint32(0)
 )
 
 type (
-	EventStorage interface {
-		AddEvents(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error
-		AddEventsWithDDBEntries(ctx context.Context, eventTag uint32, eventDDBEntries []*model.EventDDBEntry) error
-		GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventDDBEntry, error)
-		GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventDDBEntry, error)
-		GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error)
-		GetMaxEventId(ctx context.Context, eventTag uint32) (int64, error)
-		SetMaxEventId(ctx context.Context, eventTag uint32, maxEventId int64) error
-		GetFirstEventIdByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) (int64, error)
-		GetEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventDDBEntry, error)
-	}
-
 	eventStorageImpl struct {
 		eventTable                             ddbTable
 		versionedEventTable                    ddbTable
@@ -62,95 +48,9 @@ type (
 		instrumentGetFirstEventIdByBlockHeight instrument.Call
 		instrumentGetEventsByBlockHeight       instrument.Call
 	}
-
-	EventsToChainAdaptor struct {
-		eventList *list.List
-	}
 )
 
-func NewEventsToChainAdaptor() *EventsToChainAdaptor {
-	eventList := list.New()
-	return &EventsToChainAdaptor{
-		eventList: eventList,
-	}
-}
-
-func (e *EventsToChainAdaptor) AppendEvents(events []*model.EventDDBEntry) error {
-	for i := len(events) - 1; i >= 0; i-- {
-		event := events[i]
-		lastItem := e.eventList.Back()
-		if lastItem != nil {
-			lastEvent, ok := model.CastItemToDDBEntry(lastItem.Value)
-			if !ok {
-				return xerrors.Errorf("failed to cast {%+v} to *model.EventDDBEntry", lastItem.Value)
-			}
-			if lastEvent.EventType == event.EventType {
-				if event.EventType == api.BlockchainEvent_BLOCK_ADDED {
-					// chain normal growing case, +1, [+2, +3]
-					err := validateChainEvents(lastEvent, event)
-					if err != nil {
-						return xerrors.Errorf("parent hash of later add event is expected to be the same with previous event block hash (event={%+v}, lastEvent={%+v}): %w", event, lastEvent, err)
-					}
-				}
-				if event.EventType == api.BlockchainEvent_BLOCK_REMOVED {
-					// rollback case, +1, +2, +3, [-3, -2]
-					err := validateChainEvents(event, lastEvent)
-					if err != nil {
-						return xerrors.Errorf("parent hash of remove event is expected to be the same with later remove event block hash (event={%+v}, lastEvent={%+v}): %w", event, lastEvent, err)
-					}
-				}
-			} else {
-				if lastEvent.BlockHeight != event.BlockHeight {
-					return xerrors.Errorf("expect adjacent events with different types to have the same block height (event={%+v}, lastEvent={%+v})", event, lastEvent)
-				}
-				if lastEvent.EventType == api.BlockchainEvent_BLOCK_REMOVED && event.EventType == api.BlockchainEvent_BLOCK_ADDED {
-					// rollback case +1, +2, [+3, -3], need pop the remove and skip append
-					if lastEvent.BlockHeight != event.BlockHeight || lastEvent.BlockHash != event.BlockHash {
-						return xerrors.Errorf("expect event {%+v} and lastEvent {%+v} to have the same block hash/height", event, lastEvent)
-					}
-					e.eventList.Remove(lastItem)
-					continue
-				} else if event.EventType == api.BlockchainEvent_BLOCK_REMOVED && lastEvent.EventType == api.BlockchainEvent_BLOCK_ADDED {
-					// rollback and regrow case +1, +2, +3, -3, [-2, +2]
-					// blocks could have different hashes
-				} else {
-					return xerrors.Errorf("unexpect event sequence last event={%+v}, new event={%+v}", lastEvent, event)
-				}
-			}
-
-		}
-		e.eventList.PushBack(event)
-	}
-	return nil
-}
-
-func validateChainEvents(event *model.EventDDBEntry, lastEvent *model.EventDDBEntry) error {
-	if lastEvent.BlockHeight != event.BlockHeight-1 {
-		return xerrors.Errorf("chain is not continuous because of inconsistent heights (last={%+v}, curr={%+v})", lastEvent, event)
-	}
-
-	if !event.BlockSkipped && !lastEvent.BlockSkipped && event.ParentHash != "" && lastEvent.BlockHash != event.ParentHash {
-		return xerrors.Errorf("chain is not continuous because of inconsistent parent hash (last={%+v}, curr={%+v})", lastEvent, event)
-	}
-	return nil
-}
-
-func (e *EventsToChainAdaptor) PopEventForTailBlock() (*model.EventDDBEntry, error) {
-	headItem := e.eventList.Front()
-	if headItem != nil {
-		headEvent, ok := model.CastItemToDDBEntry(headItem.Value)
-		if !ok {
-			return nil, xerrors.Errorf("failed to cast {%+v} to *model.EventDDBEntry", headItem.Value)
-		}
-		if headEvent.EventType == api.BlockchainEvent_BLOCK_ADDED {
-			e.eventList.Remove(headItem)
-			return headEvent, nil
-		}
-	}
-	return nil, errors.ErrNoEventAvailable
-}
-
-func newEventStorage(params Params) (EventStorage, error) {
+func newEventStorage(params Params) (internal.EventStorage, error) {
 	heightIndexName := params.Config.AWS.DynamoDB.EventTableHeightIndex
 	eventTable, err := createEventTable(params)
 	if err != nil {
@@ -379,7 +279,7 @@ func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, event
 		if !xerrors.Is(err, errors.ErrNoEventHistory) {
 			return err
 		}
-		startEventId = EventIdStartValue
+		startEventId = model.EventIdStartValue
 	} else {
 		startEventId = maxEventId + 1
 	}
@@ -400,8 +300,8 @@ func (e *eventStorageImpl) AddEventsWithDDBEntries(ctx context.Context, eventTag
 		var eventsToValidate []*model.EventDDBEntry
 		// fetch some events before startEventId
 		startFetchId := startEventId - addEventsSafePadding
-		if startFetchId < EventIdStartValue {
-			startFetchId = EventIdStartValue
+		if startFetchId < model.EventIdStartValue {
+			startFetchId = model.EventIdStartValue
 		}
 		if startFetchId < startEventId {
 			beforeEvents, err := e.GetEventsByEventIdRange(ctx, eventTag, startFetchId, startEventId)
@@ -485,8 +385,8 @@ func (e *eventStorageImpl) GetEventByEventId(ctx context.Context, eventTag uint3
 }
 
 func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error) {
-	if minEventId < EventIdStartValue {
-		return nil, xerrors.Errorf("invalid minEventId %d (event starts at %d): %w", minEventId, EventIdStartValue, errors.ErrInvalidEventId)
+	if minEventId < model.EventIdStartValue {
+		return nil, xerrors.Errorf("invalid minEventId %d (event starts at %d): %w", minEventId, model.EventIdStartValue, errors.ErrInvalidEventId)
 	}
 
 	if eventTag > e.latestEventTag {
@@ -591,7 +491,7 @@ func (e *eventStorageImpl) validateEvents(events []*model.EventDDBEntry) error {
 		}
 	}
 	// check if we can prepend events to an event-chain adaptor to make sure it can construct a continuous chain
-	eventsToChainAdaptor := NewEventsToChainAdaptor()
+	eventsToChainAdaptor := internal.NewEventsToChainAdaptor()
 	return eventsToChainAdaptor.AppendEvents(events)
 
 }
@@ -612,7 +512,7 @@ func (e *eventStorageImpl) GetMaxEventId(ctx context.Context, eventTag uint32) (
 				return err
 			}
 			// this scenario happens when we soft delete max event id to repopulate events table
-			if ddbEntry.MaxEventId == EventIdDeleted {
+			if ddbEntry.MaxEventId == model.EventIdDeleted {
 				return errors.ErrNoEventHistory
 			}
 			maxEventId = ddbEntry.MaxEventId
@@ -627,7 +527,7 @@ func (e *eventStorageImpl) GetMaxEventId(ctx context.Context, eventTag uint32) (
 				return err
 			}
 			// this scenario happens when we soft delete max event id to repopulate events table
-			if ddbEntry.MaxEventId == EventIdDeleted {
+			if ddbEntry.MaxEventId == model.EventIdDeleted {
 				return errors.ErrNoEventHistory
 			}
 			maxEventId = ddbEntry.MaxEventId
@@ -643,7 +543,7 @@ func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, m
 		return xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
 
-	if maxEventId < EventIdStartValue && maxEventId != EventIdDeleted {
+	if maxEventId < model.EventIdStartValue && maxEventId != model.EventIdDeleted {
 		return xerrors.Errorf("invalid max event id: %d", maxEventId)
 	}
 	err := e.instrumentSetMaxEventId.Instrument(ctx, func(ctx context.Context) error {

@@ -5,7 +5,9 @@ import (
 )
 
 const (
-	DefaultBlockTag = uint32(1)
+	DefaultBlockTag   = uint32(1)
+	EventIdStartValue = int64(1)
+	EventIdDeleted    = int64(0)
 )
 
 type (

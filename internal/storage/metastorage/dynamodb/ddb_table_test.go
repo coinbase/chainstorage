@@ -1,4 +1,4 @@
-package metastorage
+package dynamodb
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 
-	metastoragemocks "github.com/coinbase/chainstorage/internal/storage/metastorage/mocks"
+	dynamodbmocks "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/mocks"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -26,7 +26,7 @@ type (
 	DDBTableTestSuite struct {
 		suite.Suite
 		ctrl      *gomock.Controller
-		dynamoAPI *metastoragemocks.MockDynamoAPI
+		dynamoAPI *dynamodbmocks.MockDynamoAPI
 		table     ddbTable
 	}
 )
@@ -45,7 +45,7 @@ func (s *DDBTableTestSuite) SetupTest() {
 	retryer := retry.New(retry.WithLogger(logger))
 
 	s.ctrl = gomock.NewController(s.T())
-	dynamoAPIMock := metastoragemocks.NewMockDynamoAPI(s.ctrl)
+	dynamoAPIMock := dynamodbmocks.NewMockDynamoAPI(s.ctrl)
 	mockTable := &tableDBAPI{
 		TableName: tableName,
 		DBAPI:     dynamoAPIMock,
