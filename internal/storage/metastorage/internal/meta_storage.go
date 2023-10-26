@@ -58,18 +58,17 @@ type (
 
 func WithMetaStorageFactory(params MetaStorageFactoryParams) (Result, error) {
 	var factory MetaStorageFactory
-	switch params.Config.StorageType.MetaStorageType {
+	storageType := params.Config.StorageType.MetaStorageType
+	switch storageType {
 	case config.MetaStorageType_UNSPECIFIED, config.MetaStorageType_DYNAMODB:
 		factory = params.DynamoDB
 	}
 	if factory == nil {
-		return Result{}, xerrors.Errorf(
-			"meta storage type is not implemented: %v",
-			params.Config.StorageType.MetaStorageType)
+		return Result{}, xerrors.Errorf("meta storage type is not implemented: %v", storageType)
 	}
 	result, err := factory.Create()
 	if err != nil {
-		return Result{}, xerrors.Errorf("failed to create meta storage, error: %w", err)
+		return Result{}, xerrors.Errorf("failed to create meta storage of type %v, error: %w", storageType, err)
 	}
 	return result, nil
 }
