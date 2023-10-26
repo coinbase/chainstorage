@@ -1,4 +1,4 @@
-package metastorage
+package dynamodb
 
 import (
 	"go.uber.org/zap"

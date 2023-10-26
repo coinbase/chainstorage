@@ -1,34 +1,30 @@
 package metastorage
 
 import (
-	"github.com/coinbase/chainstorage/internal/config"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
+
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 )
 
-func WithMetaStorageFactory(params MetaStorageFactoryParams) (Result, error) {
-	var factory MetaStorageFactory
-	switch params.Config.StorageType.MetaStorageType {
-	case config.MetaStorageType_UNSPECIFIED, config.MetaStorageType_DYNAMODB:
-		factory = params.DynamoDB
-	}
-	if factory == nil {
-		return Result{}, xerrors.Errorf(
-			"meta storage type is not implemented: %v",
-			params.Config.StorageType.MetaStorageType)
-	}
-	result, err := factory.Create()
-	if err != nil {
-		return Result{}, xerrors.Errorf("failed to create meta storage, error: %w", err)
-	}
-	return result, nil
+type (
+	MetaStorage          = internal.MetaStorage
+	BlockStorage         = internal.BlockStorage
+	EventStorage         = internal.EventStorage
+	EventsToChainAdaptor = internal.EventsToChainAdaptor
+)
+
+const (
+	EventIdStartValue = model.EventIdStartValue
+	EventIdDeleted    = model.EventIdDeleted
+)
+
+func NewEventsToChainAdaptor() *EventsToChainAdaptor {
+	return internal.NewEventsToChainAdaptor()
 }
 
 var Module = fx.Options(
-	// TODO: move this into sub package
-	fx.Provide(fx.Annotated{
-		Name:   "metastorage/dynamodb",
-		Target: NewFactory,
-	}),
-	fx.Provide(WithMetaStorageFactory),
+	dynamodb.Module,
+	fx.Provide(internal.WithMetaStorageFactory),
 )

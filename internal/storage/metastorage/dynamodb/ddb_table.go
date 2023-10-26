@@ -1,4 +1,4 @@
-package metastorage
+package dynamodb
 
 import (
 	"context"
@@ -312,7 +312,7 @@ func (d *ddbTableImpl) QueryItems(ctx context.Context, indexName string, keyCond
 	}
 	outputItems := make([]interface{}, 0)
 	iterations := 0
-	for true {
+	for {
 		queryOutput, err := d.table.DBAPI.QueryWithContext(ctx, queryInput)
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {

@@ -1,4 +1,4 @@
-package metastorage
+package dynamodb
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -18,17 +19,17 @@ import (
 
 type eventStorageTestSuite struct {
 	suite.Suite
-	storage  MetaStorage
+	storage  internal.MetaStorage
 	config   *config.Config
 	tag      uint32
 	eventTag uint32
 }
 
 func (s *eventStorageTestSuite) SetupTest() {
-	var storage MetaStorage
+	var storage internal.MetaStorage
 	app := testapp.New(
 		s.T(),
-		Module,
+		fx.Provide(NewMetaStorage),
 		testapp.WithIntegration(),
 		testapp.WithConfig(s.config),
 		fx.Populate(&storage),
@@ -56,15 +57,15 @@ func (s *eventStorageTestSuite) verifyEvents(eventTag uint32, numEvents uint64, 
 	if err != nil {
 		panic(err)
 	}
-	require.Equal(watermark-EventIdStartValue, int64(numEvents-1))
+	require.Equal(watermark-model.EventIdStartValue, int64(numEvents-1))
 
 	// fetch range with missing item
-	_, err = s.storage.GetEventsByEventIdRange(ctx, eventTag, EventIdStartValue, EventIdStartValue+int64(numEvents+100))
+	_, err = s.storage.GetEventsByEventIdRange(ctx, eventTag, model.EventIdStartValue, model.EventIdStartValue+int64(numEvents+100))
 	require.Error(err)
 	require.True(xerrors.Is(err, errors.ErrItemNotFound))
 
 	// fetch valid range
-	fetchedEvents, err := s.storage.GetEventsByEventIdRange(ctx, eventTag, EventIdStartValue, EventIdStartValue+int64(numEvents))
+	fetchedEvents, err := s.storage.GetEventsByEventIdRange(ctx, eventTag, model.EventIdStartValue, model.EventIdStartValue+int64(numEvents))
 	if err != nil {
 		panic(err)
 	}
@@ -73,7 +74,7 @@ func (s *eventStorageTestSuite) verifyEvents(eventTag uint32, numEvents uint64, 
 
 	numFollowingEventsToFetch := uint64(10)
 	for i, event := range fetchedEvents {
-		require.Equal(int64(i)+EventIdStartValue, event.EventId)
+		require.Equal(int64(i)+model.EventIdStartValue, event.EventId)
 		require.Equal(uint64(i), event.BlockHeight)
 		require.Equal(api.BlockchainEvent_BLOCK_ADDED, event.EventType)
 		require.Equal(tag, event.Tag)
@@ -81,7 +82,7 @@ func (s *eventStorageTestSuite) verifyEvents(eventTag uint32, numEvents uint64, 
 
 		expectedNumEvents := numFollowingEventsToFetch
 		if uint64(event.EventId)+numFollowingEventsToFetch >= numEvents {
-			expectedNumEvents = numEvents - 1 - uint64(event.EventId-EventIdStartValue)
+			expectedNumEvents = numEvents - 1 - uint64(event.EventId-model.EventIdStartValue)
 		}
 		followingEvents, err := s.storage.GetEventsAfterEventId(ctx, eventTag, event.EventId, numFollowingEventsToFetch)
 		if err != nil {
@@ -89,7 +90,7 @@ func (s *eventStorageTestSuite) verifyEvents(eventTag uint32, numEvents uint64, 
 		}
 		require.Equal(uint64(len(followingEvents)), expectedNumEvents)
 		for j, followingEvent := range followingEvents {
-			require.Equal(int64(i+j+1)+EventIdStartValue, followingEvent.EventId)
+			require.Equal(int64(i+j+1)+model.EventIdStartValue, followingEvent.EventId)
 			require.Equal(uint64(i+j+1), followingEvent.BlockHeight)
 			require.Equal(api.BlockchainEvent_BLOCK_ADDED, followingEvent.EventType)
 			require.Equal(eventTag, followingEvent.EventTag)
@@ -104,7 +105,7 @@ func (s *eventStorageTestSuite) TestSetMaxEventId() {
 	s.addEvents(s.eventTag, 0, numEvents, s.tag)
 	watermark, err := s.storage.GetMaxEventId(ctx, s.eventTag)
 	require.NoError(err)
-	require.Equal(EventIdStartValue+int64(numEvents-1), watermark)
+	require.Equal(model.EventIdStartValue+int64(numEvents-1), watermark)
 
 	// reset it to a new value
 	newEventId := int64(5)
@@ -125,7 +126,7 @@ func (s *eventStorageTestSuite) TestSetMaxEventId() {
 	require.Error(err)
 
 	// reset it to EventIdDeleted
-	err = s.storage.SetMaxEventId(ctx, s.eventTag, EventIdDeleted)
+	err = s.storage.SetMaxEventId(ctx, s.eventTag, model.EventIdDeleted)
 	require.NoError(err)
 	_, err = s.storage.GetMaxEventId(ctx, s.eventTag)
 	require.Error(err)
@@ -140,7 +141,7 @@ func (s *eventStorageTestSuite) TestSetMaxEventIdNonDefaultEventTag() {
 	s.addEvents(eventTag, 0, numEvents, s.tag)
 	watermark, err := s.storage.GetMaxEventId(ctx, eventTag)
 	require.NoError(err)
-	require.Equal(EventIdStartValue+int64(numEvents-1), watermark)
+	require.Equal(model.EventIdStartValue+int64(numEvents-1), watermark)
 
 	// reset it to a new value
 	newEventId := int64(5)
@@ -161,7 +162,7 @@ func (s *eventStorageTestSuite) TestSetMaxEventIdNonDefaultEventTag() {
 	require.Error(err)
 
 	// reset it to EventIdDeleted
-	err = s.storage.SetMaxEventId(ctx, eventTag, EventIdDeleted)
+	err = s.storage.SetMaxEventId(ctx, eventTag, model.EventIdDeleted)
 	require.NoError(err)
 	_, err = s.storage.GetMaxEventId(ctx, eventTag)
 	require.Error(err)
@@ -336,7 +337,7 @@ func (s *eventStorageTestSuite) TestGetFirstEventIdByBlockHeight() {
 		if err != nil {
 			panic(err)
 		}
-		require.Equal(i+EventIdStartValue, eventId)
+		require.Equal(i+model.EventIdStartValue, eventId)
 	}
 }
 
@@ -352,7 +353,7 @@ func (s *eventStorageTestSuite) TestGetFirstEventIdByBlockHeightNonDefaultEventT
 	// fetch event for blockHeight=0
 	eventId, err := s.storage.GetFirstEventIdByBlockHeight(ctx, eventTag, uint64(0))
 	require.NoError(err)
-	require.Equal(eventId, EventIdStartValue)
+	require.Equal(eventId, model.EventIdStartValue)
 
 	// add the remove events again so for each height, there should be two events
 	for i := int64(numEvents - 1); i >= 0; i-- {
@@ -361,7 +362,7 @@ func (s *eventStorageTestSuite) TestGetFirstEventIdByBlockHeightNonDefaultEventT
 		require.NoError(err)
 		eventId, err := s.storage.GetFirstEventIdByBlockHeight(ctx, eventTag, uint64(i))
 		require.NoError(err)
-		require.Equal(i+EventIdStartValue, eventId)
+		require.Equal(i+model.EventIdStartValue, eventId)
 	}
 }
 

@@ -1,4 +1,4 @@
-package metastorage
+package dynamodb
 
 import (
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -6,18 +6,14 @@ import (
 
 	"go.uber.org/fx"
 
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 )
 
 type (
-	MetaStorage interface {
-		BlockStorage
-		EventStorage
-	}
-
 	metaStorageImpl struct {
-		BlockStorage
-		EventStorage
+		internal.BlockStorage
+		internal.EventStorage
 	}
 
 	Params struct {
@@ -26,37 +22,20 @@ type (
 		Session *session.Session
 	}
 
-	Result struct {
-		fx.Out
-		BlockStorage BlockStorage
-		EventStorage EventStorage
-		MetaStorage  MetaStorage
-	}
-
-	MetaStorageFactory interface {
-		Create() (Result, error)
-	}
-
-	MetaStorageFactoryParams struct {
-		fx.In
-		fxparams.Params
-		DynamoDB MetaStorageFactory `name:"metastorage/dynamodb"`
-	}
-
 	metaStorageFactory struct {
 		params Params
 	}
 )
 
-func NewMetaStorage(params Params) (Result, error) {
+func NewMetaStorage(params Params) (internal.Result, error) {
 	blockStorage, err := newBlockStorage(params)
 	if err != nil {
-		return Result{}, xerrors.Errorf("failed create new BlockStorage: %w", err)
+		return internal.Result{}, xerrors.Errorf("failed create new BlockStorage: %w", err)
 	}
 
 	eventStorage, err := newEventStorage(params)
 	if err != nil {
-		return Result{}, xerrors.Errorf("failed create new EventStorage: %w", err)
+		return internal.Result{}, xerrors.Errorf("failed create new EventStorage: %w", err)
 	}
 
 	metaStorage := &metaStorageImpl{
@@ -64,7 +43,7 @@ func NewMetaStorage(params Params) (Result, error) {
 		EventStorage: eventStorage,
 	}
 
-	return Result{
+	return internal.Result{
 		BlockStorage: blockStorage,
 		EventStorage: eventStorage,
 		MetaStorage:  metaStorage,
@@ -72,10 +51,10 @@ func NewMetaStorage(params Params) (Result, error) {
 }
 
 // Create implements internal.MetaStorageFactory.
-func (f *metaStorageFactory) Create() (Result, error) {
+func (f *metaStorageFactory) Create() (internal.Result, error) {
 	return NewMetaStorage(f.params)
 }
 
-func NewFactory(params Params) MetaStorageFactory {
+func NewFactory(params Params) internal.MetaStorageFactory {
 	return &metaStorageFactory{params}
 }

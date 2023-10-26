@@ -1,4 +1,4 @@
-package metastorage
+package dynamodb
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -28,14 +29,6 @@ const (
 )
 
 type (
-	BlockStorage interface {
-		PersistBlockMetas(ctx context.Context, updateWatermark bool, blocks []*api.BlockMetadata, lastBlock *api.BlockMetadata) error
-		GetLatestBlock(ctx context.Context, tag uint32) (*api.BlockMetadata, error)
-		GetBlockByHash(ctx context.Context, tag uint32, height uint64, blockHash string) (*api.BlockMetadata, error)
-		GetBlockByHeight(ctx context.Context, tag uint32, height uint64) (*api.BlockMetadata, error)
-		GetBlocksByHeightRange(ctx context.Context, tag uint32, startHeight, endHeight uint64) ([]*api.BlockMetadata, error)
-	}
-
 	blockStorageImpl struct {
 		blockTable                       ddbTable
 		blockStartHeight                 uint64
@@ -47,7 +40,7 @@ type (
 	}
 )
 
-func newBlockStorage(params Params) (BlockStorage, error) {
+func newBlockStorage(params Params) (internal.BlockStorage, error) {
 	attrDefs := []*dynamodb.AttributeDefinition{
 		{
 			AttributeName: aws.String(blockPidKeyName),
