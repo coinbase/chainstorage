@@ -5,7 +5,8 @@ import (
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
+	publicmodel "github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 )
 
@@ -57,7 +58,7 @@ func TestCastDDBEntryToVersionedDDBEntry(t *testing.T) {
 		EventTag:     2,
 	}
 
-	actualVersionedDDBEntry := castDDBEntryToVersionedDDBEntry(ddbEntry)
+	actualVersionedDDBEntry := castEventEntryToVersionedDDBEntry((*publicmodel.EventEntry)(ddbEntry))
 	require.Equal(expectedVersionedDDBEntry, actualVersionedDDBEntry)
 }
 
@@ -86,7 +87,7 @@ func TestCastDDBEntryToVersionedDDBEntry_Watermark(t *testing.T) {
 		EventTag:     2,
 	}
 
-	actualVersionedDDBEntry := castDDBEntryToVersionedDDBEntry(ddbEntry)
+	actualVersionedDDBEntry := castEventEntryToVersionedDDBEntry((*publicmodel.EventEntry)(ddbEntry))
 	require.Equal(expectedVersionedDDBEntry, actualVersionedDDBEntry)
 }
 
@@ -106,21 +107,21 @@ func TestCastVersionedItemToDDBEntry(t *testing.T) {
 		EventTag:     2,
 	}
 
-	expectedDDBEntry := &model.EventDDBEntry{
+	expectedEntry := &publicmodel.EventEntry{
 		EventId:      101,
 		EventType:    api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight:  100,
 		BlockHash:    "aaa",
-		Tag:          model.DefaultBlockTag,
+		Tag:          publicmodel.DefaultBlockTag,
 		ParentHash:   "bbb",
 		MaxEventId:   0,
 		BlockSkipped: false,
 		EventTag:     2,
 	}
 
-	actualDDBEntry, err := castVersionedItemToDDBEntry(versionedDDBEntry)
+	actualEntry, err := castVersionedItemToEventEntry(versionedDDBEntry)
 	require.True(err)
-	require.Equal(expectedDDBEntry, actualDDBEntry)
+	require.Equal(expectedEntry, actualEntry)
 }
 
 func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
@@ -136,7 +137,7 @@ func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 		EventTag:    2,
 	}
 
-	expectedDDBEntry := &model.EventDDBEntry{
+	expectedEntry := &publicmodel.EventEntry{
 		EventId:     -1,
 		EventType:   api.BlockchainEvent_UNKNOWN,
 		BlockHeight: blockHeightForWatermark,
@@ -145,7 +146,7 @@ func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 		EventTag:    2,
 	}
 
-	actualDDBEntry, err := castVersionedItemToDDBEntry(versionedDDBEntry)
+	actualEntry, err := castVersionedItemToEventEntry(versionedDDBEntry)
 	require.True(err)
-	require.Equal(expectedDDBEntry, actualDDBEntry)
+	require.Equal(expectedEntry, actualEntry)
 }

@@ -220,9 +220,9 @@ func (s *monitorTestSuite) TestMonitor() {
 		Return(monitorMaxEventId, nil)
 	s.metadataAccessor.EXPECT().GetEventsAfterEventId(gomock.Any(), monitorEventTag, gomock.Any(), gomock.Any()).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventDDBEntry, error) {
+		DoAndReturn(func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error) {
 			s.seen.metastorageGetEventsAfterEventId++
-			return testutil.MakeBlockEventDDBEntries(
+			return testutil.MakeBlockEventEntries(
 				api.BlockchainEvent_BLOCK_ADDED,
 				monitorEventTag, eventId+int64(maxEvents-1), uint64(eventId), uint64(eventId)+maxEvents, monitorTag,
 			), nil
@@ -340,9 +340,9 @@ func (s *monitorTestSuite) TestMonitor_WithFailoverEnabled() {
 		Return(monitorMaxEventId, nil)
 	s.metadataAccessor.EXPECT().GetEventsAfterEventId(gomock.Any(), monitorEventTag, gomock.Any(), gomock.Any()).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventDDBEntry, error) {
+		DoAndReturn(func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error) {
 			s.seen.metastorageGetEventsAfterEventId++
-			return testutil.MakeBlockEventDDBEntries(
+			return testutil.MakeBlockEventEntries(
 				api.BlockchainEvent_BLOCK_ADDED,
 				monitorEventTag, eventId+int64(maxEvents-1), uint64(eventId), uint64(eventId)+maxEvents, monitorTag,
 			), nil

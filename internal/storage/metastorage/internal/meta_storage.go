@@ -23,14 +23,13 @@ type (
 
 	EventStorage interface {
 		AddEvents(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error
-		AddEventsWithDDBEntries(ctx context.Context, eventTag uint32, eventDDBEntries []*model.EventDDBEntry) error
-		GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventDDBEntry, error)
-		GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventDDBEntry, error)
-		GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error)
+		GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventEntry, error)
+		GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error)
+		GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventEntry, error)
 		GetMaxEventId(ctx context.Context, eventTag uint32) (int64, error)
 		SetMaxEventId(ctx context.Context, eventTag uint32, maxEventId int64) error
 		GetFirstEventIdByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) (int64, error)
-		GetEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventDDBEntry, error)
+		GetEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventEntry, error)
 	}
 
 	MetaStorage interface {
