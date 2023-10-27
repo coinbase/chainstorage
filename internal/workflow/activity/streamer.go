@@ -214,7 +214,7 @@ func (s *Streamer) populateEventsQueue(ctx context.Context, eventTag uint32, min
 	return nil
 }
 
-func (s *Streamer) getEventForTailBlock(ctx context.Context, eventTag uint32, minEventIdFetched *int64, eventsToChainAdaptor *metastorage.EventsToChainAdaptor) (*model.EventDDBEntry, error) {
+func (s *Streamer) getEventForTailBlock(ctx context.Context, eventTag uint32, minEventIdFetched *int64, eventsToChainAdaptor *metastorage.EventsToChainAdaptor) (*model.EventEntry, error) {
 	numFetches := 0
 	for {
 		headEvent, err := eventsToChainAdaptor.PopEventForTailBlock()
@@ -320,7 +320,7 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 		var minBlockFetchedParentHash string
 		var eventWatermarkHeight *uint64
 		minEventIdFetched := maxEventId + 1
-		var headEvent *model.EventDDBEntry
+		var headEvent *model.EventEntry
 		updateEvents := make([]*model.BlockEvent, 0)
 		for {
 			headEvent, err = s.getEventForTailBlock(ctx, eventTag, &minEventIdFetched, eventsToChainAdaptor)
@@ -365,7 +365,7 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 				}
 			}
 			// detected diff
-			newEvent := model.NewBlockEventFromAnotherDDBEntry(api.BlockchainEvent_BLOCK_REMOVED, headEvent)
+			newEvent := model.NewBlockEventFromEventEntry(api.BlockchainEvent_BLOCK_REMOVED, headEvent)
 			updateEvents = append(updateEvents, newEvent)
 			maxAllowedReorgHeight := req.MaxAllowedReorgHeight
 			if uint64(len(updateEvents)) > maxAllowedReorgHeight {

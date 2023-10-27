@@ -80,7 +80,7 @@ func (s *StreamerIntegrationTestSuite) TestStreamerIntegration() {
 	for i, event := range events {
 		expectedBlockEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, blocks[i])
 		expectedEventId := int64(i) + metastorage.EventIdStartValue
-		expectedEventDDBEntry := model.NewEventDDBEntry(eventTag, expectedEventId, expectedBlockEvent)
+		expectedEventDDBEntry := model.NewEventEntry(eventTag, expectedEventId, expectedBlockEvent)
 		require.Equal(expectedEventDDBEntry, event)
 	}
 }
@@ -132,7 +132,7 @@ func (s *StreamerIntegrationTestSuite) TestStreamerIntegration_NonDefaultEventTa
 	for i, event := range events {
 		expectedBlockEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, blocks[i])
 		expectedEventId := int64(i) + metastorage.EventIdStartValue
-		expectedEventDDBEntry := model.NewEventDDBEntry(eventTag, expectedEventId, expectedBlockEvent)
+		expectedEventDDBEntry := model.NewEventEntry(eventTag, expectedEventId, expectedBlockEvent)
 		require.Equal(expectedEventDDBEntry, event)
 	}
 }

@@ -23,14 +23,37 @@ func NewEventsToChainAdaptor() *EventsToChainAdaptor {
 	}
 }
 
-func (e *EventsToChainAdaptor) AppendEvents(events []*model.EventDDBEntry) error {
+func castItemToEventEntry(outputItem interface{}) (*model.EventEntry, bool) {
+	eventEntry, ok := outputItem.(*model.EventEntry)
+	if !ok {
+		return nil, ok
+	}
+	// switch to defaultTag is not set
+	if eventEntry.Tag == 0 {
+		eventEntry.Tag = model.DefaultBlockTag
+	}
+	return eventEntry, true
+}
+
+func validateChainEvents(event *model.EventEntry, lastEvent *model.EventEntry) error {
+	if lastEvent.BlockHeight != event.BlockHeight-1 {
+		return xerrors.Errorf("chain is not continuous because of inconsistent heights (last={%+v}, curr={%+v})", lastEvent, event)
+	}
+
+	if !event.BlockSkipped && !lastEvent.BlockSkipped && event.ParentHash != "" && lastEvent.BlockHash != event.ParentHash {
+		return xerrors.Errorf("chain is not continuous because of inconsistent parent hash (last={%+v}, curr={%+v})", lastEvent, event)
+	}
+	return nil
+}
+
+func (e *EventsToChainAdaptor) AppendEvents(events []*model.EventEntry) error {
 	for i := len(events) - 1; i >= 0; i-- {
 		event := events[i]
 		lastItem := e.eventList.Back()
 		if lastItem != nil {
-			lastEvent, ok := model.CastItemToDDBEntry(lastItem.Value)
+			lastEvent, ok := castItemToEventEntry(lastItem.Value)
 			if !ok {
-				return xerrors.Errorf("failed to cast {%+v} to *model.EventDDBEntry", lastItem.Value)
+				return xerrors.Errorf("failed to cast {%+v} to *model.EventEntry", lastItem.Value)
 			}
 			if lastEvent.EventType == event.EventType {
 				if event.EventType == api.BlockchainEvent_BLOCK_ADDED {
@@ -65,30 +88,18 @@ func (e *EventsToChainAdaptor) AppendEvents(events []*model.EventDDBEntry) error
 					return xerrors.Errorf("unexpect event sequence last event={%+v}, new event={%+v}", lastEvent, event)
 				}
 			}
-
 		}
 		e.eventList.PushBack(event)
 	}
 	return nil
 }
 
-func validateChainEvents(event *model.EventDDBEntry, lastEvent *model.EventDDBEntry) error {
-	if lastEvent.BlockHeight != event.BlockHeight-1 {
-		return xerrors.Errorf("chain is not continuous because of inconsistent heights (last={%+v}, curr={%+v})", lastEvent, event)
-	}
-
-	if !event.BlockSkipped && !lastEvent.BlockSkipped && event.ParentHash != "" && lastEvent.BlockHash != event.ParentHash {
-		return xerrors.Errorf("chain is not continuous because of inconsistent parent hash (last={%+v}, curr={%+v})", lastEvent, event)
-	}
-	return nil
-}
-
-func (e *EventsToChainAdaptor) PopEventForTailBlock() (*model.EventDDBEntry, error) {
+func (e *EventsToChainAdaptor) PopEventForTailBlock() (*model.EventEntry, error) {
 	headItem := e.eventList.Front()
 	if headItem != nil {
-		headEvent, ok := model.CastItemToDDBEntry(headItem.Value)
+		headEvent, ok := castItemToEventEntry(headItem.Value)
 		if !ok {
-			return nil, xerrors.Errorf("failed to cast {%+v} to *model.EventDDBEntry", headItem.Value)
+			return nil, xerrors.Errorf("failed to cast {%+v} to *EventEntry", headItem.Value)
 		}
 		if headEvent.EventType == api.BlockchainEvent_BLOCK_ADDED {
 			e.eventList.Remove(headItem)

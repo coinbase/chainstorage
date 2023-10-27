@@ -183,7 +183,7 @@ func (s *ValidatorTestSuite) TestValidator() {
 		Return(currentEventId, nil)
 	s.metaStorage.EXPECT().
 		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
-		Return(testutil.MakeBlockEventDDBEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
 
 	// parser
 	s.parser.EXPECT().
@@ -262,7 +262,7 @@ func (s *ValidatorTestSuite) TestValidator_WithFailover() {
 		Return(currentEventId, nil)
 	s.metaStorage.EXPECT().
 		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
-		Return(testutil.MakeBlockEventDDBEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
 
 	// parser
 	s.parser.EXPECT().

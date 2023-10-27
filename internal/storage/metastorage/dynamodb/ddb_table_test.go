@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	dynamodbmocks "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/mocks"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/sdk/services"

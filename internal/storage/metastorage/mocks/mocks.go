@@ -50,20 +50,6 @@ func (mr *MockMetaStorageMockRecorder) AddEvents(arg0, arg1, arg2 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddEvents", reflect.TypeOf((*MockMetaStorage)(nil).AddEvents), arg0, arg1, arg2)
 }
 
-// AddEventsWithDDBEntries mocks base method.
-func (m *MockMetaStorage) AddEventsWithDDBEntries(arg0 context.Context, arg1 uint32, arg2 []*model.EventDDBEntry) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddEventsWithDDBEntries", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AddEventsWithDDBEntries indicates an expected call of AddEventsWithDDBEntries.
-func (mr *MockMetaStorageMockRecorder) AddEventsWithDDBEntries(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddEventsWithDDBEntries", reflect.TypeOf((*MockMetaStorage)(nil).AddEventsWithDDBEntries), arg0, arg1, arg2)
-}
-
 // GetBlockByHash mocks base method.
 func (m *MockMetaStorage) GetBlockByHash(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 string) (*chainstorage.BlockMetadata, error) {
 	m.ctrl.T.Helper()
@@ -110,10 +96,10 @@ func (mr *MockMetaStorageMockRecorder) GetBlocksByHeightRange(arg0, arg1, arg2, 
 }
 
 // GetEventByEventId mocks base method.
-func (m *MockMetaStorage) GetEventByEventId(arg0 context.Context, arg1 uint32, arg2 int64) (*model.EventDDBEntry, error) {
+func (m *MockMetaStorage) GetEventByEventId(arg0 context.Context, arg1 uint32, arg2 int64) (*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventByEventId", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*model.EventDDBEntry)
+	ret0, _ := ret[0].(*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -125,10 +111,10 @@ func (mr *MockMetaStorageMockRecorder) GetEventByEventId(arg0, arg1, arg2 interf
 }
 
 // GetEventsAfterEventId mocks base method.
-func (m *MockMetaStorage) GetEventsAfterEventId(arg0 context.Context, arg1 uint32, arg2 int64, arg3 uint64) ([]*model.EventDDBEntry, error) {
+func (m *MockMetaStorage) GetEventsAfterEventId(arg0 context.Context, arg1 uint32, arg2 int64, arg3 uint64) ([]*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventsAfterEventId", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].([]*model.EventDDBEntry)
+	ret0, _ := ret[0].([]*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -140,10 +126,10 @@ func (mr *MockMetaStorageMockRecorder) GetEventsAfterEventId(arg0, arg1, arg2, a
 }
 
 // GetEventsByBlockHeight mocks base method.
-func (m *MockMetaStorage) GetEventsByBlockHeight(arg0 context.Context, arg1 uint32, arg2 uint64) ([]*model.EventDDBEntry, error) {
+func (m *MockMetaStorage) GetEventsByBlockHeight(arg0 context.Context, arg1 uint32, arg2 uint64) ([]*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventsByBlockHeight", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]*model.EventDDBEntry)
+	ret0, _ := ret[0].([]*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -155,10 +141,10 @@ func (mr *MockMetaStorageMockRecorder) GetEventsByBlockHeight(arg0, arg1, arg2 i
 }
 
 // GetEventsByEventIdRange mocks base method.
-func (m *MockMetaStorage) GetEventsByEventIdRange(arg0 context.Context, arg1 uint32, arg2, arg3 int64) ([]*model.EventDDBEntry, error) {
+func (m *MockMetaStorage) GetEventsByEventIdRange(arg0 context.Context, arg1 uint32, arg2, arg3 int64) ([]*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventsByEventIdRange", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].([]*model.EventDDBEntry)
+	ret0, _ := ret[0].([]*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -279,25 +265,11 @@ func (mr *MockEventStorageMockRecorder) AddEvents(arg0, arg1, arg2 interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddEvents", reflect.TypeOf((*MockEventStorage)(nil).AddEvents), arg0, arg1, arg2)
 }
 
-// AddEventsWithDDBEntries mocks base method.
-func (m *MockEventStorage) AddEventsWithDDBEntries(arg0 context.Context, arg1 uint32, arg2 []*model.EventDDBEntry) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddEventsWithDDBEntries", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AddEventsWithDDBEntries indicates an expected call of AddEventsWithDDBEntries.
-func (mr *MockEventStorageMockRecorder) AddEventsWithDDBEntries(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddEventsWithDDBEntries", reflect.TypeOf((*MockEventStorage)(nil).AddEventsWithDDBEntries), arg0, arg1, arg2)
-}
-
 // GetEventByEventId mocks base method.
-func (m *MockEventStorage) GetEventByEventId(arg0 context.Context, arg1 uint32, arg2 int64) (*model.EventDDBEntry, error) {
+func (m *MockEventStorage) GetEventByEventId(arg0 context.Context, arg1 uint32, arg2 int64) (*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventByEventId", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*model.EventDDBEntry)
+	ret0, _ := ret[0].(*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -309,10 +281,10 @@ func (mr *MockEventStorageMockRecorder) GetEventByEventId(arg0, arg1, arg2 inter
 }
 
 // GetEventsAfterEventId mocks base method.
-func (m *MockEventStorage) GetEventsAfterEventId(arg0 context.Context, arg1 uint32, arg2 int64, arg3 uint64) ([]*model.EventDDBEntry, error) {
+func (m *MockEventStorage) GetEventsAfterEventId(arg0 context.Context, arg1 uint32, arg2 int64, arg3 uint64) ([]*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventsAfterEventId", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].([]*model.EventDDBEntry)
+	ret0, _ := ret[0].([]*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -324,10 +296,10 @@ func (mr *MockEventStorageMockRecorder) GetEventsAfterEventId(arg0, arg1, arg2, 
 }
 
 // GetEventsByBlockHeight mocks base method.
-func (m *MockEventStorage) GetEventsByBlockHeight(arg0 context.Context, arg1 uint32, arg2 uint64) ([]*model.EventDDBEntry, error) {
+func (m *MockEventStorage) GetEventsByBlockHeight(arg0 context.Context, arg1 uint32, arg2 uint64) ([]*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventsByBlockHeight", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]*model.EventDDBEntry)
+	ret0, _ := ret[0].([]*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -339,10 +311,10 @@ func (mr *MockEventStorageMockRecorder) GetEventsByBlockHeight(arg0, arg1, arg2 
 }
 
 // GetEventsByEventIdRange mocks base method.
-func (m *MockEventStorage) GetEventsByEventIdRange(arg0 context.Context, arg1 uint32, arg2, arg3 int64) ([]*model.EventDDBEntry, error) {
+func (m *MockEventStorage) GetEventsByEventIdRange(arg0 context.Context, arg1 uint32, arg2, arg3 int64) ([]*model.EventEntry, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEventsByEventIdRange", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].([]*model.EventDDBEntry)
+	ret0, _ := ret[0].([]*model.EventEntry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

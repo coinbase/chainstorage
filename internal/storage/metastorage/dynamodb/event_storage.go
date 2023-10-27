@@ -12,6 +12,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	ddbmodel "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
@@ -121,7 +122,7 @@ func createEventTable(params Params) (ddbTable, error) {
 
 	eventTable, err := newDDBTable(
 		params.Config.AWS.DynamoDB.EventTable,
-		reflect.TypeOf(model.EventDDBEntry{}),
+		reflect.TypeOf(ddbmodel.EventDDBEntry{}),
 		keySchema, attrDefs, globalSecondaryIndexes,
 		params,
 	)
@@ -175,7 +176,7 @@ func createVersionedEventTable(params Params) (ddbTable, error) {
 
 	versionedEventTable, err := newDDBTable(
 		params.Config.AWS.DynamoDB.VersionedEventTable,
-		reflect.TypeOf(model.VersionedEventDDBEntry{}),
+		reflect.TypeOf(ddbmodel.VersionedEventDDBEntry{}),
 		keySchema, attrDefs, globalSecondaryIndexes,
 		params,
 	)
@@ -199,37 +200,37 @@ func getVersionedEventStorageKeyMap(eventId string) StringMap {
 }
 
 func (e *eventStorageImpl) getEventByKey(
-	ctx context.Context, eventId int64) (*model.EventDDBEntry, error) {
+	ctx context.Context, eventId int64) (*model.EventEntry, error) {
 
 	eventKeyMap := getEventStorageKeyMap(eventId)
 	outputItem, err := e.eventTable.GetItem(ctx, eventKeyMap)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get event: %w", err)
 	}
-	eventDDBEntry, ok := model.CastItemToDDBEntry(outputItem)
+	eventEntry, ok := castItemToEventEntry(outputItem)
 	if !ok {
 		return nil, xerrors.Errorf("failed to cast to EventDDBEntry: %v", outputItem)
 	}
-	return eventDDBEntry, nil
+	return eventEntry, nil
 }
 
 func (e *eventStorageImpl) getVersionedEventByKey(
-	ctx context.Context, eventId string) (*model.EventDDBEntry, error) {
+	ctx context.Context, eventId string) (*model.EventEntry, error) {
 
 	eventKeyMap := getVersionedEventStorageKeyMap(eventId)
 	outputItem, err := e.versionedEventTable.GetItem(ctx, eventKeyMap)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get versioned event: %w", err)
 	}
-	eventDDBEntry, ok := castVersionedItemToDDBEntry(outputItem)
+	eventEntry, ok := castVersionedItemToEventEntry(outputItem)
 	if !ok {
 		return nil, xerrors.Errorf("failed to cast versioned item to EventDDBEntry: %v", outputItem)
 	}
-	return eventDDBEntry, nil
+	return eventEntry, nil
 }
 
-func makeWatermarkDDBEntry(eventTag uint32, maxEventId int64) *model.EventDDBEntry {
-	return &model.EventDDBEntry{
+func makeWatermarkDDBEntry(eventTag uint32, maxEventId int64) *ddbmodel.EventDDBEntry {
+	return &ddbmodel.EventDDBEntry{
 		EventId:     pkeyValueForWatermark,
 		EventType:   api.BlockchainEvent_UNKNOWN,
 		BlockHeight: blockHeightForWatermark,
@@ -239,8 +240,8 @@ func makeWatermarkDDBEntry(eventTag uint32, maxEventId int64) *model.EventDDBEnt
 	}
 }
 
-func makeWatermarkVersionedDDBEntry(eventTag uint32, eventId int64) *model.VersionedEventDDBEntry {
-	return &model.VersionedEventDDBEntry{
+func makeWatermarkVersionedDDBEntry(eventTag uint32, eventId int64) *ddbmodel.VersionedEventDDBEntry {
+	return &ddbmodel.VersionedEventDDBEntry{
 		EventId:      getEventIdForWatermark(eventTag),
 		Sequence:     eventId,
 		BlockId:      getBlockIdForWatermark(eventTag), // block_id cannot be empty string
@@ -254,18 +255,18 @@ func makeWatermarkVersionedDDBEntry(eventTag uint32, eventId int64) *model.Versi
 	}
 }
 
-func convertBlockEventsToEventDDBEntries(blockEvents []*model.BlockEvent, eventTag uint32, eventId int64) []*model.EventDDBEntry {
+func convertBlockEventsToEventEntries(blockEvents []*model.BlockEvent, eventTag uint32, eventId int64) []*model.EventEntry {
 	if len(blockEvents) == 0 {
-		return []*model.EventDDBEntry{}
+		return []*model.EventEntry{}
 	}
-	eventDDBEntries := make([]*model.EventDDBEntry, len(blockEvents))
+	eventEntries := make([]*model.EventEntry, len(blockEvents))
 	for i, inputEvent := range blockEvents {
-		event := model.NewEventDDBEntry(eventTag, eventId, inputEvent)
-		eventDDBEntries[i] = event
+		event := model.NewEventEntry(eventTag, eventId, inputEvent)
+		eventEntries[i] = event
 		eventId += 1
 	}
 
-	return eventDDBEntries
+	return eventEntries
 }
 
 func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error {
@@ -284,20 +285,20 @@ func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, event
 		startEventId = maxEventId + 1
 	}
 
-	eventsToAdd := convertBlockEventsToEventDDBEntries(events, eventTag, startEventId)
+	eventsToAdd := convertBlockEventsToEventEntries(events, eventTag, startEventId)
 
-	return e.AddEventsWithDDBEntries(ctx, eventTag, eventsToAdd)
+	return e.addEventsWithDDBEntries(ctx, eventTag, eventsToAdd)
 }
 
-func (e *eventStorageImpl) AddEventsWithDDBEntries(ctx context.Context, eventTag uint32, eventDDBEntries []*model.EventDDBEntry) error {
+func (e *eventStorageImpl) addEventsWithDDBEntries(ctx context.Context, eventTag uint32, eventEntries []*model.EventEntry) error {
 	if eventTag > e.latestEventTag {
 		return xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
-	startEventId := eventDDBEntries[0].EventId
+	startEventId := eventEntries[0].EventId
 
 	return e.instrumentAddEvents.Instrument(ctx, func(ctx context.Context) error {
-		watermark := makeWatermarkDDBEntry(eventTag, eventDDBEntries[len(eventDDBEntries)-1].EventId)
-		var eventsToValidate []*model.EventDDBEntry
+		watermark := makeWatermarkDDBEntry(eventTag, eventEntries[len(eventEntries)-1].EventId)
+		var eventsToValidate []*model.EventEntry
 		// fetch some events before startEventId
 		startFetchId := startEventId - addEventsSafePadding
 		if startFetchId < model.EventIdStartValue {
@@ -308,9 +309,9 @@ func (e *eventStorageImpl) AddEventsWithDDBEntries(ctx context.Context, eventTag
 			if err != nil {
 				return xerrors.Errorf("failed to fetch events: %w", err)
 			}
-			eventsToValidate = append(beforeEvents, eventDDBEntries...)
+			eventsToValidate = append(beforeEvents, eventEntries...)
 		} else {
-			eventsToValidate = eventDDBEntries
+			eventsToValidate = eventEntries
 		}
 
 		err := e.validateEvents(eventsToValidate)
@@ -319,9 +320,9 @@ func (e *eventStorageImpl) AddEventsWithDDBEntries(ctx context.Context, eventTag
 		}
 
 		if eventTag == defaultEventTag {
-			itemsToWrite := make([]interface{}, len(eventDDBEntries))
-			for i, event := range eventDDBEntries {
-				itemsToWrite[i] = event
+			itemsToWrite := make([]interface{}, len(eventEntries))
+			for i, event := range eventEntries {
+				itemsToWrite[i] = (*ddbmodel.EventDDBEntry)(event)
 			}
 			err = e.eventTable.WriteItems(ctx, itemsToWrite)
 			if err != nil {
@@ -333,15 +334,15 @@ func (e *eventStorageImpl) AddEventsWithDDBEntries(ctx context.Context, eventTag
 			}
 			return nil
 		} else {
-			itemsToWrite := make([]interface{}, len(eventDDBEntries))
-			for i, event := range eventDDBEntries {
-				itemsToWrite[i] = castDDBEntryToVersionedDDBEntry(event)
+			itemsToWrite := make([]interface{}, len(eventEntries))
+			for i, event := range eventEntries {
+				itemsToWrite[i] = castEventEntryToVersionedDDBEntry(event)
 			}
 			err = e.versionedEventTable.WriteItems(ctx, itemsToWrite)
 			if err != nil {
 				return xerrors.Errorf("failed to write versioned events: %w", err)
 			}
-			versionedWatermark := castDDBEntryToVersionedDDBEntry(watermark)
+			versionedWatermark := castEventEntryToVersionedDDBEntry((*model.EventEntry)(watermark))
 			err = e.versionedEventTable.WriteItem(ctx, versionedWatermark)
 			if err != nil {
 				return xerrors.Errorf("failed to update versioned watermark: %w", err)
@@ -351,12 +352,12 @@ func (e *eventStorageImpl) AddEventsWithDDBEntries(ctx context.Context, eventTag
 	})
 }
 
-func (e *eventStorageImpl) GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventDDBEntry, error) {
+func (e *eventStorageImpl) GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventEntry, error) {
 	if eventTag > e.latestEventTag {
 		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
 
-	var event *model.EventDDBEntry
+	var event *model.EventEntry
 	if err := e.instrumentGetEventByEventId.Instrument(ctx, func(ctx context.Context) error {
 		maxEventId, err := e.GetMaxEventId(ctx, eventTag)
 		if err != nil {
@@ -384,7 +385,7 @@ func (e *eventStorageImpl) GetEventByEventId(ctx context.Context, eventTag uint3
 	return event, nil
 }
 
-func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventDDBEntry, error) {
+func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventEntry, error) {
 	if minEventId < model.EventIdStartValue {
 		return nil, xerrors.Errorf("invalid minEventId %d (event starts at %d): %w", minEventId, model.EventIdStartValue, errors.ErrInvalidEventId)
 	}
@@ -393,7 +394,7 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
 
-	var events []*model.EventDDBEntry
+	var events []*model.EventEntry
 	inputKeys := make([]StringMap, 0, maxEventId-minEventId)
 	if err := e.instrumentGetEventsByEventIdRange.Instrument(ctx, func(ctx context.Context) error {
 		if eventTag == defaultEventTag {
@@ -408,9 +409,9 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 				}
 				return xerrors.Errorf("failed to get events: %w", err)
 			}
-			events = make([]*model.EventDDBEntry, 0, len(outputItems))
+			events = make([]*model.EventEntry, 0, len(outputItems))
 			for _, outputItem := range outputItems {
-				event, ok := model.CastItemToDDBEntry(outputItem)
+				event, ok := castItemToEventEntry(outputItem)
 				if !ok {
 					return xerrors.Errorf("failed to cast to EventDDBEntry: %v", outputItem)
 				}
@@ -430,9 +431,9 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 				}
 				return xerrors.Errorf("failed to get versioned events: %w", err)
 			}
-			events = make([]*model.EventDDBEntry, 0, len(outputItems))
+			events = make([]*model.EventEntry, 0, len(outputItems))
 			for _, outputItem := range outputItems {
-				event, ok := castVersionedItemToDDBEntry(outputItem)
+				event, ok := castVersionedItemToEventEntry(outputItem)
 				if !ok {
 					return xerrors.Errorf("failed to cast versioned item to EventDDBEntry: %v", outputItem)
 				}
@@ -446,12 +447,12 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 	return events, nil
 }
 
-func (e *eventStorageImpl) GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventDDBEntry, error) {
+func (e *eventStorageImpl) GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error) {
 	if eventTag > e.latestEventTag {
 		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
 
-	var events []*model.EventDDBEntry
+	var events []*model.EventEntry
 	if err := e.instrumentGetEventsAfterEventId.Instrument(ctx, func(ctx context.Context) error {
 		maxEventId, err := e.GetMaxEventId(ctx, eventTag)
 		if err != nil {
@@ -481,7 +482,7 @@ func (e *eventStorageImpl) GetEventsAfterEventId(ctx context.Context, eventTag u
 	return events, nil
 }
 
-func (e *eventStorageImpl) validateEvents(events []*model.EventDDBEntry) error {
+func (e *eventStorageImpl) validateEvents(events []*model.EventEntry) error {
 	// check if event ids are continuous
 	for i, event := range events {
 		if i > 0 {
@@ -493,7 +494,6 @@ func (e *eventStorageImpl) validateEvents(events []*model.EventDDBEntry) error {
 	// check if we can prepend events to an event-chain adaptor to make sure it can construct a continuous chain
 	eventsToChainAdaptor := internal.NewEventsToChainAdaptor()
 	return eventsToChainAdaptor.AppendEvents(events)
-
 }
 
 func (e *eventStorageImpl) GetMaxEventId(ctx context.Context, eventTag uint32) (int64, error) {
@@ -574,11 +574,11 @@ func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, m
 	return err
 }
 
-func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventDDBEntry, error) {
+func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventEntry, error) {
 	if eventTag > e.latestEventTag {
 		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
-	var events []*model.EventDDBEntry
+	var events []*model.EventEntry
 	if eventTag == defaultEventTag {
 		outputItems, err := e.eventTable.QueryItems(ctx, e.heightIndexName, fmt.Sprintf("%s = %s", heightKeyName, heightValueName),
 			map[string]*dynamodb.AttributeValue{
@@ -594,15 +594,15 @@ func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag 
 			return nil, errors.ErrItemNotFound
 		}
 		for _, outputItem := range outputItems {
-			eventDDBEntry, ok := model.CastItemToDDBEntry(outputItem)
+			eventEntry, ok := castItemToEventEntry(outputItem)
 			if !ok {
 				return nil, xerrors.Errorf("failed to cast to EventDDBEntry: %v", outputItem)
 			}
-			if eventDDBEntry.EventId == pkeyValueForWatermark {
+			if eventEntry.EventId == pkeyValueForWatermark {
 				// does not count since it is the watermark entry
 				continue
 			}
-			events = append(events, eventDDBEntry)
+			events = append(events, eventEntry)
 		}
 	} else {
 		outputItems, err := e.versionedEventTable.QueryItems(ctx, e.versionedEventBlockIndexName, fmt.Sprintf("%s = %s", blockIdKeyName, blockIdValueName),
@@ -618,7 +618,7 @@ func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag 
 			return nil, errors.ErrItemNotFound
 		}
 		for _, outputItem := range outputItems {
-			eventDDBEntry, ok := castVersionedItemToDDBEntry(outputItem)
+			eventDDBEntry, ok := castVersionedItemToEventEntry(outputItem)
 			if !ok {
 				return nil, xerrors.Errorf("failed to cast versioned item to EventDDBEntry: %v", outputItem)
 			}
@@ -652,11 +652,11 @@ func (e *eventStorageImpl) GetFirstEventIdByBlockHeight(ctx context.Context, eve
 	return eventId, err
 }
 
-func (e *eventStorageImpl) GetEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventDDBEntry, error) {
+func (e *eventStorageImpl) GetEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventEntry, error) {
 	if eventTag > e.latestEventTag {
 		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
 	}
-	var events []*model.EventDDBEntry
+	var events []*model.EventEntry
 	if err := e.instrumentGetEventsByBlockHeight.Instrument(ctx, func(ctx context.Context) error {
 		var err error
 		events, err = e.getEventsByBlockHeight(ctx, eventTag, blockHeight)
@@ -686,33 +686,49 @@ func getBlockIdForHeight(eventTag uint32, height uint64) string {
 	return fmt.Sprintf(versionedIdFormat, eventTag, height)
 }
 
-func castDDBEntryToVersionedDDBEntry(eventDDBEntry *model.EventDDBEntry) *model.VersionedEventDDBEntry {
-	eventTag := eventDDBEntry.EventTag
-	if eventDDBEntry.EventId == pkeyValueForWatermark {
-		return makeWatermarkVersionedDDBEntry(eventTag, eventDDBEntry.MaxEventId)
+func castEventEntryToVersionedDDBEntry(eventEntry *model.EventEntry) *ddbmodel.VersionedEventDDBEntry {
+	eventTag := eventEntry.EventTag
+	if eventEntry.EventId == pkeyValueForWatermark {
+		return makeWatermarkVersionedDDBEntry(eventTag, eventEntry.MaxEventId)
 	}
 
-	eventId := getEventIdForEventSequence(eventTag, eventDDBEntry.EventId)
-	blockId := getBlockIdForHeight(eventTag, eventDDBEntry.BlockHeight)
-	return &model.VersionedEventDDBEntry{
+	eventId := getEventIdForEventSequence(eventTag, eventEntry.EventId)
+	blockId := getBlockIdForHeight(eventTag, eventEntry.BlockHeight)
+	return &ddbmodel.VersionedEventDDBEntry{
 		EventId:        eventId,
-		Sequence:       eventDDBEntry.EventId,
+		Sequence:       eventEntry.EventId,
 		BlockId:        blockId,
-		BlockHeight:    eventDDBEntry.BlockHeight,
-		BlockHash:      eventDDBEntry.BlockHash,
-		EventType:      eventDDBEntry.EventType,
-		Tag:            eventDDBEntry.Tag,
-		ParentHash:     eventDDBEntry.ParentHash,
-		BlockSkipped:   eventDDBEntry.BlockSkipped,
+		BlockHeight:    eventEntry.BlockHeight,
+		BlockHash:      eventEntry.BlockHash,
+		EventType:      eventEntry.EventType,
+		Tag:            eventEntry.Tag,
+		ParentHash:     eventEntry.ParentHash,
+		BlockSkipped:   eventEntry.BlockSkipped,
 		EventTag:       eventTag,
-		BlockTimestamp: eventDDBEntry.BlockTimestamp,
+		BlockTimestamp: eventEntry.BlockTimestamp,
 	}
 }
 
-func castVersionedItemToDDBEntry(outputItem interface{}) (*model.EventDDBEntry, bool) {
-	versionedEventDDBEntry, ok := model.CastVersionedItemToVersionedDDBEntry(outputItem)
+func castItemToEventEntry(outputItem interface{}) (*model.EventEntry, bool) {
+	eventDDBEntry, ok := outputItem.(*ddbmodel.EventDDBEntry)
 	if !ok {
 		return nil, ok
+	}
+	// switch to defaultTag is not set
+	if eventDDBEntry.Tag == 0 {
+		eventDDBEntry.Tag = model.DefaultBlockTag
+	}
+	return (*model.EventEntry)(eventDDBEntry), true
+}
+
+func castVersionedItemToEventEntry(outputItem interface{}) (*model.EventEntry, bool) {
+	versionedEventDDBEntry, ok := outputItem.(*ddbmodel.VersionedEventDDBEntry)
+	if !ok {
+		return nil, ok
+	}
+	// switch to defaultTag is not set
+	if versionedEventDDBEntry.Tag == 0 {
+		versionedEventDDBEntry.Tag = model.DefaultBlockTag
 	}
 
 	// update eventId to -1 if this is for watermark event
@@ -722,7 +738,7 @@ func castVersionedItemToDDBEntry(outputItem interface{}) (*model.EventDDBEntry, 
 		eventId = pkeyValueForWatermark
 		maxEventId = versionedEventDDBEntry.Sequence
 	}
-	eventDDBEntry := &model.EventDDBEntry{
+	eventEntry := &model.EventEntry{
 		EventId:        eventId,
 		EventType:      versionedEventDDBEntry.EventType,
 		BlockHeight:    versionedEventDDBEntry.BlockHeight,
@@ -735,5 +751,5 @@ func castVersionedItemToDDBEntry(outputItem interface{}) (*model.EventDDBEntry, 
 		BlockTimestamp: versionedEventDDBEntry.BlockTimestamp,
 	}
 
-	return eventDDBEntry, true
+	return eventEntry, true
 }

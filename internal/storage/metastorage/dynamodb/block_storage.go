@@ -12,8 +12,8 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )

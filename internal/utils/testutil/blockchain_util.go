@@ -47,11 +47,11 @@ func MakeBlockEvents(eventType api.BlockchainEvent_Type, startHeight uint64, end
 	return events
 }
 
-func MakeBlockEventDDBEntries(eventType api.BlockchainEvent_Type, eventTag uint32, endEventId int64, startHeight uint64, endHeight uint64, tag uint32, opts ...Option) []*model.EventDDBEntry {
+func MakeBlockEventEntries(eventType api.BlockchainEvent_Type, eventTag uint32, endEventId int64, startHeight uint64, endHeight uint64, tag uint32, opts ...Option) []*model.EventEntry {
 	events := MakeBlockEvents(eventType, startHeight, endHeight, tag, opts...)
-	entries := make([]*model.EventDDBEntry, len(events))
+	entries := make([]*model.EventEntry, len(events))
 	for i, event := range events {
-		entries[i] = model.NewEventDDBEntry(eventTag, endEventId+int64(i+1-len(events)), event)
+		entries[i] = model.NewEventEntry(eventTag, endEventId+int64(i+1-len(events)), event)
 	}
 	return entries
 }
