@@ -46,10 +46,12 @@ type (
 	StorageType struct {
 		BlobStorageType BlobStorageType `mapstructure:"blob"`
 		MetaStorageType MetaStorageType `mapstructure:"meta"`
+		DLQType         DLQType         `mapstructure:"dlq"`
 	}
 
 	BlobStorageType int32
 	MetaStorageType int32
+	DLQType         int32
 
 	ChainConfig struct {
 		Blockchain           common.Blockchain `mapstructure:"blockchain" validate:"required"`
@@ -361,6 +363,11 @@ var (
 		"UNSPECIFIED": 0,
 		"DYNAMODB":    1,
 	}
+
+	DLQType_value = map[string]int32{
+		"UNSPECIFIED": 0,
+		"SQS":         1,
+	}
 )
 
 const (
@@ -386,6 +393,9 @@ const (
 
 	MetaStorageType_UNSPECIFIED MetaStorageType = 0
 	MetaStorageType_DYNAMODB    MetaStorageType = 1
+
+	DLQType_UNSPECIFIED DLQType = 0
+	DLQType_SQS         DLQType = 1
 
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
@@ -464,6 +474,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 		mapstructure.StringToSliceHookFunc(","),
 		stringToBlobStorageTypeHookFunc(),
 		stringToMetaStorageTypeHookFunc(),
+		stringToDLQTypeHookFunc(),
 		stringToBlockchainHookFunc(),
 		stringToNetworkHookFunc(),
 		stringToCompressionHookFunc(),
@@ -782,6 +793,27 @@ func stringToMetaStorageTypeHookFunc() mapstructure.DecodeHookFunc {
 			return nil, xerrors.Errorf(
 				"invalid blob storage type: %v, possible values are: %v",
 				data, strings.Join(keysWithoutUnspecified(MetaStorageType_value), ", "))
+		}
+
+		return v, nil
+	}
+}
+
+func stringToDLQTypeHookFunc() mapstructure.DecodeHookFunc {
+	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+
+		if t != reflect.TypeOf(DLQType_UNSPECIFIED) {
+			return data, nil
+		}
+
+		v, ok := DLQType_value[data.(string)]
+		if !ok {
+			return nil, xerrors.Errorf(
+				"invalid dlq type: %v, possible values are: %v",
+				data, strings.Join(keysWithoutUnspecified(DLQType_value), ", "))
 		}
 
 		return v, nil

@@ -4,3 +4,4 @@ sdk:
 storage_type:
   blob: S3
   meta: DYNAMODB
+  dlq: SQS

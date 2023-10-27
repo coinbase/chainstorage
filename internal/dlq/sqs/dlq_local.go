@@ -1,8 +1,6 @@
-package dlq
+package sqs
 
 import (
-	"context"
-
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"go.uber.org/zap"
@@ -10,30 +8,6 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/utils/pointer"
 )
-
-type nopImpl struct{}
-
-var _ DLQ = (*nopImpl)(nil)
-
-func NewNop() DLQ {
-	return &nopImpl{}
-}
-
-func (q *nopImpl) SendMessage(_ context.Context, _ *Message) error {
-	return nil
-}
-
-func (q *nopImpl) ResendMessage(_ context.Context, _ *Message) error {
-	return nil
-}
-
-func (q *nopImpl) ReceiveMessage(_ context.Context) (*Message, error) {
-	return nil, xerrors.New("not implemented")
-}
-
-func (q *nopImpl) DeleteMessage(_ context.Context, _ *Message) error {
-	return nil
-}
 
 func (q *dlqImpl) resetLocalResources() error {
 	q.logger.Info("initializing dlq")

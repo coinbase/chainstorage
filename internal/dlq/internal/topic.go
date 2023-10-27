@@ -1,4 +1,4 @@
-package dlq
+package internal
 
 const (
 	FailedBlockTopic            = "failed_block"

@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	dlq "github.com/coinbase/chainstorage/internal/dlq"
+	internal "github.com/coinbase/chainstorage/internal/dlq/internal"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -36,7 +36,7 @@ func (m *MockDLQ) EXPECT() *MockDLQMockRecorder {
 }
 
 // DeleteMessage mocks base method.
-func (m *MockDLQ) DeleteMessage(arg0 context.Context, arg1 *dlq.Message) error {
+func (m *MockDLQ) DeleteMessage(arg0 context.Context, arg1 *internal.Message) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMessage", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -50,10 +50,10 @@ func (mr *MockDLQMockRecorder) DeleteMessage(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // ReceiveMessage mocks base method.
-func (m *MockDLQ) ReceiveMessage(arg0 context.Context) (*dlq.Message, error) {
+func (m *MockDLQ) ReceiveMessage(arg0 context.Context) (*internal.Message, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReceiveMessage", arg0)
-	ret0, _ := ret[0].(*dlq.Message)
+	ret0, _ := ret[0].(*internal.Message)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -65,7 +65,7 @@ func (mr *MockDLQMockRecorder) ReceiveMessage(arg0 interface{}) *gomock.Call {
 }
 
 // ResendMessage mocks base method.
-func (m *MockDLQ) ResendMessage(arg0 context.Context, arg1 *dlq.Message) error {
+func (m *MockDLQ) ResendMessage(arg0 context.Context, arg1 *internal.Message) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ResendMessage", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -79,7 +79,7 @@ func (mr *MockDLQMockRecorder) ResendMessage(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // SendMessage mocks base method.
-func (m *MockDLQ) SendMessage(arg0 context.Context, arg1 *dlq.Message) error {
+func (m *MockDLQ) SendMessage(arg0 context.Context, arg1 *internal.Message) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendMessage", arg0, arg1)
 	ret0, _ := ret[0].(error)
