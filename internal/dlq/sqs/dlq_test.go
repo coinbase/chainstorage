@@ -1,4 +1,4 @@
-package dlq
+package sqs
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
+	"github.com/coinbase/chainstorage/internal/dlq/internal"
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -25,25 +26,25 @@ func TestIntegrationDLQ(t *testing.T) {
 		t,
 		testapp.WithIntegration(),
 		testapp.WithConfig(cfg),
-		Module,
+		fx.Provide(New),
 		s3.Module,
 		fx.Populate(&q),
 	)
 	defer app.Close()
 
 	sent := Message{
-		Topic: FailedBlockTopic,
-		Data:  FailedBlockData{Tag: 3, Height: 123},
+		Topic: internal.FailedBlockTopic,
+		Data:  internal.FailedBlockData{Tag: 3, Height: 123},
 	}
 	err = q.SendMessage(context.Background(), &sent)
 	require.NoError(err)
 
 	received, err := q.ReceiveMessage(context.Background())
 	require.NoError(err)
-	require.Equal(FailedBlockTopic, received.Topic)
+	require.Equal(internal.FailedBlockTopic, received.Topic)
 	require.Equal(0, received.Retries)
 	require.NotEmpty(received.ReceiptHandle)
-	data, ok := received.Data.(*FailedBlockData)
+	data, ok := received.Data.(*internal.FailedBlockData)
 	require.True(ok)
 	require.Equal(uint32(3), data.Tag)
 	require.Equal(uint64(123), data.Height)
@@ -68,15 +69,15 @@ func TestIntegrationDLQ_Resend(t *testing.T) {
 		t,
 		testapp.WithIntegration(),
 		testapp.WithConfig(cfg),
-		Module,
+		fx.Provide(New),
 		s3.Module,
 		fx.Populate(&q),
 	)
 	defer app.Close()
 
 	sent := Message{
-		Topic: FailedTransactionTraceTopic,
-		Data:  FailedTransactionTraceData{Tag: 1, Height: 321, IgnoredTransactions: []int{2, 3, 5}},
+		Topic: internal.FailedTransactionTraceTopic,
+		Data:  internal.FailedTransactionTraceData{Tag: 1, Height: 321, IgnoredTransactions: []int{2, 3, 5}},
 	}
 	err = q.SendMessage(context.Background(), &sent)
 	require.NoError(err)
@@ -94,10 +95,10 @@ func TestIntegrationDLQ_Resend(t *testing.T) {
 	received, err := q.ReceiveMessage(context.Background())
 	require.NoError(err)
 
-	require.Equal(FailedTransactionTraceTopic, received.Topic)
+	require.Equal(internal.FailedTransactionTraceTopic, received.Topic)
 	require.Equal(retries, received.Retries)
 	require.NotEmpty(received.ReceiptHandle)
-	data, ok := received.Data.(*FailedTransactionTraceData)
+	data, ok := received.Data.(*internal.FailedTransactionTraceData)
 	require.True(ok)
 	require.Equal(uint32(1), data.Tag)
 	require.Equal(uint64(321), data.Height)
@@ -123,7 +124,7 @@ func TestIntegrationDLQ_UnknownTopic(t *testing.T) {
 		t,
 		testapp.WithIntegration(),
 		testapp.WithConfig(cfg),
-		Module,
+		fx.Provide(New),
 		s3.Module,
 		fx.Populate(&q),
 	)
@@ -131,7 +132,7 @@ func TestIntegrationDLQ_UnknownTopic(t *testing.T) {
 
 	sent := Message{
 		Topic: "foo",
-		Data:  FailedBlockData{Tag: 3, Height: 123},
+		Data:  internal.FailedBlockData{Tag: 3, Height: 123},
 	}
 	err = q.SendMessage(context.Background(), &sent)
 	require.NoError(err)

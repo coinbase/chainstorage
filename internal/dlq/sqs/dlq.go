@@ -1,4 +1,4 @@
-package dlq
+package sqs
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
+	"github.com/coinbase/chainstorage/internal/dlq/internal"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -20,20 +21,8 @@ import (
 )
 
 type (
-	DLQ interface {
-		SendMessage(ctx context.Context, message *Message) error
-		ResendMessage(ctx context.Context, message *Message) error
-		ReceiveMessage(ctx context.Context) (*Message, error)
-		DeleteMessage(ctx context.Context, message *Message) error
-	}
-
-	Message struct {
-		Topic         string
-		Retries       int
-		SentTimestamp time.Time
-		ReceiptHandle string
-		Data          interface{}
-	}
+	DLQ     = internal.DLQ
+	Message = internal.Message
 
 	DLQParams struct {
 		fx.In
@@ -51,7 +40,21 @@ type (
 		instrumentReceiveMessage instrument.Call
 		instrumentDeleteMessage  instrument.Call
 	}
+
+	dlqFactory struct {
+		params DLQParams
+	}
 )
+
+var _ DLQ = (*dlqImpl)(nil)
+
+func (f *dlqFactory) Create() (internal.DLQ, error) {
+	return New(f.params)
+}
+
+func NewFactory(params DLQParams) internal.DLQFactory {
+	return &dlqFactory{params}
+}
 
 const (
 	topicAttributeName       = "topic"
@@ -63,8 +66,6 @@ const (
 var (
 	ErrNotFound = xerrors.New("not found")
 )
-
-var _ DLQ = (*dlqImpl)(nil)
 
 func New(params DLQParams) (DLQ, error) {
 	client := sqs.New(params.Session)
@@ -225,10 +226,10 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 
 		var data interface{}
 		switch topic {
-		case FailedBlockTopic:
-			data = new(FailedBlockData)
-		case FailedTransactionTraceTopic:
-			data = new(FailedTransactionTraceData)
+		case internal.FailedBlockTopic:
+			data = new(internal.FailedBlockData)
+		case internal.FailedTransactionTraceTopic:
+			data = new(internal.FailedTransactionTraceData)
 		default:
 			q.logger.Warn("unknown topic", zap.String("topic", topic))
 		}
