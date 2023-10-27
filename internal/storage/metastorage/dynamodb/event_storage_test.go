@@ -5,15 +5,15 @@ import (
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 
-	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
-	publicmodel "github.com/coinbase/chainstorage/internal/storage/metastorage/model"
+	ddbmodel "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 )
 
 func TestMakeWatermarkVersionedDDBEntry(t *testing.T) {
 	require := testutil.Require(t)
 
-	expected := &model.VersionedEventDDBEntry{
+	expected := &ddbmodel.VersionedEventDDBEntry{
 		EventId:      "2-latest",
 		Sequence:     100,
 		BlockId:      "2-latest",
@@ -33,7 +33,7 @@ func TestMakeWatermarkVersionedDDBEntry(t *testing.T) {
 func TestCastDDBEntryToVersionedDDBEntry(t *testing.T) {
 	require := testutil.Require(t)
 
-	ddbEntry := &model.EventDDBEntry{
+	ddbEntry := &ddbmodel.EventDDBEntry{
 		EventId:      101,
 		EventType:    api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight:  100,
@@ -45,7 +45,7 @@ func TestCastDDBEntryToVersionedDDBEntry(t *testing.T) {
 		EventTag:     2,
 	}
 
-	expectedVersionedDDBEntry := &model.VersionedEventDDBEntry{
+	expectedVersionedDDBEntry := &ddbmodel.VersionedEventDDBEntry{
 		EventId:      "2-101",
 		Sequence:     101,
 		BlockId:      "2-100",
@@ -58,14 +58,14 @@ func TestCastDDBEntryToVersionedDDBEntry(t *testing.T) {
 		EventTag:     2,
 	}
 
-	actualVersionedDDBEntry := castEventEntryToVersionedDDBEntry((*publicmodel.EventEntry)(ddbEntry))
+	actualVersionedDDBEntry := castEventEntryToVersionedDDBEntry((*model.EventEntry)(ddbEntry))
 	require.Equal(expectedVersionedDDBEntry, actualVersionedDDBEntry)
 }
 
 func TestCastDDBEntryToVersionedDDBEntry_Watermark(t *testing.T) {
 	require := testutil.Require(t)
 
-	ddbEntry := &model.EventDDBEntry{
+	ddbEntry := &ddbmodel.EventDDBEntry{
 		EventId:     pkeyValueForWatermark,
 		EventType:   api.BlockchainEvent_UNKNOWN,
 		BlockHeight: blockHeightForWatermark,
@@ -74,7 +74,7 @@ func TestCastDDBEntryToVersionedDDBEntry_Watermark(t *testing.T) {
 		EventTag:    2,
 	}
 
-	expectedVersionedDDBEntry := &model.VersionedEventDDBEntry{
+	expectedVersionedDDBEntry := &ddbmodel.VersionedEventDDBEntry{
 		EventId:      "2-latest",
 		Sequence:     101,
 		BlockId:      "2-latest",
@@ -87,14 +87,14 @@ func TestCastDDBEntryToVersionedDDBEntry_Watermark(t *testing.T) {
 		EventTag:     2,
 	}
 
-	actualVersionedDDBEntry := castEventEntryToVersionedDDBEntry((*publicmodel.EventEntry)(ddbEntry))
+	actualVersionedDDBEntry := castEventEntryToVersionedDDBEntry((*model.EventEntry)(ddbEntry))
 	require.Equal(expectedVersionedDDBEntry, actualVersionedDDBEntry)
 }
 
 func TestCastVersionedItemToDDBEntry(t *testing.T) {
 	require := testutil.Require(t)
 
-	versionedDDBEntry := &model.VersionedEventDDBEntry{
+	versionedDDBEntry := &ddbmodel.VersionedEventDDBEntry{
 		EventId:      "2-101",
 		Sequence:     101,
 		BlockId:      "2-100",
@@ -107,12 +107,12 @@ func TestCastVersionedItemToDDBEntry(t *testing.T) {
 		EventTag:     2,
 	}
 
-	expectedEntry := &publicmodel.EventEntry{
+	expectedEntry := &model.EventEntry{
 		EventId:      101,
 		EventType:    api.BlockchainEvent_BLOCK_ADDED,
 		BlockHeight:  100,
 		BlockHash:    "aaa",
-		Tag:          publicmodel.DefaultBlockTag,
+		Tag:          model.DefaultBlockTag,
 		ParentHash:   "bbb",
 		MaxEventId:   0,
 		BlockSkipped: false,
@@ -127,7 +127,7 @@ func TestCastVersionedItemToDDBEntry(t *testing.T) {
 func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 	require := testutil.Require(t)
 
-	versionedDDBEntry := &model.VersionedEventDDBEntry{
+	versionedDDBEntry := &ddbmodel.VersionedEventDDBEntry{
 		EventId:     "2-latest",
 		Sequence:    101,
 		BlockId:     "2-latest",
@@ -137,7 +137,7 @@ func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 		EventTag:    2,
 	}
 
-	expectedEntry := &publicmodel.EventEntry{
+	expectedEntry := &model.EventEntry{
 		EventId:     -1,
 		EventType:   api.BlockchainEvent_UNKNOWN,
 		BlockHeight: blockHeightForWatermark,
