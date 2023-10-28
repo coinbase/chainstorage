@@ -40,7 +40,7 @@ func WithBlobStorageFactory(params BlobStorageFactoryParams) (BlobStorage, error
 	}
 	result, err := factory.Create()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create blob storage of type %v, error: %w", storageType, err)
+		return nil, xerrors.Errorf("failed to create blob storage of type %v: %w", storageType, err)
 	}
 	return result, nil
 }
