@@ -70,3 +70,8 @@ jobs:
           echo "localstack ready"
       - name: Integration Tests
         run: make integration
+  ci-passed:
+    runs-on: ubuntu-22.04
+    needs: [build, test, integration]
+    steps:
+      - run: echo "All tests passed"
