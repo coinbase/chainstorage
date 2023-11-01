@@ -34,12 +34,15 @@
 - [Public APIs](#public-apis)
 - [Contact Us](#contact-us)
 
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+<!-- END doctoc generated TOC please keep comment here to allow auto-update -->
+## Related Projects
+ChainStorage is the foundational component of [ChainNode](https://github.com/coinbase/chainnode) and [Chainsformer](https://github.com/coinbase/chainnode).
+These libraries represent the crypto data processing  suites started by the Crypto Data Foundation team in Coinbase.
 
 ## Overview
 
 ChainStorage is inspired by the Change Data Capture paradigm, commonly used in the big data world. It continuously
-replicates the changes (i.e. new blocks) on the blockchain, and acts like a distributed file system for the blockchain.
+replicates the changes (i.e. new blocks) on the blockchain and acts like a distributed file system for the blockchain.
 
 It aims to provide an efficient and flexible way to access the on-chain data:
 
