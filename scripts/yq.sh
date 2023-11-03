@@ -4,7 +4,8 @@ set -eo pipefail
 
 YQ_VERSION=4.35.2
 SCRIPTS_DIR=$(dirname "${BASH_SOURCE[0]}")
-YQ_INSTALL_PATH=${SCRIPTS_DIR}/binary/yq-${YQ_VERSION}
+BIN_DIR=${SCRIPTS_DIR}/bin
+YQ_INSTALL_PATH=${BIN_DIR}/yq-${YQ_VERSION}
 
 install_yq() {
   local version=$1
@@ -64,7 +65,7 @@ get_download_url() {
 }
 
 if ! [ -x "$(command -v ${YQ_INSTALL_PATH})" ]; then
-  mkdir -p "${SCRIPTS_DIR}/binary"
+  mkdir -p "${BIN_DIR}"
   install_yq "${YQ_VERSION}" "${YQ_INSTALL_PATH}"
 fi
 
