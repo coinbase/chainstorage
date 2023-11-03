@@ -13,14 +13,14 @@ install_yq() {
   local platform
   local download_url
 
-  platform="$(uname | tr '[:upper:]' '[:lower:]')_$(getArch)"
+  platform="$(uname | tr '[:upper:]' '[:lower:]')_$(get_arch)"
   download_url="$(get_download_url "${version}" "${platform}")"
 
   curl -sfL "${download_url}" -o "${binary_path}"
   chmod +x "${binary_path}"
 }
 
-getArch() {
+get_arch() {
   ARCH=$(uname -m)
   case $ARCH in
     armv*) ARCH="arm";;
@@ -33,35 +33,11 @@ getArch() {
   echo "$ARCH"
 }
 
-get_filename() {
-  local platform="$1"
-  echo "yq_${platform}"
-}
-
 get_download_url() {
   local version="$1"
   local platform="$2"
-  local filename
-  local major
-  local minor
-  local patch
-
-  major="$(echo "${version}" | cut -f1 -d.)"
-  minor="$(echo "${version}" | cut -f2 -d.)"
-  patch="$(echo "${version}" | cut -f3 -d.)"
-
-  if [[ "${platform}" == "darwin_arm64" && ("${major}" -lt 4 || ("${major}" -eq 4 && "${minor}" -lt 9) || ("${major}" -eq 4 && "${minor}" -eq 9 && "${patch}" -lt 6)) ]] ; then
-    # arm64 builds are introduced from 4.9.6 onwards
-    platform="darwin_amd64"
-  fi
-
-  filename="$(get_filename "${platform}")"
-
-  if [[ "${major}" -gt 4 || ("${major}" -eq 4 && "${minor}" -gt 0) ]] ; then
-    version="v${version}"
-  fi
-
-  echo "https://github.com/mikefarah/yq/releases/download/${version}/${filename}"
+  local filename="yq_${platform}"
+  echo "https://github.com/mikefarah/yq/releases/download/v${version}/${filename}"
 }
 
 if ! [ -x "$(command -v ${YQ_INSTALL_PATH})" ]; then
