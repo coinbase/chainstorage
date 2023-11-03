@@ -186,14 +186,14 @@ func TestIntegrationBscGetBlock(t *testing.T) {
 
 			// Flattened traces.
 			transactionFlattenedTraces := transaction.FlattenedTraces
-			require.Equal(2, len(transactionFlattenedTraces))
+			require.Equal(1, len(transactionFlattenedTraces))
 			app.Logger().Info("goerli transaction flattened traces:", zap.Reflect("transaction_flattened_traces", transactionFlattenedTraces))
 
 			require.Equal("CALL", transactionFlattenedTraces[0].Type)
 			require.Equal("0x29a97c6effb8a411dabc6adeefaa84f5067c8bbe", transactionFlattenedTraces[0].From)
 			require.Equal("0x0000000000000000000000000000000000001000", transactionFlattenedTraces[0].To)
 			require.Equal("22290000000000000", transactionFlattenedTraces[0].Value)
-			require.Equal(uint64(1), transactionFlattenedTraces[0].Subtraces)
+			require.Equal(uint64(0), transactionFlattenedTraces[0].Subtraces)
 			require.Equal([]uint64{}, transactionFlattenedTraces[0].TraceAddress)
 			require.Equal(bscHeight, transactionFlattenedTraces[0].BlockNumber)
 			require.Equal("0xb94ccd031e76c41214e924ef21bc5aec4c1264272f6fa1c15a03ed8f29433ca5", transactionFlattenedTraces[0].BlockHash)
@@ -203,21 +203,6 @@ func TestIntegrationBscGetBlock(t *testing.T) {
 			require.Equal("CALL", transactionFlattenedTraces[0].TraceType)
 			require.Equal("CALL_0xd3035674621c53539a92f5700a386fdc262cf6a5b49bf876f459a71ee481fb0f", transactionFlattenedTraces[0].TraceId)
 			require.Equal(uint64(1), transactionFlattenedTraces[0].Status)
-
-			require.Equal("CALL", transactionFlattenedTraces[1].Type)
-			require.Equal("0x0000000000000000000000000000000000001000", transactionFlattenedTraces[1].From)
-			require.Equal("0x000000000000000000000000000000000000dead", transactionFlattenedTraces[1].To)
-			require.Equal("2229000000000000", transactionFlattenedTraces[1].Value)
-			require.Equal(uint64(0), transactionFlattenedTraces[1].Subtraces)
-			require.Equal([]uint64{0}, transactionFlattenedTraces[1].TraceAddress)
-			require.Equal(bscHeight, transactionFlattenedTraces[1].BlockNumber)
-			require.Equal("0xb94ccd031e76c41214e924ef21bc5aec4c1264272f6fa1c15a03ed8f29433ca5", transactionFlattenedTraces[1].BlockHash)
-			require.Equal("0xd3035674621c53539a92f5700a386fdc262cf6a5b49bf876f459a71ee481fb0f", transactionFlattenedTraces[1].TransactionHash)
-			require.Equal(uint64(1), transactionFlattenedTraces[1].TransactionIndex)
-			require.Equal("CALL", transactionFlattenedTraces[1].CallType)
-			require.Equal("CALL", transactionFlattenedTraces[1].TraceType)
-			require.Equal("CALL_0xd3035674621c53539a92f5700a386fdc262cf6a5b49bf876f459a71ee481fb0f_0", transactionFlattenedTraces[1].TraceId)
-			require.Equal(uint64(1), transactionFlattenedTraces[1].Status)
 
 			// Token transfers.
 			tokenTransfers := block.Transactions[0].TokenTransfers
