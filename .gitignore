@@ -27,3 +27,6 @@
 
 # pg 
 postgres_*
+
+# ignore binaries
+/scripts/binary
