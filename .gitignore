@@ -15,6 +15,7 @@
 
 # Auto-generated config file for local execution
 /config/**/**/**/secrets.yml
+/tools/rpc_replayer/secrets.yml
 
 # Build output
 /bin/
