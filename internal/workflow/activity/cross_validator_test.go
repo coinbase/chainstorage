@@ -3,9 +3,9 @@ package activity
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/suite"
 

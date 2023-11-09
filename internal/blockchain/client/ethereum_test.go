@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -443,7 +443,7 @@ func TestEthereumClient_GetBlockByHeightWithBestEffort(t *testing.T) {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -846,7 +846,7 @@ func TestEthereumClient_GetBlockByHashExecutionTimeoutError(t *testing.T) {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			switch method {
 			case ethGetBlockByHashMethod:
 				return &jsonrpc.Response{
@@ -908,7 +908,7 @@ func TestEthereumClient_RetryOrphanedTransactionReceipts(t *testing.T) {
 	rpcClient.EXPECT().BatchCall(
 		gomock.Any(), ethGetTransactionReceiptMethod, gomock.Any(),
 	).Times(retry.DefaultMaxAttempts).
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, batchParams []jsonrpc.Params) ([]*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, batchParams []jsonrpc.Params, opts ...jsonrpc.Option) ([]*jsonrpc.Response, error) {
 			// Return the correct receipt on the last retry attempt.
 			attempts += 1
 			if attempts < retry.DefaultMaxAttempts {

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	jsonrpcmocks "github.com/coinbase/chainstorage/internal/blockchain/jsonrpc/mocks"

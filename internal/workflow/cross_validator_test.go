@@ -5,13 +5,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
+	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
@@ -133,7 +134,7 @@ func (s *crossValidatorTestSuite) TestCrossValidator() {
 		})
 	s.validatorClient.EXPECT().GetBlockByHash(gomock.Any(), validatorTag, gomock.Any(), gomock.Any()).
 		Times(int(validatorEndHeight - validatorStartHeight)).
-		DoAndReturn(func(ctx context.Context, tag uint32, height uint64, hash string) (*api.Block, error) {
+		DoAndReturn(func(ctx context.Context, tag uint32, height uint64, hash string, opts ...jsonrpc.Option) (*api.Block, error) {
 			seen.validatorClient.LoadOrStore(height, true)
 			return testutil.MakeBlock(height, tag), nil
 		})
