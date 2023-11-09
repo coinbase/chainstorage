@@ -51,14 +51,14 @@ It aims to provide an efficient and flexible way to access the on-chain data:
 
 ## Quick Start
 
-Make sure your local go version is 1.18 by running the following commands:
+Make sure your local go version is 1.20 by running the following commands:
 
 ```shell
-brew install go@1.18
+brew install go@1.20
 brew unlink go
-brew link go@1.18
+brew link go@1.20
 
-brew install protobuf@3.21.12
+brew install protobuf@25
 brew unlink protobuf
 brew link protobuf
 
