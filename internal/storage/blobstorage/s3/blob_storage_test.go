@@ -10,9 +10,10 @@ import (
 	"github.com/aws/aws-sdk-go/awstesting/unit"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/golang/mock/gomock"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 
+	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	"github.com/coinbase/chainstorage/internal/s3"
 	s3mocks "github.com/coinbase/chainstorage/internal/s3/mocks"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
@@ -34,7 +35,7 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 
 	downloader := s3mocks.NewMockDownloader(ctrl)
 	downloader.EXPECT().DownloadWithContext(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, writer io.WriterAt, input *awss3.GetObjectInput) (int64, error) {
+		DoAndReturn(func(ctx context.Context, writer io.WriterAt, input *awss3.GetObjectInput, opts ...jsonrpc.Option) (int64, error) {
 			require.NotNil(input.Bucket)
 			require.NotEmpty(*input.Bucket)
 			require.NotNil(input.Key)
@@ -45,7 +46,7 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 
 	uploader := s3mocks.NewMockUploader(ctrl)
 	uploader.EXPECT().UploadWithContext(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, input *s3manager.UploadInput) (*s3manager.UploadOutput, error) {
+		DoAndReturn(func(ctx context.Context, input *s3manager.UploadInput, opts ...jsonrpc.Option) (*s3manager.UploadOutput, error) {
 			require.NotNil(input.Bucket)
 			require.NotEmpty(*input.Bucket)
 			require.NotNil(input.Key)

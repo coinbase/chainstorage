@@ -4,7 +4,7 @@ inputs:
   go-version:
     description: 'Golang version to use'
     required: false
-    default: '1.21'
+    default: '1.20'
 runs:
   using: "composite"
   steps:
@@ -17,7 +17,7 @@ runs:
     - name: Setup
       shell: bash
       run: |
-        asdf plugin-add protoc https://github.com/paxosglobal/asdf-protoc.git
-        asdf install protoc 24.4
-        asdf global protoc 24.4
+        asdf plugin-add protoc
+        asdf install protoc 25.0
+        asdf global protoc 25.0
         make bootstrap

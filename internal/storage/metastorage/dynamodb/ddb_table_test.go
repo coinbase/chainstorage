@@ -12,9 +12,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	dynamodbmocks "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/mocks"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
@@ -72,7 +73,7 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetrySuccess() {
 	seen := sync.Map{}
 	attempts := 0
 	s.dynamoAPI.EXPECT().TransactGetItemsWithContext(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput) (
+		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput, opts ...jsonrpc.Option) (
 			*dynamodb.TransactGetItemsOutput, error) {
 			attempts += 1
 			if attempts == 1 {
@@ -145,7 +146,7 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetryFailure() {
 	keyMaps := makeKeyMapsForTestDDBEntries(numItems)
 
 	s.dynamoAPI.EXPECT().TransactGetItemsWithContext(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput) (
+		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput, opts ...jsonrpc.Option) (
 			*dynamodb.TransactGetItemsOutput, error) {
 			require.Equal(numItems, len(input.TransactItems))
 			mockCancelReasons := make([]*dynamodb.CancellationReason, numItems)

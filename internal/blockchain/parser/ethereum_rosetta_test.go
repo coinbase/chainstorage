@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

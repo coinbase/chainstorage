@@ -7,16 +7,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
+	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq"
@@ -145,7 +146,7 @@ func (s *backfillerTestSuite) TestBackfiller() {
 		})
 	s.blockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(int(endHeight - startHeight)).
-		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64) (*api.Block, error) {
+		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64, opts ...jsonrpc.Option) (*api.Block, error) {
 			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
 			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
 			require.Equal(tag, tag_)
@@ -214,7 +215,7 @@ func (s *backfillerTestSuite) TestBackfiller_Failover() {
 		})
 	s.blockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(int(endHeight - startHeight)).
-		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64) (*api.Block, error) {
+		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64, opts ...jsonrpc.Option) (*api.Block, error) {
 			require.True(s.masterEndpointProvider.HasFailoverContext(ctx))
 			require.True(s.slaveEndpointProvider.HasFailoverContext(ctx))
 			require.Equal(tag, tag_)

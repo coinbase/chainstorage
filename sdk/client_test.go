@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -364,15 +364,15 @@ func (s *clientTestSuite) TestStreamBlocks_RecvTransientErr() {
 		initialSequence = int64(100)
 	)
 	gomock.InOrder(
-		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), &api.ChainEventsRequest{
+		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), testutil.MatchProto(&api.ChainEventsRequest{
 			SequenceNum: 100,
-		}).Return(s.streamClient, nil),
-		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), &api.ChainEventsRequest{
+		})).Return(s.streamClient, nil),
+		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), testutil.MatchProto(&api.ChainEventsRequest{
 			SequenceNum: 109,
-		}).Return(s.streamClient, nil),
-		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), &api.ChainEventsRequest{
+		})).Return(s.streamClient, nil),
+		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), testutil.MatchProto(&api.ChainEventsRequest{
 			SequenceNum: 113,
-		}).Return(s.streamClient, nil),
+		})).Return(s.streamClient, nil),
 	)
 	s.gatewayClient.EXPECT().GetBlockFile(gomock.Any(), gomock.Any()).Return(&api.GetBlockFileResponse{}, nil).Times(expectedEvents)
 	s.downloaderClient.EXPECT().Download(gomock.Any(), gomock.Any()).Return(&api.Block{}, nil).Times(expectedEvents)
@@ -427,12 +427,12 @@ func (s *clientTestSuite) TestStreamBlocks_RecvPermanentErr() {
 		initialSequence = int64(100)
 	)
 	gomock.InOrder(
-		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), &api.ChainEventsRequest{
+		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), testutil.MatchProto(&api.ChainEventsRequest{
 			SequenceNum: 100,
-		}).Return(s.streamClient, nil),
-		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), &api.ChainEventsRequest{
+		})).Return(s.streamClient, nil),
+		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), testutil.MatchProto(&api.ChainEventsRequest{
 			SequenceNum: 109,
-		}).Return(s.streamClient, xerrors.New("some mock error")),
+		})).Return(s.streamClient, xerrors.New("some mock error")),
 	)
 	s.gatewayClient.EXPECT().GetBlockFile(gomock.Any(), gomock.Any()).Return(&api.GetBlockFileResponse{}, nil).AnyTimes()
 	s.downloaderClient.EXPECT().Download(gomock.Any(), gomock.Any()).Return(&api.Block{}, nil).AnyTimes()

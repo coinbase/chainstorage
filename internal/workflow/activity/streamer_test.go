@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
