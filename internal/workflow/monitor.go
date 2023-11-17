@@ -2,9 +2,11 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
@@ -32,23 +34,32 @@ type (
 	}
 
 	MonitorRequest struct {
-		StartHeight               uint64
-		Tag                       uint32
-		StartEventId              int64  // Optional. If not specified or less than metastorage.EventIdStartValue, it will be set as metastorage.EventIdStartValue.
-		ValidationHeightPadding   uint64 // Optional. If not specified, it is read from the workflow config.
-		BatchSize                 uint64 // Optional. If not specified, it is read from the workflow config.
-		EventBatchSize            uint64 // Optional. If not specified, it is read from the workflow config.
-		CheckpointSize            uint64 // Optional. If not specified, it is read from the workflow config.
-		BackoffIntervalSecs       uint64 // Optional. If not specified, it is read from the workflow config.
-		Parallelism               int    // Optional. If not specified, it is read from the workflow config.
-		ValidatorMaxReorgDistance uint64 // Optional. If not specified, it is read from the workflow config.
-		EventTag                  uint32 // Optional.
-		Failover                  bool   // Optional. If not specified, it is set as false.
+		StartHeight             uint64
+		Tag                     uint32
+		StartEventId            int64  // Optional. If not specified or less than metastorage.EventIdStartValue, it will be set as metastorage.EventIdStartValue.
+		ValidationHeightPadding uint64 // Optional. If not specified, it is read from the workflow config.
+		BatchSize               uint64 // Optional. If not specified, it is read from the workflow config.
+		EventBatchSize          uint64 // Optional. If not specified, it is read from the workflow config.
+		CheckpointSize          uint64 // Optional. If not specified, it is read from the workflow config.
+		BackoffInterval         string // Optional. If not specified, it is read from the workflow config.
+		Parallelism             int    // Optional. If not specified, it is read from the workflow config.
+		EventTag                uint32 // Optional.
+		Failover                bool   // Optional. If not specified, it is set as false.
 	}
 )
 
 const (
-	validationHeightPaddingMultiplier = 2
+	validationHeightPaddingMultiplier = 4
+
+	// monitor metrics. need to have `workflow.monitor` as prefix
+	monitorBlockGapHealthCounter = "workflow.monitor.block_gap_health"
+	monitorEventGapHealthCounter = "workflow.monitor.event_gap_health"
+	monitorEventHeightGauge      = "workflow.monitor.event_height"
+	monitorEventIdGauge          = "workflow.monitor.event_id"
+	monitorFailoverGauge         = "workflow.monitor.failover"
+	monitorHeightGauge           = "workflow.monitor.height"
+	monitorBlockGapGauge         = "workflow.monitor.block_gap"
+	monitorEventGapGauge         = "workflow.monitor.event_gap"
 )
 
 var (
@@ -65,7 +76,11 @@ func NewMonitor(params MonitorParams) *Monitor {
 }
 
 func (w *Monitor) Execute(ctx context.Context, request *MonitorRequest) (client.WorkflowRun, error) {
-	return w.startWorkflow(ctx, w.name, request)
+	workflowID := w.name
+	if request.Tag != 0 {
+		workflowID = fmt.Sprintf("%s/block_tag=%d", w.name, request.Tag)
+	}
+	return w.startWorkflow(ctx, workflowID, request)
 }
 
 func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
@@ -105,19 +120,19 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 			checkpointSize = request.CheckpointSize
 		}
 
+		var err error
 		backoffInterval := cfg.BackoffInterval
-		if request.BackoffIntervalSecs > 0 {
-			backoffInterval = time.Duration(request.BackoffIntervalSecs) * time.Second
+		if request.BackoffInterval != "" {
+			backoffInterval, err = time.ParseDuration(request.BackoffInterval)
+			if err != nil {
+				return xerrors.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
+			}
 		}
+		zeroBackoff := backoffInterval == 0
 
 		parallelism := cfg.Parallelism
 		if request.Parallelism > 0 {
 			parallelism = request.Parallelism
-		}
-
-		validatorMaxReorgDistance := cfg.IrreversibleDistance
-		if request.ValidatorMaxReorgDistance > 0 {
-			validatorMaxReorgDistance = request.ValidatorMaxReorgDistance
 		}
 
 		eventTag := cfg.GetEffectiveEventTag(request.EventTag)
@@ -126,34 +141,36 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 		ctx = w.withActivityOptions(ctx)
 
 		tag := cfg.GetEffectiveBlockTag(request.Tag)
-		metrics := w.getScope(ctx).Tagged(map[string]string{
+		metrics := w.getMetricsHandler(ctx).WithTags(map[string]string{
 			tagBlockTag: strconv.Itoa(int(tag)),
 			tagEventTag: strconv.Itoa(int(eventTag)),
 		})
 
 		failover := request.Failover
 
+		var backoff workflow.Future
 		startHeight := request.StartHeight
 		for i := 0; i < int(checkpointSize); i++ {
-			backoff := workflow.NewTimer(ctx, backoffInterval)
+			if !zeroBackoff {
+				backoff = workflow.NewTimer(ctx, backoffInterval)
+			}
 
 			if failover {
-				metrics.Gauge(failoverMetricName).Update(1)
+				metrics.Gauge(monitorFailoverGauge).Update(1)
 			} else {
-				metrics.Gauge(failoverMetricName).Update(0)
+				metrics.Gauge(monitorFailoverGauge).Update(0)
 			}
 
 			validatorRequest := &activity.ValidatorRequest{
-				Tag:                       tag,
-				MaxHeightsToValidate:      batchSize,
-				StartHeight:               startHeight,
-				ValidationHeightPadding:   validationHeightPadding,
-				StartEventId:              startEventId,
-				MaxEventsToValidate:       eventBatchSize,
-				Parallelism:               parallelism,
-				ValidatorMaxReorgDistance: validatorMaxReorgDistance,
-				EventTag:                  eventTag,
-				Failover:                  failover,
+				Tag:                     tag,
+				MaxHeightsToValidate:    batchSize,
+				StartHeight:             startHeight,
+				ValidationHeightPadding: validationHeightPadding,
+				StartEventId:            startEventId,
+				MaxEventsToValidate:     eventBatchSize,
+				Parallelism:             parallelism,
+				EventTag:                eventTag,
+				Failover:                failover,
 			}
 			validatorResponse, err := w.validator.Execute(ctx, validatorRequest)
 			if err != nil {
@@ -170,18 +187,42 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 				return xerrors.Errorf("failed to execute validator: %w", err)
 			}
 			logger.Info("validated blocks", zap.Reflect("response", validatorResponse))
-			startHeight = validatorResponse.LastValidatedHeight
-			metrics.Gauge("height").Update(float64(validatorResponse.LastValidatedHeight))
-			metrics.Gauge("block_gap").Update(float64(validatorResponse.BlockGap))
+			lastValidatedHeight := validatorResponse.LastValidatedHeight
+			startHeight = lastValidatedHeight
+			metrics.Gauge(monitorHeightGauge).Update(float64(lastValidatedHeight))
+			blockGap := validatorResponse.BlockGap
+			metrics.Gauge(monitorBlockGapGauge).Update(float64(blockGap))
+
+			newGapCounter := func(counterName string, resultType string) tally.Counter {
+				return metrics.WithTags(map[string]string{
+					resultTypeTag: resultType,
+				}).Counter(counterName)
+			}
+			if blockGap > cfg.BlockGapLimit {
+				newGapCounter(monitorBlockGapHealthCounter, resultTypeError).Inc(1)
+			} else {
+				newGapCounter(monitorBlockGapHealthCounter, resultTypeSuccess).Inc(1)
+			}
+
 			if validatorResponse.LastValidatedEventId != 0 {
 				// only need to update when we did validate events
 				startEventId = validatorResponse.LastValidatedEventId
-				metrics.Gauge("event_height").Update(float64(validatorResponse.LastValidatedEventHeight))
-				metrics.Gauge("event_id").Update(float64(validatorResponse.LastValidatedEventId))
-				metrics.Gauge("event_gap").Update(float64(validatorResponse.EventGap))
+				metrics.Gauge(monitorEventHeightGauge).Update(float64(validatorResponse.LastValidatedEventHeight))
+				metrics.Gauge(monitorEventIdGauge).Update(float64(validatorResponse.LastValidatedEventId))
+
+				eventGap := validatorResponse.EventGap
+				metrics.Gauge(monitorEventGapGauge).Update(float64(eventGap))
+				if eventGap > cfg.EventGapLimit {
+					newGapCounter(monitorEventGapHealthCounter, resultTypeError).Inc(1)
+				} else {
+					newGapCounter(monitorEventGapHealthCounter, resultTypeSuccess).Inc(1)
+				}
 			}
-			if err := backoff.Get(ctx, nil); err != nil {
-				return xerrors.Errorf("failed to sleep: %w", err)
+
+			if !zeroBackoff {
+				if err := backoff.Get(ctx, nil); err != nil {
+					return xerrors.Errorf("failed to sleep: %w", err)
+				}
 			}
 		}
 

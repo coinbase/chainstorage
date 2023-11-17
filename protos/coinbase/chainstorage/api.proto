@@ -218,6 +218,36 @@ message GetVersionedChainEventResponse {
   BlockchainEvent event = 1;
 }
 
+message GetBlockByTransactionRequest {
+  uint32 tag = 1;
+  string transaction_hash = 2;
+}
+
+message GetBlockByTransactionResponse {
+  // A transaction may exist in multiple blocks for some networks.
+  // In most of the cases, it should only belong to one block.
+  repeated BlockIdentifier blocks = 1;
+}
+
+message GetNativeTransactionRequest {
+  uint32 tag = 1;
+  string transaction_hash = 2;
+}
+
+message GetNativeTransactionResponse {
+  // A transaction may exist in multiple blocks for some networks.
+  // In most of the cases, it should only belong to one block.
+  repeated NativeTransaction transactions = 1;
+}
+
+message GetVerifiedAccountStateRequest {
+  InternalGetVerifiedAccountStateRequest req = 1;
+}
+
+message GetVerifiedAccountStateResponse {
+  ValidateAccountStateResponse response = 1;
+}
+
 service ChainStorage {
   rpc GetLatestBlock (GetLatestBlockRequest) returns (GetLatestBlockResponse);
   rpc GetBlockFile(GetBlockFileRequest) returns (GetBlockFileResponse);
@@ -232,4 +262,7 @@ service ChainStorage {
   rpc GetChainEvents(GetChainEventsRequest) returns (GetChainEventsResponse);
   rpc GetChainMetadata(GetChainMetadataRequest) returns (GetChainMetadataResponse);
   rpc GetVersionedChainEvent(GetVersionedChainEventRequest) returns (GetVersionedChainEventResponse);
+  rpc GetBlockByTransaction(GetBlockByTransactionRequest) returns (GetBlockByTransactionResponse);
+  rpc GetNativeTransaction (GetNativeTransactionRequest) returns (GetNativeTransactionResponse);
+  rpc GetVerifiedAccountState (GetVerifiedAccountStateRequest) returns (GetVerifiedAccountStateResponse);
 }

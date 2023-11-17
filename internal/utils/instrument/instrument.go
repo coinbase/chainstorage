@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
@@ -13,22 +13,38 @@ import (
 )
 
 type (
-	Call interface {
+	Instrument interface {
 		Instrument(ctx context.Context, operation OperationFn, opts ...InstrumentOption) error
+		WithRetry(retry retry.Retry) Instrument
 	}
 
-	OperationFn func(ctx context.Context) error
-	FilterFn    func(err error) bool
+	InstrumentWithResult[T any] interface {
+		Instrument(ctx context.Context, operation OperationWithResultFn[T], opts ...InstrumentOption) (T, error)
+		WithRetry(retry retry.RetryWithResult[T]) InstrumentWithResult[T]
+	}
 
-	CallOption       func(c *callImpl)
+	OperationFn                  func(ctx context.Context) error
+	OperationWithResultFn[T any] func(ctx context.Context) (T, error)
+	FilterFn                     func(err error) bool
+
+	Option           func(c *options)
 	InstrumentOption func(options *instrumentOptions)
 
-	callImpl struct {
-		name       string
-		err        tally.Counter
-		success    tally.Counter
-		latency    tally.Timer
-		retry      retry.Retry
+	instrument struct {
+		impl InstrumentWithResult[struct{}]
+	}
+
+	instrumentWithResult[T any] struct {
+		name              string
+		err               tally.Counter
+		success           tally.Counter
+		successWithFilter tally.Counter
+		latency           tally.Timer
+		retry             retry.RetryWithResult[T]
+		*options
+	}
+
+	options struct {
 		filter     FilterFn
 		timeSource timesource.TimeSource
 		logger     *zap.Logger
@@ -43,74 +59,105 @@ type (
 )
 
 const (
-	resultType        = "result_type"
+	resultTypeTag     = "result_type"
 	resultTypeError   = "error"
 	resultTypeSuccess = "success"
 	latencySuffix     = "latency"
 	durationTag       = "duration"
+	filteredTag       = "filtered"
 )
 
 var (
 	errTags = map[string]string{
-		resultType: resultTypeError,
+		resultTypeTag: resultTypeError,
 	}
 
 	successTags = map[string]string{
-		resultType: resultTypeSuccess,
+		resultTypeTag: resultTypeSuccess,
+	}
+
+	successWithFilterTags = map[string]string{
+		resultTypeTag: resultTypeSuccess,
+		filteredTag:   "true",
 	}
 )
 
-func NewCall(scope tally.Scope, name string, opts ...CallOption) Call {
-	c := &callImpl{
-		name:       name,
-		err:        scope.Tagged(errTags).Counter(name),
-		success:    scope.Tagged(successTags).Counter(name),
-		latency:    scope.SubScope(name).Timer(latencySuffix),
+func New(scope tally.Scope, name string, opts ...Option) Instrument {
+	return &instrument{
+		impl: NewWithResult[struct{}](scope, name, opts...),
+	}
+}
+
+func Wrap(
+	scope tally.Scope,
+	name string,
+	ctx context.Context,
+	operation OperationFn,
+	opts ...Option,
+) error {
+	return New(scope, name, opts...).Instrument(ctx, operation)
+}
+
+func NewWithResult[T any](scope tally.Scope, name string, opts ...Option) InstrumentWithResult[T] {
+	options := &options{
+		filter:     nil,
 		timeSource: timesource.NewRealTimeSource(),
 		logger:     zap.NewNop(),
 		loggerMsg:  name,
 		tracerMsg:  name,
 		tracerTags: make(map[string]string),
 	}
-
 	for _, opt := range opts {
-		opt(c)
+		opt(options)
+	}
+
+	c := &instrumentWithResult[T]{
+		name:              name,
+		err:               scope.Tagged(errTags).Counter(name),
+		success:           scope.Tagged(successTags).Counter(name),
+		successWithFilter: scope.Tagged(successWithFilterTags).Counter(name),
+		latency:           scope.SubScope(name).Timer(latencySuffix),
+		options:           options,
 	}
 
 	return c
 }
 
-func WithRetry(retry retry.Retry) CallOption {
-	return func(c *callImpl) {
-		c.retry = retry
+func WrapWithResult[T any](
+	scope tally.Scope,
+	name string,
+	ctx context.Context,
+	operation OperationWithResultFn[T],
+	opts ...Option,
+) (T, error) {
+	return NewWithResult[T](scope, name, opts...).Instrument(ctx, operation)
+}
+
+func WithFilter(filter FilterFn) Option {
+	return func(o *options) {
+		o.filter = filter
 	}
 }
 
-func WithFilter(filter FilterFn) CallOption {
-	return func(c *callImpl) {
-		c.filter = filter
+func WithLogger(logger *zap.Logger, msg string) Option {
+	return func(o *options) {
+		o.logger = logger
+		o.loggerMsg = msg
 	}
 }
 
-func WithLogger(logger *zap.Logger, msg string) CallOption {
-	return func(c *callImpl) {
-		c.logger = logger
-		c.loggerMsg = msg
-	}
-}
-
-func WithTracer(msg string, tags map[string]string) CallOption {
-	return func(c *callImpl) {
-		c.tracerMsg = msg
+func WithTracer(msg string, tags map[string]string) Option {
+	return func(o *options) {
+		o.tracerMsg = msg
 		for k, v := range tags {
-			c.tracerTags[k] = v
+			o.tracerTags[k] = v
 		}
 	}
 }
 
-func WithTimeSource(timeSource timesource.TimeSource) CallOption {
-	return func(c *callImpl) {
-		c.timeSource = timeSource
+func WithTimeSource(timeSource timesource.TimeSource) Option {
+	return func(o *options) {
+		o.timeSource = timeSource
 	}
 }
 
@@ -120,63 +167,89 @@ func WithLoggerFields(fields ...zap.Field) InstrumentOption {
 	}
 }
 
-func (c *callImpl) Instrument(ctx context.Context, operation OperationFn, opts ...InstrumentOption) error {
+func (i *instrument) Instrument(ctx context.Context, operation OperationFn, opts ...InstrumentOption) error {
+	_, err := i.impl.Instrument(ctx, func(ctx context.Context) (struct{}, error) {
+		err := operation(ctx)
+		return struct{}{}, err
+	}, opts...)
+	return err
+}
+
+func (i *instrument) WithRetry(r retry.Retry) Instrument {
+	return &instrument{
+		impl: i.impl.WithRetry(retry.ToRetryWithResult(r)),
+	}
+}
+
+func (i *instrumentWithResult[T]) Instrument(ctx context.Context, operation OperationWithResultFn[T], opts ...InstrumentOption) (T, error) {
 	options := new(instrumentOptions)
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	startTime := c.timeSource.Now()
-	span, ctx := c.startSpan(ctx, startTime)
+	startTime := i.timeSource.Now()
+	span, ctx := i.startSpan(ctx, startTime)
+	var res T
 	var err error
-	if c.retry == nil {
-		err = operation(ctx)
+	if i.retry == nil {
+		res, err = operation(ctx)
 	} else {
-		err = c.retry.Retry(ctx, retry.OperationFn(operation))
+		res, err = i.retry.Retry(ctx, retry.OperationWithResultFn[T](operation))
 	}
 
-	finishTime := c.timeSource.Now()
+	finishTime := i.timeSource.Now()
 	duration := finishTime.Sub(startTime)
-	c.latency.Record(duration)
+	i.latency.Record(duration)
 
-	logger := c.logger.With(zap.String(durationTag, duration.String()))
+	logger := i.logger.With(zap.String(durationTag, duration.String()))
 	if len(options.loggerFields) > 0 {
 		logger = logger.With(options.loggerFields...)
 	}
 
 	if err != nil {
-		if c.filter != nil && c.filter(err) {
-			c.onSuccess(logger, span, finishTime)
+		if i.filter != nil && i.filter(err) {
+			i.onSuccessWithFilter(logger, span, finishTime, err)
 		} else {
-			c.onError(logger, span, finishTime, err)
+			i.onError(logger, span, finishTime, err)
 		}
-
-		return err
+		return res, err
 	}
 
-	c.onSuccess(logger, span, finishTime)
-	return nil
+	i.onSuccess(logger, span, finishTime)
+	return res, nil
 }
 
-func (c *callImpl) startSpan(ctx context.Context, startTime time.Time) (tracer.Span, context.Context) {
+func (i *instrumentWithResult[T]) WithRetry(retry retry.RetryWithResult[T]) InstrumentWithResult[T] {
+	clone := *i
+	clone.retry = retry
+	return &clone
+}
+
+func (i *instrumentWithResult[T]) startSpan(ctx context.Context, startTime time.Time) (tracer.Span, context.Context) {
 	opts := []tracer.StartSpanOption{
 		tracer.SpanType("custom"),
 		tracer.StartTime(startTime),
 	}
-	for k, v := range c.tracerTags {
+	for k, v := range i.tracerTags {
 		opts = append(opts, tracer.Tag(k, v))
 	}
-	return tracer.StartSpanFromContext(ctx, c.tracerMsg, opts...)
+	return tracer.StartSpanFromContext(ctx, i.tracerMsg, opts...)
 }
 
-func (c *callImpl) onSuccess(logger *zap.Logger, span tracer.Span, finishTime time.Time) {
-	c.success.Inc(1)
-	logger.Debug(c.loggerMsg)
+func (i *instrumentWithResult[T]) onSuccess(logger *zap.Logger, span tracer.Span, finishTime time.Time) {
+	i.success.Inc(1)
+	logger.Debug(i.loggerMsg)
 	span.Finish(tracer.FinishTime(finishTime))
 }
 
-func (c *callImpl) onError(logger *zap.Logger, span tracer.Span, finishTime time.Time, err error) {
-	c.err.Inc(1)
-	logger.Warn(c.loggerMsg, zap.Error(err))
+func (i *instrumentWithResult[T]) onSuccessWithFilter(logger *zap.Logger, span tracer.Span, finishTime time.Time, err error) {
+	i.successWithFilter.Inc(1)
+	logger.Info(i.loggerMsg, zap.Error(err))
+	span.Finish(tracer.FinishTime(finishTime), tracer.WithError(err))
+}
+
+func (i *instrumentWithResult[T]) onError(logger *zap.Logger, span tracer.Span, finishTime time.Time, err error) {
+	i.err.Inc(1)
+	logger.Warn(i.loggerMsg, zap.Error(err))
 	span.Finish(tracer.FinishTime(finishTime), tracer.WithError(err))
 }

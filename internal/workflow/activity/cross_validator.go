@@ -3,14 +3,14 @@ package activity
 import (
 	"context"
 
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
+	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
@@ -26,6 +26,7 @@ type (
 		blobStorage          blobstorage.BlobStorage
 		metaStorage          metastorage.MetaStorage
 		validatorClient      client.Client
+		parser               parser.Parser
 		picker               picker.Picker
 		validationPercentage int
 		metrics              *crossValidatorMetrics
@@ -38,6 +39,7 @@ type (
 		ValidatorClient client.Client `name:"validator"`
 		MetaStorage     metastorage.MetaStorage
 		StorageClient   blobstorage.BlobStorage
+		Parser          parser.Parser
 	}
 
 	CrossValidatorRequest struct {
@@ -46,7 +48,6 @@ type (
 		ValidationHeightPadding uint64 `validate:"required"`
 		MaxHeightsToValidate    uint64 `validate:"required"`
 		Parallelism             int    `validate:"required,gt=0"`
-		MaxReorgDistance        uint64 `validate:"required"`
 	}
 
 	CrossValidatorResponse struct {
@@ -55,10 +56,9 @@ type (
 	}
 
 	crossValidatorMetrics struct {
-		instrumentValidateHeight          instrument.Call
-		rawFormatValidationFailureCounter tally.Counter
-		fetchBlockFailureCounter          tally.Counter
-		skipValidationCounter             tally.Counter
+		instrumentValidateHeight             instrument.Instrument
+		nativeFormatValidationFailureCounter tally.Counter
+		skipValidationCounter                tally.Counter
 	}
 
 	validatorMode int
@@ -67,6 +67,8 @@ type (
 const (
 	crossValidationFailure = "cross_validation_failure"
 	reasonKey              = "reason"
+
+	diffMaxLength = 3000
 )
 
 const (
@@ -98,6 +100,7 @@ func NewCrossValidator(params CrossValidatorParams) *CrossValidator {
 		blobStorage:          params.StorageClient,
 		metaStorage:          params.MetaStorage,
 		validatorClient:      params.ValidatorClient,
+		parser:               params.Parser,
 		picker:               picker,
 		validationPercentage: validationPercentage,
 		metrics:              newCrossValidatorMetrics(params.Metrics),
@@ -109,10 +112,9 @@ func NewCrossValidator(params CrossValidatorParams) *CrossValidator {
 func newCrossValidatorMetrics(scope tally.Scope) *crossValidatorMetrics {
 	scope = scope.SubScope(ActivityCrossValidator)
 	return &crossValidatorMetrics{
-		instrumentValidateHeight:          instrument.NewCall(scope, "cross_validate_height"),
-		rawFormatValidationFailureCounter: newCrossValidationFailureCounter(scope, "raw_format_validation_failure"),
-		fetchBlockFailureCounter:          newCrossValidationFailureCounter(scope, "fetch_block_failure"),
-		skipValidationCounter:             newCrossValidationFailureCounter(scope, "skip"),
+		instrumentValidateHeight:             instrument.New(scope, "cross_validate_height"),
+		nativeFormatValidationFailureCounter: newCrossValidationFailureCounter(scope, "native_format_validation_failure"),
+		skipValidationCounter:                newCrossValidationFailureCounter(scope, "skip"),
 	}
 }
 
@@ -150,6 +152,7 @@ func (v *CrossValidator) execute(ctx context.Context, request *CrossValidatorReq
 	logger.Info(
 		"validating data range",
 		zap.Uint32("tag", tag),
+		zap.Uint64("tip_of_chain", tipOfChain),
 		zap.Uint64("start_height", startHeight),
 		zap.Uint64("end_height", endHeight),
 	)
@@ -160,6 +163,10 @@ func (v *CrossValidator) execute(ctx context.Context, request *CrossValidatorReq
 	}
 
 	blockGap := tipOfChain - endHeight
+	if tipOfChain < endHeight {
+		blockGap = 0
+	}
+
 	return &CrossValidatorResponse{
 		EndHeight: endHeight,
 		BlockGap:  blockGap,
@@ -176,6 +183,9 @@ func (v *CrossValidator) getValidationEndHeight(startHeight uint64, latestPersis
 		endHeight = startHeight + request.MaxHeightsToValidate
 	}
 
+	// Since no sticky session applies to validator cluster, cross validation workflow may experience false alarm of reorg
+	// when node of validator rewinds to an older block height.
+	// For such case, cross validation will stay at startHeight and wait till nodes catch up.
 	if endHeight < startHeight {
 		logger.Info("Invalid startHeight",
 			zap.Uint64("start_height", startHeight),
@@ -183,12 +193,7 @@ func (v *CrossValidator) getValidationEndHeight(startHeight uint64, latestPersis
 			zap.Uint64("tip", tipOfChain),
 			zap.Uint64("latest_persisted", latestPersistedHeight),
 		)
-
-		if startHeight-endHeight < request.MaxReorgDistance {
-			endHeight = startHeight
-		} else {
-			return 0, xerrors.Errorf("InvalidStartHeight: the gap of calculated endHeight %d and startHeight %d is greater than %d", endHeight, startHeight, request.MaxReorgDistance)
-		}
+		endHeight = startHeight
 	}
 	return endHeight, nil
 }
@@ -228,7 +233,7 @@ func (v *CrossValidator) validateRange(ctx context.Context, logger *zap.Logger, 
 
 func (v *CrossValidator) validateHeight(ctx context.Context, logger *zap.Logger, height uint64, tag uint32) error {
 	logger = logger.With(zap.Uint64("height", height), zap.Uint32("tag", tag))
-	err := v.metrics.instrumentValidateHeight.Instrument(ctx, func(ctx context.Context) error {
+	return v.metrics.instrumentValidateHeight.Instrument(ctx, func(ctx context.Context) error {
 		persistedBlockMetaData, err := v.metaStorage.GetBlockByHeight(ctx, tag, height)
 		if err != nil {
 			return xerrors.Errorf("failed to get block meta data from meta storage (height=%d): %w", height, err)
@@ -241,34 +246,46 @@ func (v *CrossValidator) validateHeight(ctx context.Context, logger *zap.Logger,
 		hash := persistedBlockMetaData.Hash
 		expectedRawBlock, err := v.validatorClient.GetBlockByHash(ctx, tag, height, hash)
 		if err != nil {
-			logger.Error("fetch block failed",
+			logger.Warn("fetch block failed",
 				zap.String("hash", hash),
 				zap.Error(err),
 			)
-			v.metrics.fetchBlockFailureCounter.Inc(1)
-			return nil
+			return xerrors.Errorf("failed to fetch block: %w", err)
 		}
 
-		// Skip check of ObjectKeyMain
-		persistedRawBlock.Metadata.ObjectKeyMain = expectedRawBlock.Metadata.ObjectKeyMain
-		// Skip check for timestamp in metadata
-		if persistedRawBlock.Metadata.GetTimestamp() == nil {
-			persistedRawBlock.Metadata.Timestamp = expectedRawBlock.Metadata.Timestamp
+		persistedNativeBlock, err := v.parser.ParseNativeBlock(ctx, persistedRawBlock)
+		if err != nil {
+			return xerrors.Errorf("failed to parse actual raw block using native parser for block {%+v}: %w", persistedRawBlock.Metadata, err)
 		}
 
-		if !proto.Equal(expectedRawBlock, persistedRawBlock) {
+		expectedNativeBlock, err := v.parser.ParseNativeBlock(ctx, expectedRawBlock)
+		if err != nil {
+			return xerrors.Errorf("failed to parse expected raw block using native parser for block {%+v}: %w", expectedRawBlock.Metadata, err)
+		}
+
+		if err := v.parser.CompareNativeBlocks(ctx, height, expectedNativeBlock, persistedNativeBlock); err != nil {
+			var diff string
+			var checkerErr *parser.ParityCheckFailedError
+			if xerrors.As(err, &checkerErr) {
+				diff = checkerErr.Diff
+				if len(diff) > diffMaxLength {
+					diff = diff[0:diffMaxLength]
+				}
+			}
+
 			logger.Error("cross validation failed",
+				zap.Error(err),
 				zap.String("hash", hash),
 				zap.Reflect("expected_metadata", expectedRawBlock.Metadata),
 				zap.Reflect("actual_metadata", persistedRawBlock.Metadata),
+				zap.String("diff", diff),
 			)
-			v.metrics.rawFormatValidationFailureCounter.Inc(1)
+			v.metrics.nativeFormatValidationFailureCounter.Inc(1)
 			return nil
 		}
 		logger.Info("validated block successfully")
 		return nil
 	})
-	return err
 }
 
 func (v *CrossValidator) getMode() validatorMode {

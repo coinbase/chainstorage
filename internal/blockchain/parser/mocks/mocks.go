@@ -39,6 +39,35 @@ func (m *MockParser) EXPECT() *MockParserMockRecorder {
 	return m.recorder
 }
 
+// CompareNativeBlocks mocks base method.
+func (m *MockParser) CompareNativeBlocks(arg0 context.Context, arg1 uint64, arg2, arg3 *chainstorage.NativeBlock) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompareNativeBlocks", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompareNativeBlocks indicates an expected call of CompareNativeBlocks.
+func (mr *MockParserMockRecorder) CompareNativeBlocks(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompareNativeBlocks", reflect.TypeOf((*MockParser)(nil).CompareNativeBlocks), arg0, arg1, arg2, arg3)
+}
+
+// GetNativeTransaction mocks base method.
+func (m *MockParser) GetNativeTransaction(arg0 context.Context, arg1 *chainstorage.NativeBlock, arg2 string) (*chainstorage.NativeTransaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNativeTransaction", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*chainstorage.NativeTransaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNativeTransaction indicates an expected call of GetNativeTransaction.
+func (mr *MockParserMockRecorder) GetNativeTransaction(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNativeTransaction", reflect.TypeOf((*MockParser)(nil).GetNativeTransaction), arg0, arg1, arg2)
+}
+
 // ParseNativeBlock mocks base method.
 func (m *MockParser) ParseNativeBlock(arg0 context.Context, arg1 *chainstorage.Block) (*chainstorage.NativeBlock, error) {
 	m.ctrl.T.Helper()
@@ -67,4 +96,47 @@ func (m *MockParser) ParseRosettaBlock(arg0 context.Context, arg1 *chainstorage.
 func (mr *MockParserMockRecorder) ParseRosettaBlock(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseRosettaBlock", reflect.TypeOf((*MockParser)(nil).ParseRosettaBlock), arg0, arg1)
+}
+
+// ValidateAccountState mocks base method.
+func (m *MockParser) ValidateAccountState(arg0 context.Context, arg1 *chainstorage.ValidateAccountStateRequest) (*chainstorage.ValidateAccountStateResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateAccountState", arg0, arg1)
+	ret0, _ := ret[0].(*chainstorage.ValidateAccountStateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ValidateAccountState indicates an expected call of ValidateAccountState.
+func (mr *MockParserMockRecorder) ValidateAccountState(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateAccountState", reflect.TypeOf((*MockParser)(nil).ValidateAccountState), arg0, arg1)
+}
+
+// ValidateBlock mocks base method.
+func (m *MockParser) ValidateBlock(arg0 context.Context, arg1 *chainstorage.NativeBlock) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateBlock", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ValidateBlock indicates an expected call of ValidateBlock.
+func (mr *MockParserMockRecorder) ValidateBlock(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateBlock", reflect.TypeOf((*MockParser)(nil).ValidateBlock), arg0, arg1)
+}
+
+// ValidateRosettaBlock mocks base method.
+func (m *MockParser) ValidateRosettaBlock(arg0 context.Context, arg1 *chainstorage.ValidateRosettaBlockRequest, arg2 *chainstorage.RosettaBlock) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateRosettaBlock", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ValidateRosettaBlock indicates an expected call of ValidateRosettaBlock.
+func (mr *MockParserMockRecorder) ValidateRosettaBlock(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateRosettaBlock", reflect.TypeOf((*MockParser)(nil).ValidateRosettaBlock), arg0, arg1, arg2)
 }

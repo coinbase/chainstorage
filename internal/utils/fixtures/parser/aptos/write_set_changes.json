@@ -1,0 +1,120 @@
+[
+  {
+    "type": "delete_module",
+    "address": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+    "state_key_hash": "0x5ddf404c60e96e9485beafcabb95609fed8e38e941a725cae4dcec8296fb32d7",
+    "module": "0x1::aptos_coin"
+  },
+  {
+    "type": "delete_resource",
+    "address": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+    "state_key_hash": "0x5ddf404c60e96e9485beafcabb95609fed8e38e941a725cae4dcec8296fb32d7",
+    "resource": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+  },
+  {
+    "type": "delete_table_item",
+    "state_key_hash": "0x5ddf404c60e96e9485beafcabb95609fed8e38e941a725cae4dcec8296fb32d7",
+    "handle": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+    "key": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+    "data": {
+      "key": "dummy_key",
+      "key_type": "dummy_value"
+    }
+  },
+  {
+    "type": "write_resource",
+    "address": "0x1",
+    "state_key_hash": "0x7b1615bf012d3c94223f3f76287ee2f7bdf31d364071128b256aeff0841b626d",
+    "data": {
+      "type": "0x1::timestamp::CurrentTimeMicroseconds",
+      "data": {"microseconds": "1665614928907827"}
+    }
+  },
+  {
+    "type": "write_table_item",
+    "state_key_hash": "0x6e4b28d40f98a106a65163530924c0dcb40c1349d3aa915d108b4d6cfc1ddb19",
+    "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "value": "0x60e2aeae10436d010000000000000000",
+    "data": {
+      "key": "dummy_key",
+      "key_type": "dummy_key_type",
+      "value": "dummy_value",
+      "value_type": "dummy_value_type"
+    }
+  },
+  {
+    "type": "write_module",
+    "address": "0x1",
+    "state_key_hash": "0x14341421783c9456a4611af5623c6b783452ca8be626a933998270eaafa1aeb1",
+    "data": {
+      "bytecode": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+      "abi": {
+        "address": "0x1",
+        "name": "acl",
+        "friends": [
+          "0x1::code",
+          "0x1::gas_schedule"			
+        ],
+        "exposed_functions": [
+          {
+            "name": "add",
+            "visibility": "public",
+            "is_entry": false,
+            "generic_type_params": [],
+            "params": [
+              "&mut 0x1::acl::ACL",
+              "address"
+            ],
+            "return": []
+          },
+          {
+            "name": "assert_contains",
+            "visibility": "private",
+            "is_entry": false,
+            "generic_type_params": [
+              {
+                "constraints": [
+                  "param1",
+                  "param2"
+                ]
+              }
+            ],
+            "params": [
+              "&0x1::acl::ACL",
+              "address"
+            ],
+            "return": [
+              "bool"
+            ]
+          }
+        ],
+        "structs": [
+          {
+            "name": "ACL",
+            "is_native": false,
+            "abilities": [
+              "copy",
+              "drop",
+              "store"
+            ],
+            "generic_type_params": [
+              {
+                "constraints": [
+                  "dummy_a",
+                  "dummy_b"
+                ]
+              }
+            ],
+            "fields": [
+              {
+                "name": "list",
+                "type": "vector"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]

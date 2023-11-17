@@ -41,7 +41,7 @@ func (z *zapper) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.Che
 func (z *zapper) Write(ent zapcore.Entry, fs []zapcore.Field) error {
 	logger := z.with(fs)
 
-	var logFunc func(string, ...interface{})
+	var logFunc func(string, ...any)
 	switch ent.Level {
 	case zapcore.DebugLevel:
 		logFunc = logger.Debug
@@ -76,7 +76,7 @@ func (z *zapper) with(fs []zapcore.Field) temporal.Logger {
 		f.AddTo(encoder)
 	}
 
-	keyvals := make([]interface{}, 0, len(encoder.Fields)*2)
+	keyvals := make([]any, 0, len(encoder.Fields)*2)
 	for k, v := range encoder.Fields {
 		keyvals = append(keyvals, k, v)
 	}

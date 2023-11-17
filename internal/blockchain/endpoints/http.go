@@ -1,6 +1,7 @@
 package endpoints
 
 import (
+	"crypto/x509"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
 	"golang.org/x/net/publicsuffix"
 	tracehttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 )
@@ -22,6 +22,8 @@ type (
 		maxConns            int
 		jar                 http.CookieJar
 		stickySessionHeader *stickySessionHeader
+		headers             map[string]string
+		rootCAs             *x509.CertPool
 	}
 
 	// stickySessionJar implements passive cookie affinity.
@@ -40,9 +42,9 @@ type (
 	}
 
 	roundTripper struct {
-		base                http.RoundTripper
-		logger              *zap.Logger
-		stickySessionHeader *stickySessionHeader
+		base    http.RoundTripper
+		logger  *zap.Logger
+		headers map[string]string
 	}
 )
 
@@ -84,37 +86,46 @@ func newHTTPClient(opts ...ClientOption) (*http.Client, error) {
 
 func newDefaultClient(options *clientOptions) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if options.rootCAs != nil {
+		transport.TLSClientConfig.RootCAs = options.rootCAs
+	}
 
-	// Set to zero to enable HTTP/2. See https://github.com/golang/go/issues/14391
-	transport.ExpectContinueTimeout = 0
-
-	// Disable HTTP persistent connection to improve load balancing on the server side.
-	// This is necessary since BisonTrails cluster uses classic load balancer.
-	transport.DisableKeepAlives = true
-
-	return &http.Client{
+	client := &http.Client{
 		Timeout:   options.timeout,
 		Transport: transport,
-	}, nil
+	}
+	wrapClient := WrapHTTPClient(client, options.headers)
+	return wrapClient, nil
 }
 
 func newStickyClient(options *clientOptions) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 
-	// Set to zero to enable HTTP/2. See https://github.com/golang/go/issues/14391
-	transport.ExpectContinueTimeout = 0
-
 	// Override connection pool options.
 	transport.IdleConnTimeout = options.idleConnTimeout
 	transport.MaxIdleConns = options.maxConns
 	transport.MaxIdleConnsPerHost = options.maxConns
+	if options.rootCAs != nil {
+		transport.TLSClientConfig.RootCAs = options.rootCAs
+	}
 
 	client := &http.Client{
 		Timeout:   options.timeout,
 		Transport: transport,
 		Jar:       options.jar,
 	}
-	wrapClient := WrapHTTPClient(client, options.stickySessionHeader)
+
+	headers := make(map[string]string)
+	stickySession := options.stickySessionHeader
+	if stickySession != nil {
+		headers[stickySession.headerKey] = stickySession.headerValue
+	}
+
+	for key, val := range options.headers {
+		headers[key] = val
+	}
+
+	wrapClient := WrapHTTPClient(client, headers)
 	return wrapClient, nil
 }
 
@@ -147,6 +158,13 @@ func withStickySessionCookieHash(url string, key string, value string) ClientOpt
 	}
 }
 
+// The withHeaders method add customized headers to request.
+func withHeaders(headers map[string]string) ClientOption {
+	return func(opts *clientOptions) {
+		opts.headers = headers
+	}
+}
+
 func (j *stickySessionJar) SetCookies(_ *url.URL, _ []*http.Cookie) {
 	// nop
 }
@@ -164,8 +182,15 @@ func (j *stickySessionJar) Cookies(u *url.URL) []*http.Cookie {
 	}
 }
 
-func withOverrideRequestTimeout(timeout int) ClientOption {
+func withOverrideRequestTimeout(timeout time.Duration) ClientOption {
 	return func(opts *clientOptions) {
-		opts.timeout = time.Duration(timeout) * time.Second
+		opts.timeout = timeout
+	}
+}
+
+// temporary fix cert issue for golang1.18 on MacOS
+func withRootCAs(roots *x509.CertPool) ClientOption {
+	return func(opts *clientOptions) {
+		opts.rootCAs = roots
 	}
 }

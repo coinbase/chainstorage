@@ -150,3 +150,63 @@ func TestCastVersionedItemToDDBEntry_Watermark(t *testing.T) {
 	require.True(err)
 	require.Equal(expectedEntry, actualEntry)
 }
+
+func TestValidateEventTag_GreaterThanLatestTag_Err(t *testing.T) {
+	require := testutil.Require(t)
+
+	storage := eventStorageImpl{
+		eventTable:     &ddbTableImpl{},
+		latestEventTag: 1,
+	}
+
+	err := storage.validateEventTag(2)
+	require.Error(err)
+}
+
+func TestValidateEventTag_EqualToLatestTag_Success(t *testing.T) {
+	require := testutil.Require(t)
+
+	storage := eventStorageImpl{
+		eventTable:     &ddbTableImpl{},
+		latestEventTag: 1,
+	}
+
+	err := storage.validateEventTag(1)
+	require.NoError(err)
+}
+
+func TestValidateEventTag_LessThanLatestTag_Success(t *testing.T) {
+	require := testutil.Require(t)
+
+	storage := eventStorageImpl{
+		eventTable:     &ddbTableImpl{},
+		latestEventTag: 1,
+	}
+
+	err := storage.validateEventTag(0)
+	require.NoError(err)
+}
+
+func TestValidateEventTag_EvenTagZeroWithNilEventTable(t *testing.T) {
+	require := testutil.Require(t)
+
+	storage := eventStorageImpl{
+		eventTable:     nil,
+		latestEventTag: 1,
+	}
+
+	err := storage.validateEventTag(0)
+	require.Error(err)
+}
+
+func TestValidateEventTag_EvenTagNonZeroWithNilEventTable(t *testing.T) {
+	require := testutil.Require(t)
+
+	storage := eventStorageImpl{
+		eventTable:     nil,
+		latestEventTag: 1,
+	}
+
+	err := storage.validateEventTag(1)
+	require.NoError(err)
+}

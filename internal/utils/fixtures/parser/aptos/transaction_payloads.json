@@ -1,0 +1,176 @@
+[
+  {
+    "type": "entry_function_payload",
+    "function": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa::coin_bridge::lz_receive",
+    "type_arguments": [
+      "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa::asset::USDC"
+    ],
+    "arguments": [
+      "110",
+      "0x1bacc2205312534375c8d1801c27d28370656cff"
+    ]
+  },
+  {
+    "type": "script_payload",
+    "code": {
+      "bytecode": "0xa11ceb0b050000000501000203020505070b0712170829200000b020b03110002",
+      "abi": {
+        "name": "main",
+        "visibility": "public",
+        "is_entry": true,
+        "generic_type_params": [
+          {
+            "constraints": []
+          }
+        ],
+        "params": [
+          "signer",
+          "signer",
+          "address",
+          "u64"
+        ],
+        "return": []
+      }
+    },
+    "type_arguments": [
+      "0x1::aptos_coin::AptosCoin"
+    ],
+    "arguments": [
+      "0xce024fa293bc67be13dda22dee72b3fe49b1e86e23dcb03eae8b754670b0539d",
+      877500,
+      [
+        "Flour #35253"
+      ]
+    ]
+  },
+  {
+    "type": "module_bundle_payload",
+    "modules": [
+      {
+        "bytecode": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+        "abi": {
+          "address": "0x1",
+          "name": "acl",
+          "friends": [
+            "0x1::code",
+            "0x1::gas_schedule"			
+          ],
+          "exposed_functions": [
+            {
+              "name": "add",
+              "visibility": "public",
+              "is_entry": false,
+              "generic_type_params": [],
+              "params": [
+                "&mut 0x1::acl::ACL",
+                "address"
+              ],
+              "return": []
+            }
+          ],
+          "structs": [
+            {
+              "name": "ACL",
+              "is_native": false,
+              "abilities": [
+                "copy",
+                "drop",
+                "store"
+              ],
+              "generic_type_params": [
+                {
+                  "constraints": [
+                    "dummy_a",
+                    "dummy_b"
+                  ]
+                }
+              ],
+              "fields": [
+                {
+                  "name": "list",
+                  "type": "vector"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "bytecode": "0xa11ceb0b0500000006010002030206050807070f0d081c200c3c04000000010001010001060900",
+        "abi": {
+          "address": "0x1",
+          "name": "bcs",
+          "friends": [],
+          "exposed_functions": [
+            {
+              "name": "to_bytes",
+              "visibility": "public",
+              "is_entry": false,
+              "generic_type_params": [
+                {
+                  "constraints": []
+                }
+              ],
+              "params": [
+                "&T0"
+              ],
+              "return": [
+                "vector<u8>"
+              ]
+            }
+          ],
+          "structs": []
+        }
+      }
+    ]
+  },
+  {
+    "type": "multisig_payload",
+    "multisig_address": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+    "transaction_payload": {
+      "function": "0x1::aptos_coin::transfer",
+      "type_arguments": [
+        "0x1::aptos_coin::AptosCoin"
+      ],
+      "arguments": [
+        "877500"
+      ]
+    }
+  },
+  {
+    "type": "write_set_payload",
+    "write_set": {
+      "type": "script_write_set",
+      "execute_as": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+      "script": {
+        "code": {
+          "bytecode": "0xa11ceb0b050000000501000203020505070b0712170829200000b020b03110002",
+          "abi": {
+            "name": "main",
+            "visibility": "public",
+            "is_entry": true,
+            "generic_type_params": [
+              {
+                "constraints": []
+              }
+            ],
+            "params": [
+              "signer",
+              "signer",
+              "address",
+              "u64"
+            ],
+            "return": []
+          }
+        },
+        "type_arguments": [
+          "0x1::aptos_coin::AptosCoin"
+        ],
+        "arguments": [
+          "0xce024fa293bc67be13dda22dee72b3fe49b1e86e23dcb03eae8b754670b0539d",
+          "877500"
+        ]
+      }
+    }
+  }
+]

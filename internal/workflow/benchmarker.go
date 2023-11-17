@@ -38,6 +38,7 @@ type (
 		StepSize                uint64 `validate:"gt=0"`
 		SamplesToTest           uint64 `validate:"gt=0"`
 		NumConcurrentExtractors int    `validate:"gt=0"`
+		MiniBatchSize           uint64
 	}
 )
 
@@ -105,6 +106,7 @@ func (b *Benchmarker) execute(ctx workflow.Context, request *BenchmarkerRequest)
 			StartHeight:             childWfStart,
 			EndHeight:               childWfEnd,
 			NumConcurrentExtractors: request.NumConcurrentExtractors,
+			MiniBatchSize:           request.MiniBatchSize,
 		})
 		if err := future.Get(ctx, nil); err != nil {
 			logger.Error("child backfiller workflow failed.", zap.Error(err),

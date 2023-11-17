@@ -17,6 +17,9 @@ enum Blockchain {
     BLOCKCHAIN_POLYGON = 35;
     BLOCKCHAIN_OPTIMISM = 39;
     BLOCKCHAIN_ARBITRUM = 41;
+    BLOCKCHAIN_APTOS = 47;   // L1 network using the Move language (originally created for Libra/Diem)
+    BLOCKCHAIN_FANTOM = 51;
+    BLOCKCHAIN_BASE = 56; // Coinbase L2
 }
 
 // Network defines an enumeration of supported networks.
@@ -51,4 +54,15 @@ enum Network {
 
     NETWORK_ARBITRUM_MAINNET = 91;
     NETWORK_ARBITRUM_TESTNET = 92;
+
+    NETWORK_APTOS_MAINNET = 103;
+    NETWORK_APTOS_TESTNET = 104;
+
+    NETWORK_FANTOM_MAINNET = 111;
+    NETWORK_FANTOM_TESTNET = 112;
+
+    NETWORK_BASE_MAINNET = 123; // Coinbase L2 running on Ethereum mainnet
+    NETWORK_BASE_GOERLI = 125; // Coinbase L2 running on Ethereum Goerli
+
+    NETWORK_ETHEREUM_HOLESKY = 136;
 }

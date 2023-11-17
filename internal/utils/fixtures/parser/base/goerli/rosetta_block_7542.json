@@ -1,0 +1,371 @@
+{
+  "block": {
+    "blockIdentifier": {
+      "index": "7542",
+      "hash": "0x7edba9bf0ac05b8f5b97f31bc54c54b0891414023b2e6ec27beef93c9925c298"
+    },
+    "parentBlockIdentifier": {
+      "index": "7541",
+      "hash": "0xfa5a432730100381fd6d5caf4d26d8d4ed4860f320028a0175883c4965d2c85b"
+    },
+    "timestamp": "2023-01-31T23:45:00Z",
+    "transactions": [
+      {
+        "transactionIdentifier": {
+          "hash": "0x490a4493f0603641f9620c0f63c6c0edb611b28755a3371ef9677c37bf44542e"
+        },
+        "metadata": {
+          "gas_limit": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": "0x8f0d180"
+          },
+          "gas_price": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": "0x0"
+          },
+          "receipt": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": {
+                  "blockHash": "0x7edba9bf0ac05b8f5b97f31bc54c54b0891414023b2e6ec27beef93c9925c298",
+                  "blockNumber": "0x1d76",
+                  "contractAddress": null,
+                  "cumulativeGasUsed": "0x0",
+                  "effectiveGasPrice": "0x0",
+                  "from": "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001",
+                  "gasUsed": "0x0",
+                  "logs": [
+                      ],
+                  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "status": "0x1",
+                  "to": "0x4200000000000000000000000000000000000015",
+                  "transactionHash": "0x490a4493f0603641f9620c0f63c6c0edb611b28755a3371ef9677c37bf44542e",
+                  "transactionIndex": "0x0",
+                  "type": "0x7e"
+                }
+          },
+          "trace": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": {
+                  "calls": [
+                        {
+                              "from": "0x4200000000000000000000000000000000000015",
+                              "gas": "0x8cca328",
+                              "gasUsed": "0x4a28",
+                              "input": "0x015d8eb90000000000000000000000000000000000000000000000000000000000805b6c0000000000000000000000000000000000000000000000000000000063d9a790000000000000000000000000000000000000000000000000000000000000000a35788dad109bed9d3527dc1547dea6a9709fa46349d18f61aaa95a11204b0dcc00000000000000000000000000000000000000000000000000000000000000100000000000000000000000002d679b567db6187c0c8323fa982cfb88b74dbcc7000000000000000000000000000000000000000000000000000000000000083400000000000000000000000000000000000000000000000000000000000f4240",
+                              "to": "0xc0d3c0d3c0d3c0d3c0d3c0d3c0d3c0d3c0d30015",
+                              "type": "DELEGATECALL",
+                              "value": "0x0"
+                            }
+                      ],
+                  "from": "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001",
+                  "gas": "0x8f0d180",
+                  "gasUsed": "0xb711",
+                  "input": "0x015d8eb90000000000000000000000000000000000000000000000000000000000805b6c0000000000000000000000000000000000000000000000000000000063d9a790000000000000000000000000000000000000000000000000000000000000000a35788dad109bed9d3527dc1547dea6a9709fa46349d18f61aaa95a11204b0dcc00000000000000000000000000000000000000000000000000000000000000100000000000000000000000002d679b567db6187c0c8323fa982cfb88b74dbcc7000000000000000000000000000000000000000000000000000000000000083400000000000000000000000000000000000000000000000000000000000f4240",
+                  "to": "0x4200000000000000000000000000000000000015",
+                  "type": "CALL",
+                  "value": "0x0"
+                }
+          }
+        }
+      },
+      {
+        "transactionIdentifier": {
+          "hash": "0xfb06256cfd36ecb25ff5675154b0590ffd354b3ca14b1451f4778531aaf96512"
+        },
+        "operations": [
+          {
+            "operationIdentifier": {
+
+            },
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x21856935e5689490c72865f34cc665d0ff25664b"
+            },
+            "amount": {
+              "value": "-320157005318551",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "1"
+            },
+            "relatedOperations": [
+              {
+
+              }
+            ],
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x4200000000000000000000000000000000000011"
+            },
+            "amount": {
+              "value": "320157000000000",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "2"
+            },
+            "relatedOperations": [
+              {
+
+              }
+            ],
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x4200000000000000000000000000000000000019"
+            },
+            "amount": {
+              "value": "5229231",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "3"
+            },
+            "relatedOperations": [
+              {
+
+              }
+            ],
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x420000000000000000000000000000000000001a"
+            },
+            "amount": {
+              "value": "89320",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "4"
+            },
+            "type": "CREATE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x21856935e5689490c72865f34cc665d0ff25664b"
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "5"
+            },
+            "relatedOperations": [
+              {
+                "index": "4"
+              }
+            ],
+            "type": "CREATE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0xbb89e84cb43f9a206dd6ff97b5b1a041dd075aff"
+            }
+          }
+        ],
+        "metadata": {
+          "gas_limit": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": "0x21dee"
+          },
+          "gas_price": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": "0xb2d05e31"
+          },
+          "receipt": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": {
+                  "blockHash": "0x7edba9bf0ac05b8f5b97f31bc54c54b0891414023b2e6ec27beef93c9925c298",
+                  "blockNumber": "0x1d76",
+                  "contractAddress": "0xbb89e84cb43f9a206dd6ff97b5b1a041dd075aff",
+                  "cumulativeGasUsed": "0x1a0df",
+                  "effectiveGasPrice": "0xb2d05e31",
+                  "from": "0x21856935e5689490c72865f34cc665d0ff25664b",
+                  "gasUsed": "0x1a0df",
+                  "l1Fee": "0x15ce8",
+                  "l1FeeScalar": "1",
+                  "l1GasPrice": "0xa",
+                  "l1GasUsed": "0x22e4",
+                  "logs": [
+                      ],
+                  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "status": "0x1",
+                  "to": null,
+                  "transactionHash": "0xfb06256cfd36ecb25ff5675154b0590ffd354b3ca14b1451f4778531aaf96512",
+                  "transactionIndex": "0x1",
+                  "type": "0x2"
+                }
+          },
+          "trace": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": {
+                  "from": "0x21856935e5689490c72865f34cc665d0ff25664b",
+                  "gas": "0x21dee",
+                  "gasUsed": "0x1a0df",
+                  "input": "0x608060405234801561001057600080fd5b5060f78061001f6000396000f3fe6080604052348015600f57600080fd5b5060043610603c5760003560e01c80633fb5c1cb1460415780638381f58a146053578063d09de08a14606d575b600080fd5b6051604c3660046083565b600055565b005b605b60005481565b60405190815260200160405180910390f35b6051600080549080607c83609b565b9190505550565b600060208284031215609457600080fd5b5035919050565b60006001820160ba57634e487b7160e01b600052601160045260246000fd5b506001019056fea264697066735822122011622203a9c30f4b42b6454e5be5be123ac648b6381896fdd352122fae296da364736f6c634300080f0033",
+                  "output": "0x6080604052348015600f57600080fd5b5060043610603c5760003560e01c80633fb5c1cb1460415780638381f58a146053578063d09de08a14606d575b600080fd5b6051604c3660046083565b600055565b005b605b60005481565b60405190815260200160405180910390f35b6051600080549080607c83609b565b9190505550565b600060208284031215609457600080fd5b5035919050565b60006001820160ba57634e487b7160e01b600052601160045260246000fd5b506001019056fea264697066735822122011622203a9c30f4b42b6454e5be5be123ac648b6381896fdd352122fae296da364736f6c634300080f0033",
+                  "to": "0xbb89e84cb43f9a206dd6ff97b5b1a041dd075aff",
+                  "type": "CREATE",
+                  "value": "0x0"
+                }
+          }
+        }
+      },
+      {
+        "transactionIdentifier": {
+          "hash": "0xdb3e1f70e5b5d8ed94706468d4fbe8005af9051f321a7fe4e01931c37fdf4dad"
+        },
+        "operations": [
+          {
+            "operationIdentifier": {
+
+            },
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x21856935e5689490c72865f34cc665d0ff25664b"
+            },
+            "amount": {
+              "value": "-130212002177116",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "1"
+            },
+            "relatedOperations": [
+              {
+
+              }
+            ],
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x4200000000000000000000000000000000000011"
+            },
+            "amount": {
+              "value": "130212000000000",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "2"
+            },
+            "relatedOperations": [
+              {
+
+              }
+            ],
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x4200000000000000000000000000000000000019"
+            },
+            "amount": {
+              "value": "2126796",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          },
+          {
+            "operationIdentifier": {
+              "index": "3"
+            },
+            "relatedOperations": [
+              {
+
+              }
+            ],
+            "type": "FEE",
+            "status": "SUCCESS",
+            "account": {
+              "address": "0x420000000000000000000000000000000000001a"
+            },
+            "amount": {
+              "value": "50320",
+              "currency": {
+                "symbol": "ETH",
+                "decimals": 18
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "gas_limit": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": "0xea2e"
+          },
+          "gas_price": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": "0xb2d05e31"
+          },
+          "receipt": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": {
+                  "blockHash": "0x7edba9bf0ac05b8f5b97f31bc54c54b0891414023b2e6ec27beef93c9925c298",
+                  "blockNumber": "0x1d76",
+                  "contractAddress": null,
+                  "cumulativeGasUsed": "0x24a6b",
+                  "effectiveGasPrice": "0xb2d05e31",
+                  "from": "0x21856935e5689490c72865f34cc665d0ff25664b",
+                  "gasUsed": "0xa98c",
+                  "l1Fee": "0xc490",
+                  "l1FeeScalar": "1",
+                  "l1GasPrice": "0xa",
+                  "l1GasUsed": "0x13a8",
+                  "logs": [
+                      ],
+                  "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "status": "0x1",
+                  "to": "0xbb89e84cb43f9a206dd6ff97b5b1a041dd075aff",
+                  "transactionHash": "0xdb3e1f70e5b5d8ed94706468d4fbe8005af9051f321a7fe4e01931c37fdf4dad",
+                  "transactionIndex": "0x2",
+                  "type": "0x2"
+                }
+          },
+          "trace": {
+            "@type": "type.googleapis.com/google.protobuf.Value",
+            "value": {
+                  "from": "0x21856935e5689490c72865f34cc665d0ff25664b",
+                  "gas": "0xea2e",
+                  "gasUsed": "0xa98c",
+                  "input": "0xd09de08a",
+                  "to": "0xbb89e84cb43f9a206dd6ff97b5b1a041dd075aff",
+                  "type": "CALL",
+                  "value": "0x0"
+                }
+          }
+        }
+      }
+    ]
+  }
+}

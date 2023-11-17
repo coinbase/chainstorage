@@ -63,7 +63,7 @@ func TestIsErrSessionFailed(t *testing.T) {
 	}
 	err := xerrors.Errorf("fake activity error: %w", activityErr)
 	require.False(xerrors.Is(err, workflow.ErrSessionFailed))
-	require.True(IsErrSessionFailed(err))
+	require.True(IsErrSessionFailed(nil, err))
 }
 
 func TestIsScheduleToStartTimeout(t *testing.T) {

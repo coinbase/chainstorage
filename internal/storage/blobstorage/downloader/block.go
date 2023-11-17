@@ -41,7 +41,7 @@ type (
 		config     *config.Config
 		logger     *zap.Logger
 		httpClient HTTPClient
-		retry      retry.Retry
+		retry      retry.RetryWithResult[*api.Block]
 	}
 )
 
@@ -55,7 +55,7 @@ func NewBlockDownloader(params BlockDownloaderParams) BlockDownloader {
 		config:     params.Config,
 		logger:     logger,
 		httpClient: params.HttpClient,
-		retry:      retry.New(retry.WithLogger(logger)),
+		retry:      retry.NewWithResult[*api.Block](retry.WithLogger(logger)),
 	}
 }
 
@@ -84,16 +84,16 @@ func (d *blockDownloaderImpl) Download(ctx context.Context, blockFile *api.Block
 		}, nil
 	}
 
-	var block *api.Block
-	if err := d.retry.Retry(ctx, func(ctx context.Context) error {
+	defer d.logDuration(time.Now())
+	return d.retry.Retry(ctx, func(ctx context.Context) (*api.Block, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, blockFile.FileUrl, nil)
 		if err != nil {
-			return xerrors.Errorf("failed to create download request: %w", err)
+			return nil, xerrors.Errorf("failed to create download request: %w", err)
 		}
 
 		httpResp, err := d.httpClient.Do(req)
 		if err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
+			return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
 		}
 
 		finalizer := finalizer.WithCloser(httpResp.Body)
@@ -103,30 +103,34 @@ func (d *blockDownloaderImpl) Download(ctx context.Context, blockFile *api.Block
 			if statusCode == http.StatusRequestTimeout ||
 				statusCode == http.StatusTooManyRequests ||
 				statusCode >= http.StatusInternalServerError {
-				return retry.Retryable(xerrors.Errorf("received %d status code: %w", statusCode, errors.ErrDownloadFailure))
+				return nil, retry.Retryable(xerrors.Errorf("received %d status code: %w", statusCode, errors.ErrDownloadFailure))
 			} else {
-				return xerrors.Errorf("received non-retryable %d status code: %w", statusCode, errors.ErrDownloadFailure)
+				return nil, xerrors.Errorf("received non-retryable %d status code: %w", statusCode, errors.ErrDownloadFailure)
 			}
 		}
 
 		bodyBytes, err := ioutil.ReadAll(httpResp.Body)
 		if err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to read body: %w", err))
+			return nil, retry.Retryable(xerrors.Errorf("failed to read body: %w", err))
 		}
 
-		block = new(api.Block)
+		block := new(api.Block)
 		blockData, err := storage_utils.Decompress(bodyBytes, blockFile.Compression)
 		if err != nil {
-			return xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+			return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
 		}
 
 		if err := proto.Unmarshal(blockData, block); err != nil {
-			return xerrors.Errorf("failed to unmarshal file contents: %w", err)
+			return nil, xerrors.Errorf("failed to unmarshal file contents: %w", err)
 		}
-		return finalizer.Close()
-	}); err != nil {
-		return nil, err
-	}
 
-	return block, nil
+		return block, finalizer.Close()
+	})
+}
+
+func (c *blockDownloaderImpl) logDuration(start time.Time) {
+	c.logger.Debug(
+		"downloader.request",
+		zap.Duration("duration", time.Since(start)),
+	)
 }

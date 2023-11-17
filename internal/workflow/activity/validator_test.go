@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"golang.org/x/xerrors"
+
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
@@ -34,6 +36,7 @@ type ValidatorTestSuite struct {
 	masterClient           *clientmocks.MockClient
 	slaveClient            *clientmocks.MockClient
 	validatorClient        *clientmocks.MockClient
+	consensusClient        *clientmocks.MockClient
 	masterEndpointProvider endpoints.EndpointProvider
 	slaveEndpointProvider  endpoints.EndpointProvider
 	cfg                    *config.Config
@@ -54,7 +57,6 @@ const (
 	heightPadding       = uint64(1000)
 	maxBlocksToValidate = uint64(50)
 	maxEventsToValidate = uint64(50)
-	maxReorgDistance    = uint64(35)
 	parallelism         = 1
 )
 
@@ -92,6 +94,7 @@ func (s *ValidatorTestSuite) SetupTest() {
 	s.masterClient = clientmocks.NewMockClient(s.ctrl)
 	s.slaveClient = clientmocks.NewMockClient(s.ctrl)
 	s.validatorClient = clientmocks.NewMockClient(s.ctrl)
+	s.consensusClient = clientmocks.NewMockClient(s.ctrl)
 	s.parser = parsermocks.NewMockParser(s.ctrl)
 	cfg, err := config.New()
 	require.NoError(err)
@@ -122,6 +125,12 @@ func (s *ValidatorTestSuite) SetupTest() {
 			Name: "validator",
 			Target: func() client.Client {
 				return s.validatorClient
+			},
+		}),
+		fx.Provide(fx.Annotated{
+			Name: "consensus",
+			Target: func() client.Client {
+				return s.consensusClient
 			},
 		}),
 		fx.Provide(func() parser.Parser { return s.parser }),
@@ -162,9 +171,6 @@ func (s *ValidatorTestSuite) TestValidator() {
 		GetBlocksByHeightRange(gomock.Any(), blockTag, startHeight, endHeight+1).
 		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
 
-	s.metaStorage.EXPECT().
-		GetBlockByHeight(gomock.Any(), blockTag, startHeight-1).
-		Return(testutil.MakeBlockMetadata(startHeight-1, blockTag), nil)
 	for i := startHeight; i <= endHeight; i++ {
 		s.metaStorage.EXPECT().
 			GetBlockByHeight(gomock.Any(), blockTag, i).
@@ -191,20 +197,27 @@ func (s *ValidatorTestSuite) TestValidator() {
 		Return(&api.NativeBlock{}, nil).
 		AnyTimes()
 	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+	s.parser.EXPECT().
 		ParseRosettaBlock(gomock.Any(), gomock.Any()).
 		Return(&api.RosettaBlock{}, nil).
 		AnyTimes()
+	s.parser.EXPECT().
+		ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
 
 	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
-		Tag:                       blockTag,
-		StartHeight:               startHeight,
-		ValidationHeightPadding:   heightPadding,
-		MaxHeightsToValidate:      maxBlocksToValidate,
-		StartEventId:              startEventId,
-		MaxEventsToValidate:       maxEventsToValidate,
-		Parallelism:               parallelism,
-		ValidatorMaxReorgDistance: maxReorgDistance,
-		EventTag:                  eventTag,
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
 	})
 	require.NoError(err)
 	require.Equal(&ValidatorResponse{
@@ -241,9 +254,6 @@ func (s *ValidatorTestSuite) TestValidator_WithFailover() {
 		GetBlocksByHeightRange(gomock.Any(), blockTag, startHeight, endHeight+1).
 		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
 
-	s.metaStorage.EXPECT().
-		GetBlockByHeight(gomock.Any(), blockTag, startHeight-1).
-		Return(testutil.MakeBlockMetadata(startHeight-1, blockTag), nil)
 	for i := startHeight; i <= endHeight; i++ {
 		s.metaStorage.EXPECT().
 			GetBlockByHeight(gomock.Any(), blockTag, i).
@@ -270,26 +280,532 @@ func (s *ValidatorTestSuite) TestValidator_WithFailover() {
 		Return(&api.NativeBlock{}, nil).
 		AnyTimes()
 	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+	s.parser.EXPECT().
 		ParseRosettaBlock(gomock.Any(), gomock.Any()).
 		Return(&api.RosettaBlock{}, nil).
 		AnyTimes()
+	s.parser.EXPECT().
+		ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
 
 	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
-		Tag:                       blockTag,
-		StartHeight:               startHeight,
-		ValidationHeightPadding:   heightPadding,
-		MaxHeightsToValidate:      maxBlocksToValidate,
-		StartEventId:              startEventId,
-		MaxEventsToValidate:       maxEventsToValidate,
-		Parallelism:               parallelism,
-		ValidatorMaxReorgDistance: maxReorgDistance,
-		EventTag:                  eventTag,
-		Failover:                  true,
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
+		Failover:                true,
 	})
 	require.NoError(err)
 	require.Equal(&ValidatorResponse{
 		LastValidatedHeight:      endHeight,
 		BlockGap:                 theirHeight - endHeight,
+		LastValidatedEventId:     currentEventId,
+		LastValidatedEventHeight: endHeight,
+		EventGap:                 0,
+		EventTag:                 eventTag,
+	}, response)
+}
+
+func (s *ValidatorTestSuite) TestValidator_Reorg() {
+	require := testutil.Require(s.T())
+	startHeightReorg := startHeight + 200
+
+	s.metaStorage.EXPECT().
+		GetLatestBlock(gomock.Any(), blockTag).
+		Return(testutil.MakeBlockMetadata(ourHeight, blockTag), nil)
+	s.masterClient.EXPECT().
+		GetLatestHeight(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (uint64, error) {
+			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
+			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
+			return theirHeight, nil
+		})
+	// validateLatestBlock
+	s.blobStorage.EXPECT().
+		Download(gomock.Any(), testutil.MakeBlockMetadata(ourHeight, blockTag)).
+		Return(testutil.MakeBlock(ourHeight, blockTag), nil)
+
+	// validateEvents
+	s.metaStorage.EXPECT().
+		GetMaxEventId(gomock.Any(), eventTag).
+		Return(currentEventId, nil)
+	s.metaStorage.EXPECT().
+		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, startHeight+1, blockTag), nil)
+
+	// parser
+	s.parser.EXPECT().
+		ParseNativeBlock(gomock.Any(), gomock.Any()).
+		Return(&api.NativeBlock{}, nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ParseRosettaBlock(gomock.Any(), gomock.Any()).
+		Return(&api.RosettaBlock{}, nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+
+	// Validation block range:
+	// endHeight = theirHeight - heightPadding < startHeightReorg
+	// Thus validator will return directly with `response.LastValidatedHeight = startHeightReorg`
+	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
+		Tag:                     blockTag,
+		StartHeight:             startHeightReorg,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
+	})
+	require.NoError(err)
+	require.Equal(&ValidatorResponse{
+		LastValidatedHeight:      startHeightReorg,
+		BlockGap:                 theirHeight - startHeightReorg,
+		LastValidatedEventId:     currentEventId,
+		LastValidatedEventHeight: startHeight,
+		EventGap:                 0,
+		EventTag:                 eventTag,
+	}, response)
+}
+
+func (s *ValidatorTestSuite) TestValidator_BlockValidation_Failure() {
+	require := testutil.Require(s.T())
+	endHeight := theirHeight - heightPadding
+
+	// validateLatestBlock
+	s.metaStorage.EXPECT().
+		GetLatestBlock(gomock.Any(), blockTag).
+		Return(testutil.MakeBlockMetadata(ourHeight, blockTag), nil)
+	s.masterClient.EXPECT().
+		GetLatestHeight(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (uint64, error) {
+			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
+			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
+			return theirHeight, nil
+		})
+	s.blobStorage.EXPECT().
+		Download(gomock.Any(), testutil.MakeBlockMetadata(ourHeight, blockTag)).
+		Return(testutil.MakeBlock(ourHeight, blockTag), nil)
+	s.parser.EXPECT().
+		ParseNativeBlock(gomock.Any(), gomock.Any()).
+		Return(&api.NativeBlock{}, nil)
+	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(nil)
+	s.parser.EXPECT().
+		ParseRosettaBlock(gomock.Any(), gomock.Any()).
+		Return(&api.RosettaBlock{}, nil)
+	s.parser.EXPECT().
+		ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil)
+
+	// validateRange
+	s.metaStorage.EXPECT().
+		GetBlocksByHeightRange(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	for i := startHeight; i <= endHeight; i++ {
+		s.metaStorage.EXPECT().
+			GetBlockByHeight(gomock.Any(), blockTag, i).
+			Return(testutil.MakeBlockMetadata(i, blockTag), nil)
+		s.blobStorage.EXPECT().
+			Download(gomock.Any(), testutil.MakeBlockMetadata(i, blockTag)).
+			Return(testutil.MakeBlock(i, blockTag), nil)
+		s.parser.EXPECT().
+			ParseNativeBlock(gomock.Any(), gomock.Any()).
+			Return(&api.NativeBlock{}, nil).
+			AnyTimes()
+		s.parser.EXPECT().
+			ValidateBlock(gomock.Any(), gomock.Any()).
+			Return(xerrors.Errorf("mock error"))
+	}
+	s.slaveClient.EXPECT().
+		BatchGetBlockMetadata(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	// validateEvents
+	s.metaStorage.EXPECT().
+		GetMaxEventId(gomock.Any(), eventTag).
+		Return(currentEventId, nil)
+	s.metaStorage.EXPECT().
+		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
+
+	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
+	})
+	require.NoError(err)
+	require.Equal(&ValidatorResponse{
+		LastValidatedHeight:      endHeight,
+		BlockGap:                 theirHeight - endHeight,
+		LastValidatedEventId:     currentEventId,
+		LastValidatedEventHeight: endHeight,
+		EventGap:                 0,
+		EventTag:                 eventTag,
+	}, response)
+}
+
+func (s *ValidatorTestSuite) TestValidator_BlockValidation_NotImplemented() {
+	require := testutil.Require(s.T())
+	endHeight := theirHeight - heightPadding
+
+	// validateLatestBlock
+	s.metaStorage.EXPECT().
+		GetLatestBlock(gomock.Any(), blockTag).
+		Return(testutil.MakeBlockMetadata(ourHeight, blockTag), nil)
+	s.masterClient.EXPECT().
+		GetLatestHeight(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (uint64, error) {
+			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
+			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
+			return theirHeight, nil
+		})
+	s.blobStorage.EXPECT().
+		Download(gomock.Any(), testutil.MakeBlockMetadata(ourHeight, blockTag)).
+		Return(testutil.MakeBlock(ourHeight, blockTag), nil)
+	s.parser.EXPECT().
+		ParseNativeBlock(gomock.Any(), gomock.Any()).
+		Return(&api.NativeBlock{}, nil)
+	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(parser.ErrNotImplemented)
+	s.parser.EXPECT().
+		ParseRosettaBlock(gomock.Any(), gomock.Any()).
+		Return(&api.RosettaBlock{}, nil)
+	s.parser.EXPECT().
+		ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil)
+
+	// validateRange
+	s.metaStorage.EXPECT().
+		GetBlocksByHeightRange(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	for i := startHeight; i <= endHeight; i++ {
+		s.metaStorage.EXPECT().
+			GetBlockByHeight(gomock.Any(), blockTag, i).
+			Return(testutil.MakeBlockMetadata(i, blockTag), nil)
+		s.blobStorage.EXPECT().
+			Download(gomock.Any(), testutil.MakeBlockMetadata(i, blockTag)).
+			Return(testutil.MakeBlock(i, blockTag), nil)
+		s.parser.EXPECT().
+			ParseNativeBlock(gomock.Any(), gomock.Any()).
+			Return(&api.NativeBlock{}, nil)
+		s.parser.EXPECT().
+			ValidateBlock(gomock.Any(), gomock.Any()).
+			Return(parser.ErrNotImplemented)
+		s.parser.EXPECT().
+			ParseRosettaBlock(gomock.Any(), gomock.Any()).
+			Return(&api.RosettaBlock{}, nil)
+		s.parser.EXPECT().
+			ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil)
+	}
+	s.slaveClient.EXPECT().
+		BatchGetBlockMetadata(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	// validateEvents
+	s.metaStorage.EXPECT().
+		GetMaxEventId(gomock.Any(), eventTag).
+		Return(currentEventId, nil)
+	s.metaStorage.EXPECT().
+		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
+
+	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
+	})
+	require.NoError(err)
+	require.Equal(&ValidatorResponse{
+		LastValidatedHeight:      endHeight,
+		BlockGap:                 theirHeight - endHeight,
+		LastValidatedEventId:     currentEventId,
+		LastValidatedEventHeight: endHeight,
+		EventGap:                 0,
+		EventTag:                 eventTag,
+	}, response)
+}
+
+func (s *ValidatorTestSuite) TestValidator_RosettaBlockValidation_NotImplemented() {
+	require := testutil.Require(s.T())
+	endHeight := theirHeight - heightPadding
+
+	// validateLatestBlock
+	s.metaStorage.EXPECT().
+		GetLatestBlock(gomock.Any(), blockTag).
+		Return(testutil.MakeBlockMetadata(ourHeight, blockTag), nil)
+	s.masterClient.EXPECT().
+		GetLatestHeight(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (uint64, error) {
+			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
+			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
+			return theirHeight, nil
+		})
+	s.blobStorage.EXPECT().
+		Download(gomock.Any(), testutil.MakeBlockMetadata(ourHeight, blockTag)).
+		Return(testutil.MakeBlock(ourHeight, blockTag), nil)
+	s.parser.EXPECT().
+		ParseNativeBlock(gomock.Any(), gomock.Any()).
+		Return(&api.NativeBlock{}, nil)
+	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(nil)
+	s.parser.EXPECT().
+		ParseRosettaBlock(gomock.Any(), gomock.Any()).
+		Return(&api.RosettaBlock{}, nil)
+	s.parser.EXPECT().
+		ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(parser.ErrNotImplemented)
+
+	// validateRange
+	s.metaStorage.EXPECT().
+		GetBlocksByHeightRange(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	for i := startHeight; i <= endHeight; i++ {
+		s.metaStorage.EXPECT().
+			GetBlockByHeight(gomock.Any(), blockTag, i).
+			Return(testutil.MakeBlockMetadata(i, blockTag), nil)
+		s.blobStorage.EXPECT().
+			Download(gomock.Any(), testutil.MakeBlockMetadata(i, blockTag)).
+			Return(testutil.MakeBlock(i, blockTag), nil)
+		s.parser.EXPECT().
+			ParseNativeBlock(gomock.Any(), gomock.Any()).
+			Return(&api.NativeBlock{}, nil)
+		s.parser.EXPECT().
+			ValidateBlock(gomock.Any(), gomock.Any()).
+			Return(nil)
+		s.parser.EXPECT().
+			ParseRosettaBlock(gomock.Any(), gomock.Any()).
+			Return(&api.RosettaBlock{}, nil)
+		s.parser.EXPECT().
+			ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(parser.ErrNotImplemented)
+	}
+	s.slaveClient.EXPECT().
+		BatchGetBlockMetadata(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	// validateEvents
+	s.metaStorage.EXPECT().
+		GetMaxEventId(gomock.Any(), eventTag).
+		Return(currentEventId, nil)
+	s.metaStorage.EXPECT().
+		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
+
+	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
+	})
+	require.NoError(err)
+	require.Equal(&ValidatorResponse{
+		LastValidatedHeight:      endHeight,
+		BlockGap:                 theirHeight - endHeight,
+		LastValidatedEventId:     currentEventId,
+		LastValidatedEventHeight: endHeight,
+		EventGap:                 0,
+		EventTag:                 eventTag,
+	}, response)
+}
+
+func (s *ValidatorTestSuite) TestValidator_ParseRosetta_NotImplemented() {
+	require := testutil.Require(s.T())
+	endHeight := theirHeight - heightPadding
+
+	// validateLatestBlock
+	s.metaStorage.EXPECT().
+		GetLatestBlock(gomock.Any(), blockTag).
+		Return(testutil.MakeBlockMetadata(ourHeight, blockTag), nil)
+	s.blobStorage.EXPECT().
+		Download(gomock.Any(), testutil.MakeBlockMetadata(ourHeight, blockTag)).
+		Return(testutil.MakeBlock(ourHeight, blockTag), nil)
+	s.masterClient.EXPECT().
+		GetLatestHeight(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (uint64, error) {
+			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
+			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
+			return theirHeight, nil
+		})
+
+	// validateRange
+	s.metaStorage.EXPECT().
+		GetBlocksByHeightRange(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	for i := startHeight; i <= endHeight; i++ {
+		s.metaStorage.EXPECT().
+			GetBlockByHeight(gomock.Any(), blockTag, i).
+			Return(testutil.MakeBlockMetadata(i, blockTag), nil)
+		s.blobStorage.EXPECT().
+			Download(gomock.Any(), testutil.MakeBlockMetadata(i, blockTag)).
+			Return(testutil.MakeBlock(i, blockTag), nil)
+	}
+	s.slaveClient.EXPECT().
+		BatchGetBlockMetadata(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(endHeight+1-startHeight), blockTag), nil)
+
+	// validateEvents
+	s.metaStorage.EXPECT().
+		GetMaxEventId(gomock.Any(), eventTag).
+		Return(currentEventId, nil)
+	s.metaStorage.EXPECT().
+		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
+
+	// parser
+	s.parser.EXPECT().
+		ParseNativeBlock(gomock.Any(), gomock.Any()).
+		Return(&api.NativeBlock{}, nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ParseRosettaBlock(gomock.Any(), gomock.Any()).
+		Return(nil, parser.ErrNotImplemented).
+		AnyTimes()
+
+	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
+	})
+	require.NoError(err)
+	require.Equal(&ValidatorResponse{
+		LastValidatedHeight:      endHeight,
+		BlockGap:                 theirHeight - endHeight,
+		LastValidatedEventId:     currentEventId,
+		LastValidatedEventHeight: endHeight,
+		EventGap:                 0,
+		EventTag:                 eventTag,
+	}, response)
+}
+
+func (s *ValidatorTestSuite) TestValidator_WithSkipBlock() {
+	// This test verifies the following case:
+	// 15_000_000-15_000_003 (non-skipped), 15_000_004-15_000_005 (skipped)
+
+	require := testutil.Require(s.T())
+	endHeight := theirHeight - heightPadding
+	lastNonSkipBlock := uint64(15_000_003)
+
+	// validateLatestBlock
+	s.metaStorage.EXPECT().
+		GetLatestBlock(gomock.Any(), blockTag).
+		Return(testutil.MakeBlockMetadata(ourHeight, blockTag), nil)
+	s.blobStorage.EXPECT().
+		Download(gomock.Any(), testutil.MakeBlockMetadata(ourHeight, blockTag)).
+		Return(testutil.MakeBlock(ourHeight, blockTag), nil)
+	s.masterClient.EXPECT().
+		GetLatestHeight(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (uint64, error) {
+			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
+			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
+			return theirHeight, nil
+		})
+
+	// validateRange
+	blocks := testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(lastNonSkipBlock-startHeight+1), blockTag)
+	blocks = append(blocks, testutil.MakeBlockMetadatasFromStartHeight(lastNonSkipBlock+1, int(endHeight-lastNonSkipBlock), blockTag, blockSkippedOption)...)
+	s.metaStorage.EXPECT().
+		GetBlocksByHeightRange(gomock.Any(), blockTag, startHeight, endHeight+1).
+		Return(blocks, nil)
+
+	for i := startHeight; i <= lastNonSkipBlock; i++ {
+		s.metaStorage.EXPECT().
+			GetBlockByHeight(gomock.Any(), blockTag, i).
+			Return(testutil.MakeBlockMetadata(i, blockTag), nil)
+		s.blobStorage.EXPECT().
+			Download(gomock.Any(), testutil.MakeBlockMetadata(i, blockTag)).
+			Return(testutil.MakeBlock(i, blockTag), nil)
+	}
+	s.slaveClient.EXPECT().
+		BatchGetBlockMetadata(gomock.Any(), blockTag, startHeight, lastNonSkipBlock+1).
+		Return(testutil.MakeBlockMetadatasFromStartHeight(startHeight, int(lastNonSkipBlock+1-startHeight), blockTag), nil)
+
+	// validateEvents
+	s.metaStorage.EXPECT().
+		GetMaxEventId(gomock.Any(), eventTag).
+		Return(currentEventId, nil)
+	s.metaStorage.EXPECT().
+		GetEventsAfterEventId(gomock.Any(), eventTag, startEventId-numOfExtraPrevEventsToValidate, maxEventsToValidate+uint64(numOfExtraPrevEventsToValidate)).
+		Return(testutil.MakeBlockEventEntries(api.BlockchainEvent_BLOCK_ADDED, eventTag, currentEventId, startHeight, endHeight+1, blockTag), nil)
+
+	// parser
+	s.parser.EXPECT().
+		ParseNativeBlock(gomock.Any(), gomock.Any()).
+		Return(&api.NativeBlock{}, nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ValidateBlock(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ParseRosettaBlock(gomock.Any(), gomock.Any()).
+		Return(&api.RosettaBlock{}, nil).
+		AnyTimes()
+	s.parser.EXPECT().
+		ValidateRosettaBlock(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+
+	response, err := s.validator.Execute(s.env.BackgroundContext(), &ValidatorRequest{
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		StartEventId:            startEventId,
+		MaxEventsToValidate:     maxEventsToValidate,
+		Parallelism:             parallelism,
+		EventTag:                eventTag,
+	})
+	require.NoError(err)
+	require.Equal(&ValidatorResponse{
+		LastValidatedHeight:      lastNonSkipBlock,
+		BlockGap:                 theirHeight - lastNonSkipBlock,
 		LastValidatedEventId:     currentEventId,
 		LastValidatedEventHeight: endHeight,
 		EventGap:                 0,

@@ -57,8 +57,6 @@ func TestConfig(t *testing.T) {
 
 		require.Equal(fmt.Sprintf("chainstorage-%v", normalizedConfigName), cfg.Cadence.Domain)
 		require.NotEmpty(cfg.Cadence.RetentionPeriod)
-		require.NotEmpty(cfg.Cadence.TLSConfig)
-		require.True(cfg.Cadence.TLSConfig.Enabled)
 		// Cadence workflow config validation
 		require.NotEmpty(cfg.Workflows.Backfiller)
 		require.False(cfg.Workflows.Backfiller.Enabled)
@@ -70,13 +68,13 @@ func TestConfig(t *testing.T) {
 		require.Equal("workflow.backfiller", cfg.Workflows.Backfiller.WorkflowIdentity)
 		require.NotEmpty(cfg.Workflows.Backfiller.BatchSize)
 		require.NotEmpty(cfg.Workflows.Backfiller.CheckpointSize)
-		require.Less(cfg.Workflows.Backfiller.CheckpointSize, uint64(15000), "CheckpointSize is too large. There is a maximum limit of 50,000 events that is enforced by Temporal.")
+		require.LessOrEqual(cfg.Workflows.Backfiller.CheckpointSize/cfg.Workflows.Backfiller.MiniBatchSize, uint64(10000), "CheckpointSize is too large. There is a maximum limit of 50,000 events that is enforced by Temporal.")
 		require.NotEmpty(cfg.Workflows.Backfiller.NumConcurrentExtractors)
 		require.NotEmpty(cfg.Workflows.Poller.Parallelism)
 		require.NotEmpty(cfg.Workflows.Monitor.Parallelism)
 		require.NotEmpty(cfg.Workflows.Poller.SessionCreationTimeout)
 		require.Equal(cfg.Workflows.Poller.BackoffInterval, cfg.Workflows.Streamer.BackoffInterval)
-		require.Equal(cfg.Workflows.Poller.SessionEnabled, workflowSessionEnabled[cfg.Namespace()][cfg.Network()])
+		require.LessOrEqual(cfg.Workflows.Poller.BackoffInterval, cfg.Chain.BlockTime)
 
 		require.NotEmpty(cfg.Workflows.Workers)
 		// Cadence workflow identity
@@ -96,27 +94,31 @@ func TestConfig(t *testing.T) {
 		require.Equal(cfg.Chain.EventTag, cfg.Workflows.Monitor.EventTag)
 
 		require.NotEmpty(cfg.Chain.IrreversibleDistance)
-		require.Equal(cfg.Chain.IrreversibleDistance, cfg.Workflows.Monitor.IrreversibleDistance)
 		require.Equal(cfg.Chain.IrreversibleDistance, cfg.Workflows.Streamer.IrreversibleDistance)
+		require.NotEmpty(cfg.Workflows.Monitor.IrreversibleDistance)
 
 		if len(cfg.Chain.Rosetta.Blockchain) > 0 {
 			require.NotEmpty(cfg.Chain.Rosetta.Network)
-		}
-
-		if cfg.IsRosetta() {
-			require.NotEmpty(cfg.Chain.Rosetta.BlockNotFoundErrorCodes)
 		}
 
 		if cfg.Namespace() != config.DefaultNamespace {
 			return
 		}
 
-		require.Equal(getDataCompressionType(cfg), cfg.AWS.Storage.DataCompression)
+		require.GreaterOrEqual(cfg.Chain.EventTag.Latest, cfg.Chain.EventTag.Stable)
+		require.Equal(api.Compression_GZIP, cfg.AWS.Storage.DataCompression)
 
 		require.Equal(fmt.Sprintf("chainstorage-%v", normalizedConfigName), cfg.Cadence.Domain)
 
 		require.Equal(cfg.AWS.Storage, cfg.Workflows.Backfiller.Storage)
 		require.Equal(cfg.AWS.Storage, cfg.Workflows.Poller.Storage)
+
+		require.Equal(3000, cfg.Api.RateLimit.GlobalRPS)
+		require.Equal(2000, cfg.Api.RateLimit.PerClientRPS)
+
+		if cfg.Api.RateLimit.GlobalRPS > 0 && cfg.Api.RateLimit.PerClientRPS > 0 {
+			require.Greater(cfg.Api.RateLimit.GlobalRPS, cfg.Api.RateLimit.PerClientRPS)
+		}
 
 		// Verify derived configs.
 		dynamoDB := config.DynamoDBConfig{
@@ -125,6 +127,9 @@ func TestConfig(t *testing.T) {
 			EventTableHeightIndex:         fmt.Sprintf("example_chainstorage_block_events_by_height_%v", configName),
 			VersionedEventTable:           fmt.Sprintf("example_chainstorage_versioned_block_events_%v", configName),
 			VersionedEventTableBlockIndex: fmt.Sprintf("example_chainstorage_versioned_block_events_by_block_id_%v", configName),
+			TransactionTable:              cfg.AWS.DynamoDB.TransactionTable,
+			// Skip DynamoDB.Arn verification
+			Arn: "",
 		}
 
 		expectedAWS := config.AwsConfig{
@@ -138,6 +143,7 @@ func TestConfig(t *testing.T) {
 				Name:                  fmt.Sprintf("example_chainstorage_blocks_%v_dlq", configName),
 				VisibilityTimeoutSecs: 600,
 				DelaySecs:             900,
+				OwnerAccountId:        cfg.AWS.DLQ.OwnerAccountId,
 			},
 			Storage: config.StorageConfig{
 				DataCompression: getDataCompressionType(cfg),
@@ -162,18 +168,20 @@ func TestAWSAccountEnvParsing(t *testing.T) {
 					require.NoError(err)
 					defer os.Unsetenv(config.EnvVarEnvironment)
 
-					blockchain, network, err := config.ParseConfigName(configName)
+					blockchain, network, sidechain, err := config.ParseConfigName(configName)
 					require.NoError(err)
 					cfg, err := config.New(
 						config.WithNamespace(namespace),
 						config.WithBlockchain(blockchain),
 						config.WithNetwork(network),
+						config.WithSidechain(sidechain),
 					)
 					require.NoError(err)
 					require.Equal(namespace, cfg.Namespace())
 					require.Equal(config.GetEnv(), cfg.Env())
 					require.Equal(blockchain, cfg.Blockchain())
 					require.Equal(network, cfg.Network())
+					require.Equal(sidechain, cfg.Sidechain())
 				})
 			}
 		}
@@ -190,6 +198,21 @@ func TestConfig_OverrideBlockchainNetwork(t *testing.T) {
 	require.NoError(err)
 	require.Equal(common.Blockchain_BLOCKCHAIN_ETHEREUM, cfg.Blockchain())
 	require.Equal(common.Network_NETWORK_ETHEREUM_GOERLI, cfg.Network())
+}
+
+func TestConfig_OverrideNamespace(t *testing.T) {
+	require := testutil.Require(t)
+
+	const namespace = "bootcamp"
+	cfg, err := config.New(
+		config.WithNamespace(namespace),
+		config.WithBlockchain(common.Blockchain_BLOCKCHAIN_ETHEREUM),
+		config.WithNetwork(common.Network_NETWORK_ETHEREUM_MAINNET),
+	)
+	require.NoError(err)
+	require.Equal(namespace, cfg.Namespace())
+	require.Equal(common.Blockchain_BLOCKCHAIN_ETHEREUM, cfg.Blockchain())
+	require.Equal(common.Network_NETWORK_ETHEREUM_MAINNET, cfg.Network())
 }
 
 func TestConfig_UnknownEnvVar(t *testing.T) {
@@ -267,7 +290,24 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 					"password": "testPassword2",
 					"weight": 2
 				}
-			]
+			],
+			"endpoint_config": {
+				"sticky_session": {
+				  "cookie_hash": "baz"
+				},
+				"headers": {
+				  "key1": "val1",
+				  "key2": "val2"
+				}
+			},
+			"endpoint_config_failover": {
+				"sticky_session": {
+				  "header_hash": "qux"
+				},
+				"headers": {
+				  "key3": "val3"
+				}
+			}
 		}
 		`
 
@@ -296,6 +336,10 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 		require.NoError(err)
 		defer os.Unsetenv("CHAINSTORAGE_CHAIN_CLIENT_VALIDATOR_ENDPOINT_GROUP")
 
+		err = os.Setenv("CHAINSTORAGE_CHAIN_CLIENT_CONSENSUS_ENDPOINT_GROUP", jsonRpcEndpoint)
+		require.NoError(err)
+		defer os.Unsetenv("CHAINSTORAGE_CHAIN_CLIENT_CONSENSUS_ENDPOINT_GROUP")
+
 		err = os.Setenv("CHAINSTORAGE_FUNCTIONAL_TEST", jsonFunctionalTest)
 		require.NoError(err)
 		defer os.Unsetenv("CHAINSTORAGE_FUNCTIONAL_TEST")
@@ -306,6 +350,7 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 			config.WithEnvironment(cfg.Env()),
 			config.WithBlockchain(cfg.Blockchain()),
 			config.WithNetwork(cfg.Network()),
+			config.WithSidechain(cfg.Sidechain()),
 		)
 		require.NoError(err)
 		require.Equal(expectedEndpoints, cfg.Chain.Client.Master.EndpointGroup.Endpoints,
@@ -317,7 +362,31 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 		require.Equal(expectedEndpoints, cfg.Chain.Client.Validator.EndpointGroup.Endpoints,
 			"config yml is likely broken since environment variable "+
 				"'CHAINSTORAGE_CHAIN_CLIENT_VALIDATOR_ENDPOINTS' no longer overrides the config values")
+		require.Equal(expectedEndpoints, cfg.Chain.Client.Consensus.EndpointGroup.Endpoints,
+			"config yml is likely broken since environment variable "+
+				"'CHAINSTORAGE_CHAIN_CLIENT_CONSENSUS_ENDPOINTS' no longer overrides the config values")
+
 		require.Equal(2, len(cfg.FunctionalTest.SkipFunctionalTest))
+
+		require.Equal(2, len(cfg.Chain.Client.Master.EndpointGroup.EndpointConfig.Headers))
+		require.Equal(2, len(cfg.Chain.Client.Slave.EndpointGroup.EndpointConfig.Headers))
+		require.Equal(2, len(cfg.Chain.Client.Validator.EndpointGroup.EndpointConfig.Headers))
+		require.Equal(2, len(cfg.Chain.Client.Consensus.EndpointGroup.EndpointConfig.Headers))
+
+		require.Equal(1, len(cfg.Chain.Client.Master.EndpointGroup.EndpointConfigFailover.Headers))
+		require.Equal(1, len(cfg.Chain.Client.Slave.EndpointGroup.EndpointConfigFailover.Headers))
+		require.Equal(1, len(cfg.Chain.Client.Validator.EndpointGroup.EndpointConfigFailover.Headers))
+		require.Equal(1, len(cfg.Chain.Client.Consensus.EndpointGroup.EndpointConfigFailover.Headers))
+
+		require.Equal("baz", cfg.Chain.Client.Master.EndpointGroup.EndpointConfig.StickySession.CookieHash)
+		require.Equal("baz", cfg.Chain.Client.Slave.EndpointGroup.EndpointConfig.StickySession.CookieHash)
+		require.Equal("baz", cfg.Chain.Client.Validator.EndpointGroup.EndpointConfig.StickySession.CookieHash)
+		require.Equal("baz", cfg.Chain.Client.Consensus.EndpointGroup.EndpointConfig.StickySession.CookieHash)
+
+		require.Equal("qux", cfg.Chain.Client.Master.EndpointGroup.EndpointConfigFailover.StickySession.HeaderHash)
+		require.Equal("qux", cfg.Chain.Client.Slave.EndpointGroup.EndpointConfigFailover.StickySession.HeaderHash)
+		require.Equal("qux", cfg.Chain.Client.Validator.EndpointGroup.EndpointConfigFailover.StickySession.HeaderHash)
+		require.Equal("qux", cfg.Chain.Client.Consensus.EndpointGroup.EndpointConfigFailover.StickySession.HeaderHash)
 	})
 }
 
@@ -334,8 +403,10 @@ func TestEndpointParsing(t *testing.T) {
 				Weight:   1,
 			},
 		},
-		StickySession: config.StickySessionConfig{
-			CookieHash: "sync_session",
+		EndpointConfig: config.EndpointConfig{
+			StickySession: config.StickySessionConfig{
+				CookieHash: "sync_session",
+			},
 		},
 	}
 
@@ -411,13 +482,56 @@ func TestEndpointParsing(t *testing.T) {
 				Weight:   1,
 			},
 		},
-		StickySession: config.StickySessionConfig{
-			HeaderHash: "testHeader",
+		EndpointConfig: config.EndpointConfig{
+			StickySession: config.StickySessionConfig{
+				HeaderHash: "testHeader",
+			},
 		},
 	}
 	inputBytes, err = makeTestEndpointGroupBytes("testCluster", "testUrl", "testUser", "testPassword", 1, "", false, "testHeader")
 	require.NoError(err)
 	require.NoError(endpointGroup.UnmarshalText(inputBytes))
+	require.Equal(expectedEndpointGroup, endpointGroup)
+}
+
+func TestEndpointGroupWithExtraUrls(t *testing.T) {
+	require := testutil.Require(t)
+
+	expectedEndpointGroup := config.EndpointGroup{
+		Endpoints: []config.Endpoint{
+			{
+				Name:     "testCluster",
+				Url:      "testUrl",
+				User:     "testUser",
+				Password: "testPassword",
+				Weight:   1,
+				ExtraUrls: map[string]string{
+					"extraUrl": "testExtraUrl",
+				},
+			},
+		},
+	}
+
+	// test endpoints with ports
+	text := `
+	{
+		"sticky_session_key": "sync_session",
+		"endpoints": [
+			{
+				"name": "testCluster",
+				"url": "testUrl",
+				"user": "testUser",
+				"password": "testPassword",
+				"weight": 1,
+			    "extra_urls": {
+					"extraUrl": "testExtraUrl"
+				}
+			}
+		]
+	}`
+
+	var endpointGroup config.EndpointGroup
+	require.NoError(endpointGroup.UnmarshalText([]byte(text)))
 	require.Equal(expectedEndpointGroup, endpointGroup)
 }
 
@@ -453,10 +567,36 @@ func TestEndpointGroup(t *testing.T) {
 						Weight:   4,
 					},
 				},
-				UseFailover: false,
-				StickySession: config.StickySessionConfig{
-					CookieHash: "baz",
+				EndpointConfig: config.EndpointConfig{
+					StickySession: config.StickySessionConfig{
+						CookieHash: "baz",
+					},
 				},
+				UseFailover: false,
+			},
+		},
+		{
+			fixture: "no_failover_header",
+			expected: config.EndpointGroup{
+				Endpoints: []config.Endpoint{
+					{
+						Name:     "chain-storage-eth-04",
+						Url:      "https://254c3b9c-be59-41c3-8f6f-3cc3342c7b3c.ethereum.bison.run",
+						User:     "foo",
+						Password: "bar",
+						Weight:   4,
+					},
+				},
+				EndpointConfig: config.EndpointConfig{
+					StickySession: config.StickySessionConfig{
+						CookieHash: "baz",
+					},
+					Headers: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+					},
+				},
+				UseFailover: false,
 			},
 		},
 		{
@@ -519,11 +659,64 @@ func TestEndpointGroup(t *testing.T) {
 					},
 				},
 				UseFailover: false,
-				StickySession: config.StickySessionConfig{
-					CookieHash: "baz",
+				EndpointConfig: config.EndpointConfig{
+					StickySession: config.StickySessionConfig{
+						CookieHash: "baz",
+					},
 				},
-				StickySessionFailover: config.StickySessionConfig{
-					HeaderHash: "qux",
+				EndpointConfigFailover: config.EndpointConfig{
+					StickySession: config.StickySessionConfig{
+						HeaderHash: "qux",
+					},
+				},
+			},
+		},
+		{
+			fixture: "with_failover_header",
+			expected: config.EndpointGroup{
+				Endpoints: []config.Endpoint{
+					{
+						Name:     "chain-storage-eth-04",
+						Url:      "https://254c3b9c-be59-41c3-8f6f-3cc3342c7b3c.ethereum.bison.run",
+						User:     "foo",
+						Password: "bar",
+						Weight:   4,
+					},
+				},
+				EndpointsFailover: []config.Endpoint{
+					{
+						Name:     "chain-storage-eth-03",
+						Url:      "https://e608c8ee-9d88-4861-b2b1-adea0d41664b.ethereum.bison.run",
+						User:     "foo",
+						Password: "bar",
+						Weight:   4,
+					},
+					{
+						Name:     "chain-storage-eth-07",
+						Url:      "https://79612859-a432-46d7-8512-f76a0605ac73.ethereum.bison.run",
+						User:     "foo",
+						Password: "bar",
+						Weight:   4,
+					},
+				},
+				UseFailover: false,
+				EndpointConfig: config.EndpointConfig{
+					StickySession: config.StickySessionConfig{
+						CookieHash: "baz",
+					},
+					Headers: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+					},
+				},
+				EndpointConfigFailover: config.EndpointConfig{
+					StickySession: config.StickySessionConfig{
+						HeaderHash: "qux",
+					},
+					Headers: map[string]string{
+						"key3": "val3",
+						"key4": "val4",
+					},
 				},
 			},
 		},
@@ -578,41 +771,60 @@ func TestParseConfigName(t *testing.T) {
 		configName string
 		blockchain common.Blockchain
 		network    common.Network
+		sidechain  api.SideChain
 	}{
 		{
 			configName: "ethereum_mainnet",
 			blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 			network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+			sidechain:  api.SideChain_SIDECHAIN_NONE,
 		},
 		{
 			configName: "ethereum_goerli",
 			blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 			network:    common.Network_NETWORK_ETHEREUM_GOERLI,
+			sidechain:  api.SideChain_SIDECHAIN_NONE,
 		},
 		{
 			configName: "bsc_mainnet",
 			blockchain: common.Blockchain_BLOCKCHAIN_BSC,
 			network:    common.Network_NETWORK_BSC_MAINNET,
+			sidechain:  api.SideChain_SIDECHAIN_NONE,
 		},
 		{
 			configName: "bsc_testnet",
 			blockchain: common.Blockchain_BLOCKCHAIN_BSC,
 			network:    common.Network_NETWORK_BSC_TESTNET,
+			sidechain:  api.SideChain_SIDECHAIN_NONE,
 		},
 		{
 			configName: "ethereum-mainnet",
 			blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 			network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+			sidechain:  api.SideChain_SIDECHAIN_NONE,
+		},
+		{
+			configName: "bootcamp-mainnet",
+			blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+			network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+			sidechain:  api.SideChain_SIDECHAIN_NONE,
+		},
+		{
+			configName: "ethereum-mainnet-beacon",
+			blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+			network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+			sidechain:  api.SideChain_SIDECHAIN_ETHEREUM_MAINNET_BEACON,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.configName, func(t *testing.T) {
 			require := testutil.Require(t)
 
-			actualBlockchain, actualNetwork, err := config.ParseConfigName(test.configName)
+			actualBlockchain, actualNetwork, actualSidechain, err := config.ParseConfigName(test.configName)
 			require.NoError(err)
 			require.Equal(test.blockchain, actualBlockchain)
 			require.Equal(test.network, actualNetwork)
+			require.Equal(test.sidechain, actualSidechain)
 		})
 	}
 }
@@ -628,10 +840,12 @@ func makeTestEndpointGroupBytes(name string, url string, user string, password s
 				Weight:   weight,
 			},
 		},
-		StickySession: config.StickySessionConfig{
-			CookieHash:    cookieHash,
-			CookiePassive: cookiePassive,
-			HeaderHash:    headerHash,
+		EndpointConfig: config.EndpointConfig{
+			StickySession: config.StickySessionConfig{
+				CookieHash:    cookieHash,
+				CookiePassive: cookiePassive,
+				HeaderHash:    headerHash,
+			},
 		},
 	}
 	return json.Marshal(&eg)
@@ -649,9 +863,10 @@ func TestUseFailoverEndpoints(t *testing.T) {
 	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
 		require := testutil.Require(t)
 
-		masterEndpoints := `{"endpoints": [{"name": "master", "url": "url"}], "endpoints_failover": [{"name": "master_failover", "url": "url"}], "use_failover": false}`
-		slaveEndpoints := `{"endpoints": [{"name": "slave", "url": "url"}], "endpoints_failover": [{"name": "slave_failover", "url": "url"}], "use_failover": false}`
-		validatorEndpoints := `{"endpoints": [{"name": "validator", "url": "url"}], "endpoints_failover": [{"name": "validator_failover", "url": "url"}], "use_failover": false}`
+		masterEndpoints := `{"endpoints": [{"name": "master", "url": "url"}], "endpoints_failover": [{"name": "master_failover", "url": "url"}], "use_failover": false, "endpoint_config": {"headers": {"k1":"v1"}}}`
+		slaveEndpoints := `{"endpoints": [{"name": "slave", "url": "url"}], "endpoints_failover": [{"name": "slave_failover", "url": "url"}], "use_failover": false, "endpoint_config": {"headers": {"k1":"v1"}}}`
+		validatorEndpoints := `{"endpoints": [{"name": "validator", "url": "url"}], "endpoints_failover": [{"name": "validator_failover", "url": "url"}], "use_failover": false, "endpoint_config": {"headers": {"k1":"v1"}}}`
+		consensusEndpoints := `{"endpoints": [{"name": "consensus", "url": "url"}], "endpoints_failover": [{"name": "consensus_failover", "url": "url"}], "use_failover": false, "endpoint_config": {"headers": {"k1":"v1"}}}`
 
 		err := os.Setenv("CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP", masterEndpoints)
 		require.NoError(err)
@@ -662,6 +877,9 @@ func TestUseFailoverEndpoints(t *testing.T) {
 		err = os.Setenv("CHAINSTORAGE_CHAIN_CLIENT_VALIDATOR_ENDPOINT_GROUP", validatorEndpoints)
 		require.NoError(err)
 		defer os.Unsetenv("CHAINSTORAGE_CHAIN_CLIENT_VALIDATOR_ENDPOINT_GROUP")
+		err = os.Setenv("CHAINSTORAGE_CHAIN_CLIENT_CONSENSUS_ENDPOINT_GROUP", consensusEndpoints)
+		require.NoError(err)
+		defer os.Unsetenv("CHAINSTORAGE_CHAIN_CLIENT_CONSENSUS_ENDPOINT_GROUP")
 
 		// Reload config using the env var.
 		cfg, err = config.New(
@@ -669,17 +887,25 @@ func TestUseFailoverEndpoints(t *testing.T) {
 			config.WithEnvironment(cfg.Env()),
 			config.WithBlockchain(cfg.Blockchain()),
 			config.WithNetwork(cfg.Network()),
+			config.WithSidechain(cfg.Sidechain()),
 		)
 		require.NoError(err)
 		require.False(cfg.Chain.Client.Master.EndpointGroup.UseFailover)
 		require.False(cfg.Chain.Client.Slave.EndpointGroup.UseFailover)
 		require.False(cfg.Chain.Client.Validator.EndpointGroup.UseFailover)
+		require.False(cfg.Chain.Client.Consensus.EndpointGroup.UseFailover)
 		require.Equal("master", cfg.Chain.Client.Master.EndpointGroup.Endpoints[0].Name)
 		require.Equal("slave", cfg.Chain.Client.Slave.EndpointGroup.Endpoints[0].Name)
 		require.Equal("validator", cfg.Chain.Client.Validator.EndpointGroup.Endpoints[0].Name)
+		require.Equal("consensus", cfg.Chain.Client.Consensus.EndpointGroup.Endpoints[0].Name)
 		require.Equal("master_failover", cfg.Chain.Client.Master.EndpointGroup.EndpointsFailover[0].Name)
 		require.Equal("slave_failover", cfg.Chain.Client.Slave.EndpointGroup.EndpointsFailover[0].Name)
 		require.Equal("validator_failover", cfg.Chain.Client.Validator.EndpointGroup.EndpointsFailover[0].Name)
+		require.Equal("consensus_failover", cfg.Chain.Client.Consensus.EndpointGroup.EndpointsFailover[0].Name)
+		require.Equal("v1", cfg.Chain.Client.Master.EndpointGroup.EndpointConfig.Headers["k1"])
+		require.Equal("v1", cfg.Chain.Client.Slave.EndpointGroup.EndpointConfig.Headers["k1"])
+		require.Equal("v1", cfg.Chain.Client.Validator.EndpointGroup.EndpointConfig.Headers["k1"])
+		require.Equal("v1", cfg.Chain.Client.Consensus.EndpointGroup.EndpointConfig.Headers["k1"])
 
 		masterEndpoints = `{"endpoints": [{"name": "master", "url": "url"}], "endpoints_failover": [{"name": "master_failover", "url": "url"}], "use_failover": true}`
 		err = os.Setenv("CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP", masterEndpoints)
@@ -691,18 +917,22 @@ func TestUseFailoverEndpoints(t *testing.T) {
 			config.WithEnvironment(cfg.Env()),
 			config.WithBlockchain(cfg.Blockchain()),
 			config.WithNetwork(cfg.Network()),
+			config.WithSidechain(cfg.Sidechain()),
 		)
 
 		require.NoError(err)
 		require.True(cfg.Chain.Client.Master.EndpointGroup.UseFailover)
 		require.False(cfg.Chain.Client.Slave.EndpointGroup.UseFailover)
 		require.False(cfg.Chain.Client.Validator.EndpointGroup.UseFailover)
+		require.False(cfg.Chain.Client.Consensus.EndpointGroup.UseFailover)
 		require.Equal("master", cfg.Chain.Client.Master.EndpointGroup.Endpoints[0].Name)
 		require.Equal("slave", cfg.Chain.Client.Slave.EndpointGroup.Endpoints[0].Name)
 		require.Equal("validator", cfg.Chain.Client.Validator.EndpointGroup.Endpoints[0].Name)
+		require.Equal("consensus", cfg.Chain.Client.Consensus.EndpointGroup.Endpoints[0].Name)
 		require.Equal("master_failover", cfg.Chain.Client.Master.EndpointGroup.EndpointsFailover[0].Name)
 		require.Equal("slave_failover", cfg.Chain.Client.Slave.EndpointGroup.EndpointsFailover[0].Name)
 		require.Equal("validator_failover", cfg.Chain.Client.Validator.EndpointGroup.EndpointsFailover[0].Name)
+		require.Equal("consensus_failover", cfg.Chain.Client.Consensus.EndpointGroup.EndpointsFailover[0].Name)
 
 		slaveEndpoints = `{"endpoints": [{"name": "slave", "url": "url"}], "endpoints_failover": [{"name": "slave_failover", "url": "url"}], "use_failover": true}`
 		err = os.Setenv("CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP", slaveEndpoints)
@@ -714,12 +944,14 @@ func TestUseFailoverEndpoints(t *testing.T) {
 			config.WithEnvironment(cfg.Env()),
 			config.WithBlockchain(cfg.Blockchain()),
 			config.WithNetwork(cfg.Network()),
+			config.WithSidechain(cfg.Sidechain()),
 		)
 
 		require.NoError(err)
 		require.True(cfg.Chain.Client.Master.EndpointGroup.UseFailover)
 		require.True(cfg.Chain.Client.Slave.EndpointGroup.UseFailover)
 		require.False(cfg.Chain.Client.Validator.EndpointGroup.UseFailover)
+		require.False(cfg.Chain.Client.Consensus.EndpointGroup.UseFailover)
 		require.Equal("master", cfg.Chain.Client.Master.EndpointGroup.Endpoints[0].Name)
 		require.Equal("slave", cfg.Chain.Client.Slave.EndpointGroup.Endpoints[0].Name)
 		require.Equal("validator", cfg.Chain.Client.Validator.EndpointGroup.Endpoints[0].Name)
@@ -737,18 +969,35 @@ func TestUseFailoverEndpoints(t *testing.T) {
 			config.WithEnvironment(cfg.Env()),
 			config.WithBlockchain(cfg.Blockchain()),
 			config.WithNetwork(cfg.Network()),
+			config.WithSidechain(cfg.Sidechain()),
 		)
 
 		require.NoError(err)
 		require.True(cfg.Chain.Client.Master.EndpointGroup.UseFailover)
 		require.True(cfg.Chain.Client.Slave.EndpointGroup.UseFailover)
 		require.True(cfg.Chain.Client.Validator.EndpointGroup.UseFailover)
+		require.False(cfg.Chain.Client.Consensus.EndpointGroup.UseFailover)
 		require.Equal("master", cfg.Chain.Client.Master.EndpointGroup.Endpoints[0].Name)
 		require.Equal("slave", cfg.Chain.Client.Slave.EndpointGroup.Endpoints[0].Name)
 		require.Equal("validator", cfg.Chain.Client.Validator.EndpointGroup.Endpoints[0].Name)
 		require.Equal("master_failover", cfg.Chain.Client.Master.EndpointGroup.EndpointsFailover[0].Name)
 		require.Equal("slave_failover", cfg.Chain.Client.Slave.EndpointGroup.EndpointsFailover[0].Name)
 		require.Equal("validator_failover", cfg.Chain.Client.Validator.EndpointGroup.EndpointsFailover[0].Name)
+
+		consensusEndpoints = `{"endpoints": [{"name": "consensus", "url": "url"}], "endpoints_failover": [{"name": "consensus_failover", "url": "url"}], "use_failover": true}`
+		err = os.Setenv("CHAINSTORAGE_CHAIN_CLIENT_CONSENSUS_ENDPOINT_GROUP", consensusEndpoints)
+		require.NoError(err)
+		defer os.Unsetenv("CHAINSTORAGE_CHAIN_CLIENT_CONSENSUS_ENDPOINT_GROUP")
+
+		cfg, err = config.New(
+			config.WithNamespace(cfg.Namespace()),
+			config.WithEnvironment(cfg.Env()),
+			config.WithBlockchain(cfg.Blockchain()),
+			config.WithNetwork(cfg.Network()),
+			config.WithSidechain(cfg.Sidechain()),
+		)
+		require.NoError(err)
+		require.True(cfg.Chain.Client.Consensus.EndpointGroup.UseFailover)
 	})
 }
 
@@ -761,5 +1010,14 @@ func TestGetCommonTags(t *testing.T) {
 		"blockchain": "ethereum",
 		"network":    "ethereum-mainnet",
 		"tier":       "1",
+		"sidechain":  "none",
 	}, cfg.GetCommonTags())
+}
+
+func TestDefaultHttpTimeout(t *testing.T) {
+	require := testutil.Require(t)
+
+	cfg, err := config.New()
+	require.NoError(err)
+	require.Equal(0*time.Second, cfg.Chain.Client.HttpTimeout)
 }

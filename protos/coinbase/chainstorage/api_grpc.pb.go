@@ -32,6 +32,9 @@ const (
 	ChainStorage_GetChainEvents_FullMethodName          = "/coinbase.chainstorage.ChainStorage/GetChainEvents"
 	ChainStorage_GetChainMetadata_FullMethodName        = "/coinbase.chainstorage.ChainStorage/GetChainMetadata"
 	ChainStorage_GetVersionedChainEvent_FullMethodName  = "/coinbase.chainstorage.ChainStorage/GetVersionedChainEvent"
+	ChainStorage_GetBlockByTransaction_FullMethodName   = "/coinbase.chainstorage.ChainStorage/GetBlockByTransaction"
+	ChainStorage_GetNativeTransaction_FullMethodName    = "/coinbase.chainstorage.ChainStorage/GetNativeTransaction"
+	ChainStorage_GetVerifiedAccountState_FullMethodName = "/coinbase.chainstorage.ChainStorage/GetVerifiedAccountState"
 )
 
 // ChainStorageClient is the client API for ChainStorage service.
@@ -51,6 +54,9 @@ type ChainStorageClient interface {
 	GetChainEvents(ctx context.Context, in *GetChainEventsRequest, opts ...grpc.CallOption) (*GetChainEventsResponse, error)
 	GetChainMetadata(ctx context.Context, in *GetChainMetadataRequest, opts ...grpc.CallOption) (*GetChainMetadataResponse, error)
 	GetVersionedChainEvent(ctx context.Context, in *GetVersionedChainEventRequest, opts ...grpc.CallOption) (*GetVersionedChainEventResponse, error)
+	GetBlockByTransaction(ctx context.Context, in *GetBlockByTransactionRequest, opts ...grpc.CallOption) (*GetBlockByTransactionResponse, error)
+	GetNativeTransaction(ctx context.Context, in *GetNativeTransactionRequest, opts ...grpc.CallOption) (*GetNativeTransactionResponse, error)
+	GetVerifiedAccountState(ctx context.Context, in *GetVerifiedAccountStateRequest, opts ...grpc.CallOption) (*GetVerifiedAccountStateResponse, error)
 }
 
 type chainStorageClient struct {
@@ -201,6 +207,33 @@ func (c *chainStorageClient) GetVersionedChainEvent(ctx context.Context, in *Get
 	return out, nil
 }
 
+func (c *chainStorageClient) GetBlockByTransaction(ctx context.Context, in *GetBlockByTransactionRequest, opts ...grpc.CallOption) (*GetBlockByTransactionResponse, error) {
+	out := new(GetBlockByTransactionResponse)
+	err := c.cc.Invoke(ctx, ChainStorage_GetBlockByTransaction_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chainStorageClient) GetNativeTransaction(ctx context.Context, in *GetNativeTransactionRequest, opts ...grpc.CallOption) (*GetNativeTransactionResponse, error) {
+	out := new(GetNativeTransactionResponse)
+	err := c.cc.Invoke(ctx, ChainStorage_GetNativeTransaction_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chainStorageClient) GetVerifiedAccountState(ctx context.Context, in *GetVerifiedAccountStateRequest, opts ...grpc.CallOption) (*GetVerifiedAccountStateResponse, error) {
+	out := new(GetVerifiedAccountStateResponse)
+	err := c.cc.Invoke(ctx, ChainStorage_GetVerifiedAccountState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChainStorageServer is the server API for ChainStorage service.
 // All implementations should embed UnimplementedChainStorageServer
 // for forward compatibility
@@ -218,6 +251,9 @@ type ChainStorageServer interface {
 	GetChainEvents(context.Context, *GetChainEventsRequest) (*GetChainEventsResponse, error)
 	GetChainMetadata(context.Context, *GetChainMetadataRequest) (*GetChainMetadataResponse, error)
 	GetVersionedChainEvent(context.Context, *GetVersionedChainEventRequest) (*GetVersionedChainEventResponse, error)
+	GetBlockByTransaction(context.Context, *GetBlockByTransactionRequest) (*GetBlockByTransactionResponse, error)
+	GetNativeTransaction(context.Context, *GetNativeTransactionRequest) (*GetNativeTransactionResponse, error)
+	GetVerifiedAccountState(context.Context, *GetVerifiedAccountStateRequest) (*GetVerifiedAccountStateResponse, error)
 }
 
 // UnimplementedChainStorageServer should be embedded to have forward compatible implementations.
@@ -262,6 +298,15 @@ func (UnimplementedChainStorageServer) GetChainMetadata(context.Context, *GetCha
 }
 func (UnimplementedChainStorageServer) GetVersionedChainEvent(context.Context, *GetVersionedChainEventRequest) (*GetVersionedChainEventResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetVersionedChainEvent not implemented")
+}
+func (UnimplementedChainStorageServer) GetBlockByTransaction(context.Context, *GetBlockByTransactionRequest) (*GetBlockByTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByTransaction not implemented")
+}
+func (UnimplementedChainStorageServer) GetNativeTransaction(context.Context, *GetNativeTransactionRequest) (*GetNativeTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNativeTransaction not implemented")
+}
+func (UnimplementedChainStorageServer) GetVerifiedAccountState(context.Context, *GetVerifiedAccountStateRequest) (*GetVerifiedAccountStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVerifiedAccountState not implemented")
 }
 
 // UnsafeChainStorageServer may be embedded to opt out of forward compatibility for this service.
@@ -512,6 +557,60 @@ func _ChainStorage_GetVersionedChainEvent_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChainStorage_GetBlockByTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlockByTransactionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChainStorageServer).GetBlockByTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChainStorage_GetBlockByTransaction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChainStorageServer).GetBlockByTransaction(ctx, req.(*GetBlockByTransactionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChainStorage_GetNativeTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNativeTransactionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChainStorageServer).GetNativeTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChainStorage_GetNativeTransaction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChainStorageServer).GetNativeTransaction(ctx, req.(*GetNativeTransactionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChainStorage_GetVerifiedAccountState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetVerifiedAccountStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChainStorageServer).GetVerifiedAccountState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChainStorage_GetVerifiedAccountState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChainStorageServer).GetVerifiedAccountState(ctx, req.(*GetVerifiedAccountStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ChainStorage_ServiceDesc is the grpc.ServiceDesc for ChainStorage service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -566,6 +665,18 @@ var ChainStorage_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetVersionedChainEvent",
 			Handler:    _ChainStorage_GetVersionedChainEvent_Handler,
+		},
+		{
+			MethodName: "GetBlockByTransaction",
+			Handler:    _ChainStorage_GetBlockByTransaction_Handler,
+		},
+		{
+			MethodName: "GetNativeTransaction",
+			Handler:    _ChainStorage_GetNativeTransaction_Handler,
+		},
+		{
+			MethodName: "GetVerifiedAccountState",
+			Handler:    _ChainStorage_GetVerifiedAccountState_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

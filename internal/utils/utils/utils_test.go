@@ -73,3 +73,19 @@ func TestSinceTimestamp(t *testing.T) {
 	require.NotZero(duration)
 	require.Less(duration, time.Second*2)
 }
+
+func TestGenerateSha256HashString(t *testing.T) {
+	require := require.New(t)
+
+	hash := GenerateSha256HashString("test")
+	require.Equal("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", hash)
+}
+
+func TestParseSidechain(t *testing.T) {
+	require := require.New(t)
+
+	sidechainName := "ethereum-mainnet-beacon"
+	sidechain, err := ParseSidechain(sidechainName)
+	require.NoError(err)
+	require.Equal(api.SideChain_SIDECHAIN_ETHEREUM_MAINNET_BEACON, sidechain)
+}

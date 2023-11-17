@@ -12,7 +12,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	client "github.com/coinbase/chainstorage/internal/blockchain/client"
+	internal "github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	chainstorage "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -69,8 +69,23 @@ func (mr *MockClientMockRecorder) CanReprocess(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanReprocess", reflect.TypeOf((*MockClient)(nil).CanReprocess), arg0, arg1)
 }
 
+// GetAccountProof mocks base method.
+func (m *MockClient) GetAccountProof(arg0 context.Context, arg1 *chainstorage.GetVerifiedAccountStateRequest) (*chainstorage.GetAccountProofResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccountProof", arg0, arg1)
+	ret0, _ := ret[0].(*chainstorage.GetAccountProofResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAccountProof indicates an expected call of GetAccountProof.
+func (mr *MockClientMockRecorder) GetAccountProof(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountProof", reflect.TypeOf((*MockClient)(nil).GetAccountProof), arg0, arg1)
+}
+
 // GetBlockByHash mocks base method.
-func (m *MockClient) GetBlockByHash(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 string, arg4 ...client.ClientOption) (*chainstorage.Block, error) {
+func (m *MockClient) GetBlockByHash(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 string, arg4 ...internal.ClientOption) (*chainstorage.Block, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{arg0, arg1, arg2, arg3}
 	for _, a := range arg4 {
@@ -90,7 +105,7 @@ func (mr *MockClientMockRecorder) GetBlockByHash(arg0, arg1, arg2, arg3 any, arg
 }
 
 // GetBlockByHeight mocks base method.
-func (m *MockClient) GetBlockByHeight(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 ...client.ClientOption) (*chainstorage.Block, error) {
+func (m *MockClient) GetBlockByHeight(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 ...internal.ClientOption) (*chainstorage.Block, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{arg0, arg1, arg2}
 	for _, a := range arg3 {

@@ -6,22 +6,30 @@ import (
 	"net"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
+
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	"google.golang.org/grpc/reflection"
 
 	"github.com/aws/aws-sdk-go/aws"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/cenkalti/backoff"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"golang.org/x/exp/maps"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
-	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
@@ -42,25 +50,31 @@ import (
 
 type (
 	Server struct {
-		config         *config.Config
-		logger         *zap.Logger
-		metaStorage    metastorage.MetaStorage
-		blobStorage    blobstorage.BlobStorage
-		s3Client       s3.Client
-		parser         parser.Parser
-		metrics        *serverMetrics
-		streamDone     chan struct{}
-		maxNoEventTime time.Duration
+		config             *config.Config
+		logger             *zap.Logger
+		metaStorage        metastorage.MetaStorage
+		blobStorage        blobstorage.BlobStorage
+		transactionStorage metastorage.TransactionStorage
+		s3Client           s3.Client
+		blockchainClient   client.Client
+		parser             parser.Parser
+		metrics            *serverMetrics
+		streamDone         chan struct{}
+		maxNoEventTime     time.Duration
+		authorizedClients  map[string]*config.AuthClient // Token => AuthClient
+		throttler          *Throttler
 	}
 
 	ServerParams struct {
 		fx.In
 		fxparams.Params
-		MetaStorage metastorage.MetaStorage
-		BlobStorage blobstorage.BlobStorage
-		S3Client    s3.Client
-		Parser      parser.Parser
-		Lifecycle   fx.Lifecycle
+		MetaStorage        metastorage.MetaStorage
+		BlobStorage        blobstorage.BlobStorage
+		TransactionStorage metastorage.TransactionStorage
+		S3Client           s3.Client
+		BlockchainClient   client.Client `name:"slave"`
+		Parser             parser.Parser
+		Lifecycle          fx.Lifecycle
 	}
 
 	RegisterParams struct {
@@ -91,11 +105,19 @@ type (
 		GetSequence() string
 		GetSequenceNum() int64
 		GetInitialPositionInStream() string
-		GetEventTag() uint32
 	}
+
+	contextKey string
 )
 
 const (
+	// Custom interceptors
+	// Note that they are all prefixed with "x" to prevent naming conflict with the CSF interceptors.
+	errorInterceptorID     = "xerror"
+	requestInterceptorID   = "xrequest"
+	statsdInterceptorID    = "xstatsd"
+	rateLimitInterceptorID = "xratelimit"
+
 	keepAliveTime    = 5 * time.Second
 	keepAliveTimeout = 5 * time.Second
 )
@@ -114,6 +136,11 @@ const (
 	eventTypeTag          = "event_type"
 	eventTypeBlockAdded   = "block_added"
 	eventTypeBlockRemoved = "block_removed"
+	metricEventTag        = "event_tag"
+
+	transactionsServedCounter = "transactions_served"
+
+	accountStateServedCounter = "account_state_served"
 
 	errorCounter = "error"
 	serviceTag   = "service"
@@ -121,6 +148,16 @@ const (
 	statusTag    = "status"
 
 	requestCounter = "request"
+	clientIDTag    = "clientID"
+
+	// The client id header in the request
+	clientIDHeader = "x-client-id"
+
+	// If the client ID is not set, set it as unknown.
+	unknownClientID = "unknown"
+
+	// Client ID is cached in context.Context for quick access.
+	contextKeyClientID = contextKey("client_id")
 )
 
 const (
@@ -137,6 +174,7 @@ var (
 
 	errServerShutDown       = xerrors.New("sever is shutting down")
 	errNoNewEventForTooLong = xerrors.New("there was no new event for quite a while")
+	errNotImplemented       = xerrors.New("handler method not implemented")
 
 	// The method the interceptor is given is of the form /coinbase.chainstorage.ChainStorage/GetNativeBlock
 	// This regex matches that and extracts the service and method name into
@@ -147,17 +185,37 @@ var (
 var registerServerOnce sync.Once
 var registerServerError error
 
+// RCU stands for Read Capacity Unit, which is similar to the concept in DynamoDB.
+// Each request consumes 1 RCU unless it is explicitly defined below.
+// When the total RCUs exceed the rate limit, the request would be rejected.
+var rcuByMethod = map[string]int{
+	"GetRawBlock":             10,
+	"GetRawBlocksByRange":     50,
+	"GetNativeBlock":          10,
+	"GetNativeBlocksByRange":  50,
+	"GetRosettaBlock":         10,
+	"GetRosettaBlocksByRange": 50,
+	"GetNativeTransaction":    10,
+	"GetVerifiedAccountState": 10,
+}
+
 func NewServer(params ServerParams) *Server {
+	cfg := params.Config
+
 	s := &Server{
-		config:         params.Config,
-		logger:         log.WithPackage(params.Logger),
-		metaStorage:    params.MetaStorage,
-		blobStorage:    params.BlobStorage,
-		s3Client:       params.S3Client,
-		parser:         params.Parser,
-		metrics:        newServerMetrics(params.Metrics),
-		streamDone:     make(chan struct{}),
-		maxNoEventTime: params.Config.Api.StreamingMaxNoEventTime,
+		config:             cfg,
+		logger:             log.WithPackage(params.Logger),
+		metaStorage:        params.MetaStorage,
+		blobStorage:        params.BlobStorage,
+		transactionStorage: params.TransactionStorage,
+		s3Client:           params.S3Client,
+		blockchainClient:   params.BlockchainClient,
+		parser:             params.Parser,
+		metrics:            newServerMetrics(params.Metrics),
+		streamDone:         make(chan struct{}),
+		maxNoEventTime:     cfg.Api.StreamingMaxNoEventTime,
+		authorizedClients:  cfg.Api.Auth.AsMap(),
+		throttler:          NewThrottler(&cfg.Api),
 	}
 	params.Lifecycle.Append(fx.Hook{
 		OnStart: s.onStart,
@@ -184,12 +242,14 @@ func Register(params RegisterParams) error {
 			// XXX: Add your own interceptors here.
 			server.unaryRequestInterceptor,
 			server.unaryErrorInterceptor,
+			server.unaryRateLimitInterceptor,
 		)
 
 		streamInterceptr := grpc.ChainStreamInterceptor(
 			// XXX: Add your own interceptors here.
 			server.streamRequestInterceptor,
 			server.streamErrorInterceptor,
+			server.streamRateLimitInterceptor,
 		)
 
 		gs := grpc.NewServer(
@@ -258,12 +318,20 @@ func startServer(
 	}, errorChannel
 }
 
-func (s *Server) emitBlocksMetric(format string, count int64) {
-	s.metrics.scope.Tagged(map[string]string{formatTag: format}).Counter(blocksServedCounter).Inc(count)
+func (s *Server) emitBlocksMetric(format string, clientID string, count int64) {
+	s.metrics.scope.Tagged(map[string]string{formatTag: format, clientIDTag: clientID}).Counter(blocksServedCounter).Inc(count)
 }
 
-func (s *Server) emitEventsMetric(eventType string, count int64) {
-	s.metrics.scope.Tagged(map[string]string{eventTypeTag: eventType}).Counter(eventsServedCounter).Inc(count)
+func (s *Server) emitEventsMetric(eventType string, clientID string, eventTag string, count int64) {
+	s.metrics.scope.Tagged(map[string]string{eventTypeTag: eventType, clientIDTag: clientID, metricEventTag: eventTag}).Counter(eventsServedCounter).Inc(count)
+}
+
+func (s *Server) emitTransactionsMetric(format string, clientID string, count int64) {
+	s.metrics.scope.Tagged(map[string]string{formatTag: format, clientIDTag: clientID}).Counter(transactionsServedCounter).Inc(count)
+}
+
+func (s *Server) emitAccountStateMetric(clientID string, count int64) {
+	s.metrics.scope.Tagged(map[string]string{clientIDTag: clientID}).Counter(accountStateServedCounter).Inc(count)
 }
 
 func (s *Server) GetLatestBlock(ctx context.Context, req *api.GetLatestBlockRequest) (*api.GetLatestBlockResponse, error) {
@@ -287,6 +355,8 @@ func (s *Server) GetLatestBlock(ctx context.Context, req *api.GetLatestBlockRequ
 }
 
 func (s *Server) GetBlockFile(ctx context.Context, req *api.GetBlockFileRequest) (*api.GetBlockFileResponse, error) {
+	clientID := getClientID(ctx)
+
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
@@ -297,7 +367,7 @@ func (s *Server) GetBlockFile(ctx context.Context, req *api.GetBlockFileRequest)
 		return nil, xerrors.Errorf("failed to prepare block file: %w", err)
 	}
 
-	s.emitBlocksMetric(formatFile, 1)
+	s.emitBlocksMetric(formatFile, clientID, 1)
 
 	return &api.GetBlockFileResponse{
 		File: blockFile,
@@ -305,6 +375,8 @@ func (s *Server) GetBlockFile(ctx context.Context, req *api.GetBlockFileRequest)
 }
 
 func (s *Server) GetBlockFilesByRange(ctx context.Context, req *api.GetBlockFilesByRangeRequest) (*api.GetBlockFilesByRangeResponse, error) {
+	clientID := getClientID(ctx)
+
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlockFiles)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
@@ -320,12 +392,14 @@ func (s *Server) GetBlockFilesByRange(ctx context.Context, req *api.GetBlockFile
 		blockFiles[i] = blockFile
 	}
 
-	s.emitBlocksMetric(formatFile, int64(len(blockFiles)))
+	s.emitBlocksMetric(formatFile, clientID, int64(len(blockFiles)))
 
 	return &api.GetBlockFilesByRangeResponse{Files: blockFiles}, nil
 }
 
 func (s *Server) GetRawBlock(ctx context.Context, req *api.GetRawBlockRequest) (*api.GetRawBlockResponse, error) {
+	clientID := getClientID(ctx)
+
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
@@ -336,7 +410,7 @@ func (s *Server) GetRawBlock(ctx context.Context, req *api.GetRawBlockRequest) (
 		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
 	}
 
-	s.emitBlocksMetric(formatRaw, 1)
+	s.emitBlocksMetric(formatRaw, clientID, 1)
 
 	return &api.GetRawBlockResponse{
 		Block: rawBlock,
@@ -344,6 +418,8 @@ func (s *Server) GetRawBlock(ctx context.Context, req *api.GetRawBlockRequest) (
 }
 
 func (s *Server) GetRawBlocksByRange(ctx context.Context, req *api.GetRawBlocksByRangeRequest) (*api.GetRawBlocksByRangeResponse, error) {
+	clientID := getClientID(ctx)
+
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlocks)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
@@ -354,7 +430,7 @@ func (s *Server) GetRawBlocksByRange(ctx context.Context, req *api.GetRawBlocksB
 		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
 	}
 
-	s.emitBlocksMetric(formatRaw, int64(len(rawBlocks)))
+	s.emitBlocksMetric(formatRaw, clientID, int64(len(rawBlocks)))
 
 	return &api.GetRawBlocksByRangeResponse{
 		Blocks: rawBlocks,
@@ -362,6 +438,8 @@ func (s *Server) GetRawBlocksByRange(ctx context.Context, req *api.GetRawBlocksB
 }
 
 func (s *Server) GetNativeBlock(ctx context.Context, req *api.GetNativeBlockRequest) (*api.GetNativeBlockResponse, error) {
+	clientID := getClientID(ctx)
+
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
@@ -377,7 +455,7 @@ func (s *Server) GetNativeBlock(ctx context.Context, req *api.GetNativeBlockRequ
 		return nil, xerrors.Errorf("failed to parse block: %w", err)
 	}
 
-	s.emitBlocksMetric(formatNative, 1)
+	s.emitBlocksMetric(formatNative, clientID, 1)
 
 	return &api.GetNativeBlockResponse{
 		Block: nativeBlock,
@@ -385,6 +463,8 @@ func (s *Server) GetNativeBlock(ctx context.Context, req *api.GetNativeBlockRequ
 }
 
 func (s *Server) GetNativeBlocksByRange(ctx context.Context, req *api.GetNativeBlocksByRangeRequest) (*api.GetNativeBlocksByRangeResponse, error) {
+	clientID := getClientID(ctx)
+
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlocks)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
@@ -405,7 +485,7 @@ func (s *Server) GetNativeBlocksByRange(ctx context.Context, req *api.GetNativeB
 		nativeBlocks[i] = nativeBlock
 	}
 
-	s.emitBlocksMetric(formatNative, int64(len(nativeBlocks)))
+	s.emitBlocksMetric(formatNative, clientID, int64(len(nativeBlocks)))
 
 	return &api.GetNativeBlocksByRangeResponse{
 		Blocks: nativeBlocks,
@@ -413,6 +493,9 @@ func (s *Server) GetNativeBlocksByRange(ctx context.Context, req *api.GetNativeB
 }
 
 func (s *Server) GetRosettaBlock(ctx context.Context, req *api.GetRosettaBlockRequest) (*api.GetRosettaBlockResponse, error) {
+	// TODO: short-circuit fetching block from blob-storage if RosettaParser is not implemented for chain
+	clientID := getClientID(ctx)
+
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
@@ -428,7 +511,7 @@ func (s *Server) GetRosettaBlock(ctx context.Context, req *api.GetRosettaBlockRe
 		return nil, xerrors.Errorf("failed to parse block: %w", err)
 	}
 
-	s.emitBlocksMetric(formatRosetta, 1)
+	s.emitBlocksMetric(formatRosetta, clientID, 1)
 
 	return &api.GetRosettaBlockResponse{
 		Block: rosettaBlock,
@@ -436,6 +519,8 @@ func (s *Server) GetRosettaBlock(ctx context.Context, req *api.GetRosettaBlockRe
 }
 
 func (s *Server) GetRosettaBlocksByRange(ctx context.Context, req *api.GetRosettaBlocksByRangeRequest) (*api.GetRosettaBlocksByRangeResponse, error) {
+	clientID := getClientID(ctx)
+
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlocks)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
@@ -456,11 +541,173 @@ func (s *Server) GetRosettaBlocksByRange(ctx context.Context, req *api.GetRosett
 		rosettaBlocks[i] = rosettaBlock
 	}
 
-	s.emitBlocksMetric(formatRosetta, int64(len(rosettaBlocks)))
+	s.emitBlocksMetric(formatRosetta, clientID, int64(len(rosettaBlocks)))
 
 	return &api.GetRosettaBlocksByRangeResponse{
 		Blocks: rosettaBlocks,
 	}, nil
+}
+
+func (s *Server) GetBlockByTransaction(ctx context.Context, req *api.GetBlockByTransactionRequest) (*api.GetBlockByTransactionResponse, error) {
+	if !s.config.Chain.Feature.TransactionIndexing {
+		return nil, errNotImplemented
+	}
+
+	blocks, err := s.getBlocksFromTransactionStorage(ctx, req.GetTag(), req.GetTransactionHash())
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get blocks from transaction storage: %w", err)
+	}
+
+	results := make([]*api.BlockIdentifier, len(blocks))
+	for i, block := range blocks {
+		results[i] = &api.BlockIdentifier{
+			Hash:      block.GetHash(),
+			Height:    block.GetHeight(),
+			Tag:       block.GetTag(),
+			Skipped:   block.GetSkipped(),
+			Timestamp: block.GetTimestamp(),
+		}
+	}
+
+	clientID := getClientID(ctx)
+	s.emitTransactionsMetric(formatRaw, clientID, 1)
+
+	return &api.GetBlockByTransactionResponse{
+		Blocks: results,
+	}, nil
+}
+
+func (s *Server) GetNativeTransaction(ctx context.Context, req *api.GetNativeTransactionRequest) (*api.GetNativeTransactionResponse, error) {
+	if !s.config.Chain.Feature.TransactionIndexing {
+		return nil, errNotImplemented
+	}
+
+	blocks, err := s.getBlocksFromTransactionStorage(ctx, req.GetTag(), req.GetTransactionHash())
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get blocks from transaction storage: %w", err)
+	}
+
+	rawBlocks, err := s.getBlocksFromBlobStorage(ctx, blocks)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+	}
+
+	nativeTransactions := make([]*api.NativeTransaction, len(rawBlocks))
+	for i := 0; i < len(nativeTransactions); i++ {
+		nativeBlock, err := s.parser.ParseNativeBlock(ctx, rawBlocks[i])
+		if err != nil {
+			return nil, xerrors.Errorf("failed to parse block: %w", err)
+		}
+
+		nativeTransaction, err := s.parser.GetNativeTransaction(ctx, nativeBlock, req.GetTransactionHash())
+		if err != nil {
+			return nil, xerrors.Errorf("failed to extract transaction from block: %w", err)
+		}
+
+		nativeTransactions[i] = nativeTransaction
+	}
+
+	clientID := getClientID(ctx)
+	s.emitTransactionsMetric(formatNative, clientID, 1)
+
+	return &api.GetNativeTransactionResponse{
+		Transactions: nativeTransactions,
+	}, nil
+}
+
+func (s *Server) GetVerifiedAccountState(ctx context.Context, req *api.GetVerifiedAccountStateRequest) (*api.GetVerifiedAccountStateResponse, error) {
+	if !s.config.Chain.Feature.VerifiedAccountStateEnabled {
+		return nil, errNotImplemented
+	}
+
+	// First, use the tag, height, and hash to get the native block
+	block, err := s.getBlockFromMetaStorage(ctx, req.Req)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
+	}
+
+	rawBlock, err := s.getBlockFromBlobStorage(ctx, block)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+	}
+
+	nativeBlock, err := s.parser.ParseNativeBlock(ctx, rawBlock)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to parse block: %w", err)
+	}
+
+	// Second, call eth_getProof to fetch the account proof for the target account and block
+	accountProof, err := s.blockchainClient.GetAccountProof(ctx, req)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to call client.GetAccountProof: %w", err)
+	}
+
+	// Finally, verify the account state with parser.VerifyAccountState
+	request := &api.ValidateAccountStateRequest{
+		AccountReq:   req.Req,
+		Block:        nativeBlock,
+		AccountProof: accountProof,
+	}
+	accountResult, err := s.parser.ValidateAccountState(ctx, request)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to ValidateAccountState: %w", err)
+	}
+
+	clientID := getClientID(ctx)
+	s.emitAccountStateMetric(clientID, 1)
+
+	return &api.GetVerifiedAccountStateResponse{
+		Response: accountResult,
+	}, nil
+}
+
+// getBlocksFromTransactionStorage returns the blocks associated with the transaction.
+// If the transaction is not found, storage.ErrItemNotFound is returned.
+func (s *Server) getBlocksFromTransactionStorage(ctx context.Context, tag uint32, transactionHash string) ([]*api.BlockMetadata, error) {
+	tag = s.config.GetEffectiveBlockTag(tag)
+
+	if err := s.validateTag(tag); err != nil {
+		return nil, err
+	}
+
+	txs, err := s.transactionStorage.GetTransaction(ctx, tag, transactionHash)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get transaction from transaction storage: %w", err)
+	}
+
+	// use map to dedup in blockNums
+	blockNumberToMetadataMap := make(map[uint64]*api.BlockMetadata)
+	for _, tx := range txs {
+		blockNumberToMetadataMap[tx.BlockNumber] = nil
+	}
+
+	// query blockMetadata for blocks
+	blockNums := maps.Keys(blockNumberToMetadataMap)
+	blocksMetadata, err := s.metaStorage.GetBlocksByHeights(ctx, tag, blockNums)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get blockMetadata for blocks=%v: %w", blockNums, err)
+	}
+
+	for _, blockMetadata := range blocksMetadata {
+		blockNumberToMetadataMap[blockMetadata.Height] = blockMetadata
+	}
+
+	var results []*api.BlockMetadata
+	for _, tx := range txs {
+		canonicalBlock, ok := blockNumberToMetadataMap[tx.BlockNumber]
+		if !ok {
+			// this should not happen
+			continue
+		}
+
+		if canonicalBlock == nil || canonicalBlock.Hash != tx.BlockHash {
+			// tx.BlockHash got reorged
+			continue
+		}
+
+		results = append(results, canonicalBlock)
+	}
+	return results, nil
 }
 
 func (s *Server) newBlockFile(block *api.BlockMetadata) (*api.BlockFile, error) {
@@ -604,6 +851,56 @@ func (s *Server) getBlocksFromBlobStorage(ctx context.Context, blocks []*api.Blo
 	return result, nil
 }
 
+func (s *Server) newAuthContext(ctx context.Context) context.Context {
+	// Client ID is optional. Set it to "unknown" by default.
+	clientID := unknownClientID
+
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		// Use "x-client-id" if available.
+		if v := md.Get(clientIDHeader); len(v) > 0 {
+			clientID = v[0]
+		}
+
+		// Remove non-printable characters.
+		clientID = sanitizeClientID(clientID)
+	}
+
+	// Cache clientID for quick access.
+	return context.WithValue(ctx, contextKeyClientID, clientID)
+}
+
+func sanitizeClientID(s string) string {
+	s = strings.TrimSpace(s)
+
+	s = strings.Split(s, ":")[0]
+	if s == "" {
+		return unknownClientID
+	}
+
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return '_'
+		} else if unicode.IsLetter(r) {
+			return unicode.ToLower(r)
+		} else if unicode.IsNumber(r) || r == '_' || r == '-' || r == '/' {
+			return r
+		}
+
+		return -1
+	}, s)
+}
+
+func getClientID(ctx context.Context) string {
+	// Client ID should already be cached by newAuthContext.
+	clientID, ok := ctx.Value(contextKeyClientID).(string)
+	if !ok {
+		// Client ID not set - set it to unknown to avoid a panic.
+		return unknownClientID
+	}
+
+	return clientID
+}
+
 // getServiceAndMethod extracts the service and method name.
 func getServiceAndMethod(fullMethod string) (service, method string) {
 	methodParts := methodRegex.FindStringSubmatch(fullMethod)
@@ -616,57 +913,104 @@ func getServiceAndMethod(fullMethod string) (service, method string) {
 	return
 }
 
-func (s *Server) unaryRequestInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (s *Server) unaryRequestInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	service, method := getServiceAndMethod(info.FullMethod)
 
+	ctx = s.newAuthContext(ctx)
+	clientID := getClientID(ctx)
 	resp, err := handler(ctx, req)
 
 	status := status.Convert(err).Code().String()
 	s.metrics.scope.Tagged(map[string]string{
-		serviceTag: service,
-		methodTag:  method,
-		statusTag:  status,
+		serviceTag:  service,
+		methodTag:   method,
+		clientIDTag: clientID,
+		statusTag:   status,
 	}).Counter(requestCounter).Inc(1)
 	s.logger.Debug(
 		"handler.request",
 		zap.String(methodTag, method),
+		zap.String(clientIDTag, clientID),
 		zap.String(statusTag, status),
 	)
 	return resp, err
 }
 
-func (s *Server) streamRequestInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+func (s *Server) streamRequestInterceptor(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	service, method := getServiceAndMethod(info.FullMethod)
 
+	ctx := s.newAuthContext(stream.Context())
+	clientID := getClientID(ctx)
+
+	stream = &grpc_middleware.WrappedServerStream{
+		ServerStream:   stream,
+		WrappedContext: ctx,
+	}
 	err := handler(srv, stream)
 
 	status := status.Convert(err).Code().String()
 	s.metrics.scope.Tagged(map[string]string{
-		methodTag: method,
-		statusTag: status,
+		serviceTag:  service,
+		methodTag:   method,
+		clientIDTag: clientID,
+		statusTag:   status,
 	}).Counter(requestCounter).Inc(1)
 	s.logger.Debug(
 		"handler.stream.request",
 		zap.String(serviceTag, service),
 		zap.String(methodTag, method),
+		zap.String(clientIDTag, clientID),
 		zap.String(statusTag, status),
 	)
 	return err
 }
 
 // unaryErrorInterceptor is responsible for instrumenting the errors returned by unary methods.
-func (s *Server) unaryErrorInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (s *Server) unaryErrorInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	resp, err := handler(ctx, req)
 	return resp, s.mapToGrpcError(err, info.FullMethod, req)
 }
 
 // streamErrorInterceptor is responsible for instrumenting the errors returned by stream methods.
-func (s *Server) streamErrorInterceptor(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+func (s *Server) streamErrorInterceptor(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	err := handler(srv, stream)
 	return s.mapToGrpcError(err, info.FullMethod, nil)
 }
 
-func (s *Server) mapToGrpcError(err error, fullMethod string, request interface{}) error {
+func (s *Server) unaryRateLimitInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	service, method := getServiceAndMethod(info.FullMethod)
+	if service == consts.FullServiceName {
+		clientID := getClientID(ctx)
+		rcu := s.getRCUByMethod(method)
+		if !s.throttler.AllowN(clientID, rcu) {
+			return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
+		}
+	}
+
+	return handler(ctx, req)
+}
+
+func (s *Server) streamRateLimitInterceptor(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	service, method := getServiceAndMethod(info.FullMethod)
+	if service == consts.FullServiceName {
+		clientID := getClientID(stream.Context())
+		rcu := s.getRCUByMethod(method)
+		if !s.throttler.AllowN(clientID, rcu) {
+			return status.Error(codes.ResourceExhausted, "rate limit exceeded")
+		}
+	}
+	return handler(srv, stream)
+}
+
+func (s *Server) getRCUByMethod(method string) int {
+	rcu, ok := rcuByMethod[method]
+	if !ok {
+		return 1
+	}
+	return rcu
+}
+
+func (s *Server) mapToGrpcError(err error, fullMethod string, request any) error {
 	if err == nil {
 		return nil
 	}
@@ -705,8 +1049,14 @@ func (s *Server) mapToGrpcError(err error, fullMethod string, request interface{
 	} else if xerrors.Is(err, storage.ErrRequestCanceled) {
 		description = "storage request canceled"
 		code = codes.Canceled
+	} else if xerrors.Is(err, parser.ErrInvalidParameters) {
+		description = "invalid parser input parameters"
+		code = codes.InvalidArgument
 	} else if xerrors.Is(err, parser.ErrNotImplemented) {
 		description = "parser method not implemented"
+		code = codes.Unimplemented
+	} else if xerrors.Is(err, errNotImplemented) {
+		description = "handler method not implemented"
 		code = codes.Unimplemented
 	} else if xerrors.Is(err, context.Canceled) {
 		description = "context canceled"
@@ -724,12 +1074,27 @@ func (s *Server) mapToGrpcError(err error, fullMethod string, request interface{
 		statusTag: code.String(),
 	}).Counter(errorCounter).Inc(1)
 
-	logFn := s.logger.Warn
-	if code == codes.Internal {
-		logFn = s.logger.Error
+	var logLevel zapcore.Level
+	switch code {
+	case codes.Internal:
+		logLevel = zapcore.ErrorLevel
+
+	case codes.Canceled,
+		codes.FailedPrecondition,
+		codes.InvalidArgument,
+		codes.NotFound,
+		codes.Unimplemented,
+		codes.Aborted:
+		// The list of unimportant errors is defined in the following monitor:
+		// https://app.datadoghq.com/monitors/58218923/edit
+		logLevel = zapcore.InfoLevel
+
+	default:
+		logLevel = zapcore.WarnLevel
 	}
 
-	logFn(
+	s.logger.Log(
+		logLevel,
 		"server.error",
 		zap.String("method", method),
 		zap.String("status", code.String()),
@@ -751,8 +1116,14 @@ func decodeSequenceToEventId(sequence string) (int64, error) {
 
 func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.ChainStorage_StreamChainEventsServer) error {
 	ctx := stream.Context()
+	clientID := getClientID(ctx)
+
 	eventTag := request.EventTag
-	lastSentEventId, err := s.parseChainEventsRequest(ctx, request)
+	if s.config.Chain.Feature.DefaultStableEvent {
+		eventTag = s.config.GetEffectiveEventTag(request.EventTag)
+	}
+
+	lastSentEventId, err := s.parseChainEventsRequest(ctx, request, eventTag)
 	if err != nil {
 		return xerrors.Errorf("failed to parse chain events request: %w", err)
 	}
@@ -792,11 +1163,6 @@ func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.C
 				},
 				EventTag: e.EventTag,
 			}
-			if e.EventType == api.BlockchainEvent_BLOCK_ADDED {
-				s.emitEventsMetric(eventTypeBlockAdded, 1)
-			} else if e.EventType == api.BlockchainEvent_BLOCK_REMOVED {
-				s.emitEventsMetric(eventTypeBlockRemoved, 1)
-			}
 
 			res := &api.ChainEventsResponse{
 				Event: event,
@@ -808,6 +1174,13 @@ func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.C
 					return nil
 				}
 				return xerrors.Errorf("failed to stream event to client: %w", err)
+			}
+
+			eventTagString := strconv.Itoa(int(e.EventTag))
+			if e.EventType == api.BlockchainEvent_BLOCK_ADDED {
+				s.emitEventsMetric(eventTypeBlockAdded, clientID, eventTagString, 1)
+			} else if e.EventType == api.BlockchainEvent_BLOCK_REMOVED {
+				s.emitEventsMetric(eventTypeBlockRemoved, clientID, eventTagString, 1)
 			}
 
 			lastSentEventId = e.EventId
@@ -842,8 +1215,13 @@ func (s *Server) GetChainEvents(ctx context.Context, req *api.GetChainEventsRequ
 	if req.MaxNumEvents == 0 {
 		req.MaxNumEvents = uint64(1)
 	}
+	clientID := getClientID(ctx)
 	eventTag := req.GetEventTag()
-	lastSentEventId, err := s.parseChainEventsRequest(ctx, req)
+	if s.config.Chain.Feature.DefaultStableEvent {
+		eventTag = s.config.GetEffectiveEventTag(eventTag)
+	}
+
+	lastSentEventId, err := s.parseChainEventsRequest(ctx, req, eventTag)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to parse chain events request: %w", err)
 	}
@@ -876,22 +1254,22 @@ func (s *Server) GetChainEvents(ctx context.Context, req *api.GetChainEventsRequ
 		}
 	}
 
+	eventTagString := strconv.Itoa(int(eventTag))
 	if numBlockAddedEvents > 0 {
-		s.emitEventsMetric(eventTypeBlockAdded, numBlockAddedEvents)
+		s.emitEventsMetric(eventTypeBlockAdded, clientID, eventTagString, numBlockAddedEvents)
 	}
 
 	if numBlockRemovedEvents > 0 {
-		s.emitEventsMetric(eventTypeBlockRemoved, numBlockRemovedEvents)
+		s.emitEventsMetric(eventTypeBlockRemoved, clientID, eventTagString, numBlockRemovedEvents)
 	}
 
 	return &api.GetChainEventsResponse{Events: blockchainEvents}, nil
 }
 
-func (s *Server) parseChainEventsRequest(ctx context.Context, input parseChainEventsRequestInput) (int64, error) {
+func (s *Server) parseChainEventsRequest(ctx context.Context, input parseChainEventsRequestInput, eventTag uint32) (int64, error) {
 	sequence := input.GetSequence()
 	sequenceNum := input.GetSequenceNum()
 	initialPositionInStream := input.GetInitialPositionInStream()
-	eventTag := input.GetEventTag()
 	latestEventTag := s.config.GetLatestEventTag()
 
 	if eventTag > latestEventTag {
@@ -1014,7 +1392,9 @@ func (s *Server) onStart(ctx context.Context) error {
 		zap.String("env", string(s.config.Env())),
 		zap.String("blockchain", s.config.Blockchain().GetName()),
 		zap.String("network", s.config.Network().GetName()),
+		zap.String("sidechain", s.config.Sidechain().GetName()),
 	)
+
 	return nil
 }
 

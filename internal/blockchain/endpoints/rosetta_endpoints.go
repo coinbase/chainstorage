@@ -24,6 +24,7 @@ type (
 		Master    EndpointProvider `name:"master"`
 		Slave     EndpointProvider `name:"slave"`
 		Validator EndpointProvider `name:"validator"`
+		Consensus EndpointProvider `name:"consensus"`
 	}
 
 	RosettaEndpointsResult struct {
@@ -31,6 +32,7 @@ type (
 		Master    RosettaEndpointProvider `name:"master"`
 		Slave     RosettaEndpointProvider `name:"slave"`
 		Validator RosettaEndpointProvider `name:"validator"`
+		Consensus RosettaEndpointProvider `name:"consensus"`
 	}
 
 	rosettaEndpointProvider struct {
@@ -55,10 +57,16 @@ func NewRosettaEndpointProvider(params RosettaEndpointsParams) (RosettaEndpoints
 		return RosettaEndpointsResult{}, xerrors.Errorf("failed to create validator endpoint provider: %w", err)
 	}
 
+	consensus, err := newRosettaEndpointProvider(params.Consensus)
+	if err != nil {
+		return RosettaEndpointsResult{}, xerrors.Errorf("failed to create consensus endpoint provider: %w", err)
+	}
+
 	return RosettaEndpointsResult{
 		Master:    master,
 		Slave:     slave,
 		Validator: validator,
+		Consensus: consensus,
 	}, nil
 }
 

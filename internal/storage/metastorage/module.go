@@ -12,6 +12,7 @@ type (
 	MetaStorage          = internal.MetaStorage
 	BlockStorage         = internal.BlockStorage
 	EventStorage         = internal.EventStorage
+	TransactionStorage   = internal.TransactionStorage
 	EventsToChainAdaptor = internal.EventsToChainAdaptor
 )
 

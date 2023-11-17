@@ -2,10 +2,10 @@ package cron
 
 import (
 	"context"
-	"strings"
+	"regexp"
 	"time"
 
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
@@ -49,12 +49,14 @@ const (
 )
 
 var (
-	workflowSeverityMap = map[string]string{
-		monitor:        sev2,
-		poller:         sev1,
-		streamer:       sev1,
-		crossValidator: sev2,
-		backfiller:     sev2,
+	workflowSeverityMap = map[*regexp.Regexp]string{
+		regexp.MustCompile(`^poller$`):                 sev1,
+		regexp.MustCompile(`^poller/block_tag=\d+$`):   sev2,
+		regexp.MustCompile(`^streamer$`):               sev1,
+		regexp.MustCompile(`^streamer/event_tag=\d+$`): sev2,
+		regexp.MustCompile(`^cross_validator$`):        sev2,
+		regexp.MustCompile(`^monitor$`):                sev2,
+		regexp.MustCompile(`^backfiller$`):             sev3,
 	}
 )
 
@@ -72,7 +74,7 @@ func newWorkflowStatusMetrics(workflows []string, rootScope tally.Scope) *workfl
 	countersSuccess := make(map[string]tally.Counter)
 	countersError := make(map[string]tally.Counter)
 	for _, wf := range workflows {
-		severity := getWorkflowSeverity(strings.Split(wf, "/")[0])
+		severity := getWorkflowSeverity(wf)
 		countersSuccess[workflowPrefix+wf] = rootScope.Tagged(map[string]string{
 			slaTypeTag:    workflowPrefix + wf,
 			severityTag:   severity,
@@ -93,8 +95,10 @@ func newWorkflowStatusMetrics(workflows []string, rootScope tally.Scope) *workfl
 }
 
 func getWorkflowSeverity(workflow string) string {
-	if severity, ok := workflowSeverityMap[workflow]; ok {
-		return severity
+	for pattern, severity := range workflowSeverityMap {
+		if pattern.MatchString(workflow) {
+			return severity
+		}
 	}
 	return sev3
 }

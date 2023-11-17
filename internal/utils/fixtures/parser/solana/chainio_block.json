@@ -1,0 +1,176 @@
+{
+  "ledger": {
+    "blockchain": "BLOCKCHAIN_SOLANA",
+    "identifier": {
+      "hsh": "GdY1gj7F8vq1nCy4dgCZK42WV19bkfQ4cp2e9evK18ry",
+      "index": "100000000"
+    },
+    "previousLedger": {
+      "hsh": "7KpgQJdgXdPhzj69gCnyvyBiw9s6DZ5gmfNrhQr3XW1t",
+      "index": "99999999"
+    },
+    "timestamp": "2021-10-06T07:18:25Z",
+    "solanaMetadata": {
+      "blockHeight": "89586871"
+    }
+  },
+  "transactions": [
+    {
+      "blockchain": "BLOCKCHAIN_SOLANA",
+      "identifier": {
+        "hsh": "s28hELYcWfbRFKScS4Ysdh8CSyhFoCM3SkxU1VS6GZcWNVxHjYyBA81QQ4WNTMMnkmk68AWLB9ZsyzxAL6Tb1fc",
+        "index": "1"
+      },
+      "ledger": {
+        "hsh": "GdY1gj7F8vq1nCy4dgCZK42WV19bkfQ4cp2e9evK18ry",
+        "index": "100000000"
+      },
+      "fee": {
+        "amountString": "0"
+      },
+      "operations": [
+        {
+          "blockchain": "BLOCKCHAIN_SOLANA",
+          "type": "FEE",
+          "from": {
+            "address": "CuieVDEDtLo7FypA9SbLM9saXFdb1dsshEkyErMqkRQq"
+          },
+          "amount": {
+            "amount": "5000",
+            "currency": "SOL",
+            "amountString": "5000",
+            "currencyIdentifier": {
+              "id": "native/SOL",
+              "symbol": "SOL"
+            }
+          },
+          "solanaMetadata": {
+
+          }
+        },
+        {
+          "blockchain": "BLOCKCHAIN_SOLANA",
+          "type": "INPUT",
+          "index": "1",
+          "from": {
+
+          },
+          "amount": {
+            "amount": "1242000000",
+            "currency": "OXY",
+            "amountString": "1242000000",
+            "currencyIdentifier": {
+              "id": "spl/z3dn17yLaGMKffVogeFHQ9zWVcXgqgf3PQnDsNs2g6M",
+              "symbol": "OXY"
+            }
+          },
+          "solanaMetadata": {
+            "instructionType": "9999"
+          }
+        },
+        {
+          "blockchain": "BLOCKCHAIN_SOLANA",
+          "type": "OUTPUT",
+          "index": "2",
+          "to": {
+
+          },
+          "amount": {
+            "amount": "1242000000",
+            "currency": "OXY",
+            "amountString": "1242000000",
+            "currencyIdentifier": {
+              "id": "spl/z3dn17yLaGMKffVogeFHQ9zWVcXgqgf3PQnDsNs2g6M",
+              "symbol": "OXY"
+            }
+          },
+          "solanaMetadata": {
+            "instructionType": "9999"
+          }
+        }
+      ],
+      "status": "SUCCESS",
+      "solanaMetadata": {
+
+      }
+    },
+    {
+      "blockchain": "BLOCKCHAIN_SOLANA",
+      "identifier": {
+        "hsh": "uhHy7XE5bWFR1JpC1kYYqHpUMhBoQTkjBUCM7M4KcVAUwrxM1bx8Dpx95zVQT35XbrDJad7XJiqspaaYQS2jiHa",
+        "index": "3"
+      },
+      "ledger": {
+        "hsh": "GdY1gj7F8vq1nCy4dgCZK42WV19bkfQ4cp2e9evK18ry",
+        "index": "100000000"
+      },
+      "fee": {
+        "amountString": "0"
+      },
+      "operations": [
+        {
+          "blockchain": "BLOCKCHAIN_SOLANA",
+          "type": "FEE",
+          "from": {
+            "address": "7ivguYMpnUBMboByJbKc7z31fJMg2pXYQ4nNPziWLchZ"
+          },
+          "amount": {
+            "amount": "5000",
+            "currency": "SOL",
+            "amountString": "5000",
+            "currencyIdentifier": {
+              "id": "native/SOL",
+              "symbol": "SOL"
+            }
+          },
+          "solanaMetadata": {
+
+          }
+        }
+      ],
+      "status": "SUCCESS",
+      "solanaMetadata": {
+
+      }
+    },
+    {
+      "blockchain": "BLOCKCHAIN_SOLANA",
+      "identifier": {
+        "hsh": "GdY1gj7F8vq1nCy4dgCZK42WV19bkfQ4cp2e9evK18ry",
+        "index": "4"
+      },
+      "ledger": {
+        "hsh": "GdY1gj7F8vq1nCy4dgCZK42WV19bkfQ4cp2e9evK18ry",
+        "index": "100000000"
+      },
+      "fee": {
+        "amountString": "0"
+      },
+      "operations": [
+        {
+          "blockchain": "BLOCKCHAIN_SOLANA",
+          "type": "BLOCK_REWARD",
+          "to": {
+            "address": "DDnAqxJVFo2GVTujibHt5cjevHMSE9bo8HJaydHoshdp"
+          },
+          "amount": {
+            "amount": "7247500",
+            "currency": "SOL",
+            "amountString": "7247500",
+            "currencyIdentifier": {
+              "id": "native/SOL",
+              "symbol": "SOL"
+            }
+          },
+          "solanaMetadata": {
+
+          }
+        }
+      ],
+      "status": "SUCCESS",
+      "solanaMetadata": {
+
+      }
+    }
+  ]
+}

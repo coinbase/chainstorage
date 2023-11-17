@@ -53,7 +53,7 @@ func TestPicker_Weighted(t *testing.T) {
 	}
 
 	picker := New(choices)
-	stats := make(map[interface{}]*atomic.Int32, numChoices)
+	stats := make(map[any]*atomic.Int32, numChoices)
 	for _, choice := range choices {
 		stats[choice.Item] = new(atomic.Int32)
 	}

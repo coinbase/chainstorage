@@ -1,0 +1,51 @@
+[
+  {
+    "type": "ed25519_signature",
+    "public_key": "0xa4359868f5c115b86aee128b9e74600506e502121a2a6648eaeb022183fc32e3",
+    "signature": "0x35bf510b3a7d53f2ee948a48b8f184028c1da3dba30d44e3737270f01e17"
+  },
+  {
+    "type": "multi_ed25519_signature",
+    "public_keys": [
+      "0xa4359868f5c115b86aee128b9e74600506e502121a2a6648eaeb022183fc32e3",
+      "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+    ],
+    "signatures": [
+      "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+      "0x35bf510b3a7d53f2ee948a48b8f184028c1da3dba30d4163f5afc3719d26c1c97ed8e4e3240394912c1"
+    ],
+    "threshold": 0,
+    "bitmap": "0xa11ceb0b050000000501000203020505070b0712170829200000b020b03110002"
+  },
+  {
+    "type": "multi_agent_signature",
+    "sender": {
+      "type": "ed25519_signature",
+      "public_key": "0xa4359868f5c115b86aee128b9e74600506e502121a2a6648eaeb022183fc32e3",
+      "signature": "0x35bf510b3a7d53f2ee948a48b8f184028c1da3dba30d4163f5afc3719d26c1c97ed8e4e3737270f01e17"
+    },
+    "secondary_signer_addresses": [
+      "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+    ],
+    "secondary_signers": [
+      {
+        "type": "ed25519_signature",
+        "public_key": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+        "signature": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+      },
+      {
+        "type": "multi_ed25519_signature",
+        "public_keys": [
+          "0xa4359868f5c115b86aee128b9e74600506e502121a2a6648eaeb022183fc32e3",
+          "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+        ],
+        "signatures": [
+          "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1",
+          "0x35bf510b3a7d53f2ee948a48b8f184028c1da3dba30d4163f5afc3719d26c1c97ed8e4e3240394912c1"
+        ],
+        "threshold": 0,
+        "bitmap": "0xa11ceb0b050000000501000203020505070b0712170829200000b020b03110002"
+      }
+    ]
+  }
+]

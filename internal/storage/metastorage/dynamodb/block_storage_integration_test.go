@@ -37,7 +37,13 @@ type blockStorageTestSuite struct {
 }
 
 func (s *blockStorageTestSuite) SetupTest() {
+	require := testutil.Require(s.T())
+
 	var accessor internal.MetaStorage
+	cfg, err := config.New()
+	require.NoError(err)
+	cfg.Chain.BlockStartHeight = 10
+	s.config = cfg
 	app := testapp.New(
 		s.T(),
 		fx.Provide(NewMetaStorage),
@@ -118,12 +124,14 @@ func (s *blockStorageTestSuite) TestPersistBlockMetasNotUpdatingWatermark() {
 
 func (s *blockStorageTestSuite) TestPersistBlockMetasWithSkippedBlocks() {
 	require := testutil.Require(s.T())
+
 	ctx := context.Background()
-	blocks := testutil.MakeBlockMetadatas(100, tag)
+	startHeight := s.config.Chain.BlockStartHeight
+	blocks := testutil.MakeBlockMetadatasFromStartHeight(startHeight, 100, tag)
 	// Mark 37th block as skipped and point the next block to the previous block.
 	blocks[37] = &api.BlockMetadata{
 		Tag:     tag,
-		Height:  37,
+		Height:  startHeight + 37,
 		Skipped: true,
 	}
 	blocks[38].ParentHeight = blocks[36].Height
@@ -131,7 +139,7 @@ func (s *blockStorageTestSuite) TestPersistBlockMetasWithSkippedBlocks() {
 	err := s.accessor.PersistBlockMetas(ctx, true, blocks, nil)
 	require.NoError(err)
 
-	fetchedBlocks, err := s.accessor.GetBlocksByHeightRange(ctx, tag, 0, 100)
+	fetchedBlocks, err := s.accessor.GetBlocksByHeightRange(ctx, tag, startHeight, startHeight+100)
 	require.NoError(err)
 	require.Equal(blocks, fetchedBlocks)
 }
@@ -194,6 +202,16 @@ func (s *blockStorageTestSuite) runTestPersistBlockMetas(totalBlocks int) {
 		s.equalProto(blocks[i], fetchedBlocks[i])
 	}
 
+	fetchedBlocksMeta, err := s.accessor.GetBlocksByHeights(ctx, tag, []uint64{startHeight + 1, startHeight + uint64(totalBlocks/2), startHeight, startHeight + uint64(totalBlocks) - 1})
+	if err != nil {
+		panic(err)
+	}
+	assert.Len(s.T(), fetchedBlocksMeta, 4)
+	s.equalProto(blocks[1], fetchedBlocksMeta[0])
+	s.equalProto(blocks[totalBlocks/2], fetchedBlocksMeta[1])
+	s.equalProto(blocks[0], fetchedBlocksMeta[2])
+	s.equalProto(blocks[totalBlocks-1], fetchedBlocksMeta[3])
+
 	fetchedBlockMeta, err := s.accessor.GetLatestBlock(ctx, tag)
 	if err != nil {
 		panic(err)
@@ -253,28 +271,45 @@ func (s *blockStorageTestSuite) TestGetBlocksNotExist() {
 }
 
 func (s *blockStorageTestSuite) TestGetBlockByHeightInvalidHeight() {
-	if s.config.Chain.BlockStartHeight > 0 {
-		_, err := s.accessor.GetBlockByHeight(context.TODO(), 0, tag)
-		assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
-	}
+	_, err := s.accessor.GetBlockByHeight(context.TODO(), tag, 0)
+	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
+}
+
+func (s *blockStorageTestSuite) TestGetBlocksByHeightsInvalidHeight() {
+	_, err := s.accessor.GetBlocksByHeights(context.TODO(), tag, []uint64{0})
+	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
+}
+
+func (s *blockStorageTestSuite) TestGetBlocksByHeightsBlockNotFound() {
+	_, err := s.accessor.GetBlocksByHeights(context.TODO(), tag, []uint64{15})
+	assert.True(s.T(), xerrors.Is(err, errors.ErrItemNotFound))
+}
+
+func (s *blockStorageTestSuite) TestGetBlockByHashInvalidHeight() {
+	_, err := s.accessor.GetBlockByHash(context.TODO(), tag, 0, "0x0")
+	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
 }
 
 func (s *blockStorageTestSuite) TestGetBlocksByHeightRangeInvalidRange() {
 	_, err := s.accessor.GetBlocksByHeightRange(context.TODO(), tag, 100, 100)
 	assert.True(s.T(), xerrors.Is(err, errors.ErrOutOfRange))
-	if s.config.Chain.BlockStartHeight > 0 {
-		_, err = s.accessor.GetBlocksByHeightRange(context.TODO(), tag, 0, s.config.Chain.BlockStartHeight)
-		assert.True(s.T(), xerrors.Is(err, errors.ErrOutOfRange))
-	}
+
+	_, err = s.accessor.GetBlocksByHeightRange(context.TODO(), tag, 0, s.config.Chain.BlockStartHeight)
+	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
 }
 
-func (s *blockStorageTestSuite) equalProto(x, y interface{}) {
+func (s *blockStorageTestSuite) equalProto(x, y any) {
 	if diff := cmp.Diff(x, y, protocmp.Transform()); diff != "" {
 		assert.FailNow(s.T(), diff)
 	}
 }
 
 func TestIntegrationBlockStorageTestSuite(t *testing.T) {
+	// TODO: speed up the tests before re-enabling TestAllEnvs.
+	// testapp.TestAllEnvs(t, func(t *testing.T, cfg *config.Config) {
+	// 	suite.Run(t, &blockStorageTestSuite{config: cfg})
+	// })
+
 	require := testutil.Require(t)
 	cfg, err := config.New()
 	require.NoError(err)

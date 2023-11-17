@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package coinbase.chainstorage;
+
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/chainstorage";
+
+message RosettaBlobdata {
+  bytes header = 1;
+  repeated bytes other_transactions = 2;
+  bytes raw_block = 3;
+}

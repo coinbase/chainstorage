@@ -22,7 +22,7 @@ func Require(t require.TestingT) *Assertions {
 	}
 }
 
-func (a *Assertions) Equal(expected interface{}, actual interface{}, msgAndArgs ...interface{}) {
+func (a *Assertions) Equal(expected any, actual any, msgAndArgs ...any) {
 	// Use protocmp if proto messages are being compared.
 	if _, ok := expected.(proto.Message); ok {
 		if _, ok := actual.(proto.Message); ok {
@@ -43,7 +43,7 @@ func (a *Assertions) Equal(expected interface{}, actual interface{}, msgAndArgs 
 	a.Assertions.Equal(expected, actual, msgAndArgs...)
 }
 
-func (a *Assertions) equalProto(expected interface{}, actual interface{}, msgAndArgs ...interface{}) {
+func (a *Assertions) equalProto(expected any, actual any, msgAndArgs ...any) {
 	if diff := cmp.Diff(expected, actual, protocmp.Transform()); diff != "" {
 		a.FailNow(diff, msgAndArgs...)
 	}

@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/uber-go/tally"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
@@ -46,6 +45,7 @@ type (
 		UpdateWatermark         bool
 		NumConcurrentExtractors int     // Optional. If not specified, it is read from the workflow config.
 		BatchSize               uint64  // Optional. If not specified, it is read from the workflow config.
+		MiniBatchSize           uint64  // Optional. If not specified, it is read from the workflow config.
 		CheckpointSize          uint64  // Optional. If not specified, it is read from the workflow config.
 		MaxReprocessedPerBatch  uint64  // Optional. If not specified, it is read from the workflow config.
 		RehydrateFromTag        *uint32 // Optional. If not specified, rehydration is disabled.
@@ -57,6 +57,12 @@ type (
 
 var (
 	_ InstrumentedRequest = (*BackfillerRequest)(nil)
+)
+
+const (
+	// backfiller metrics. need to have `workflow.backfiller` as prefix
+	backfillerHeightGauge        = "workflow.backfiller.height"
+	backfillerReprocessedCounter = "workflow.backfiller.reprocessed"
 )
 
 func NewBackfiller(params BackfillerParams) *Backfiller {
@@ -91,6 +97,14 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 			batchSize = request.BatchSize
 		}
 
+		miniBatchSize := uint64(1)
+		if cfg.MiniBatchSize > 0 {
+			miniBatchSize = cfg.MiniBatchSize
+		}
+		if request.MiniBatchSize > 0 {
+			miniBatchSize = request.MiniBatchSize
+		}
+
 		checkpointSize := cfg.CheckpointSize
 		if request.CheckpointSize > 0 {
 			checkpointSize = request.CheckpointSize
@@ -122,7 +136,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 		}
 
 		tag := cfg.GetEffectiveBlockTag(request.Tag)
-		metrics := w.getScope(ctx).Tagged(map[string]string{
+		metrics := w.getMetricsHandler(ctx).WithTags(map[string]string{
 			tagBlockTag: strconv.Itoa(int(tag)),
 		})
 		logger := w.getLogger(ctx).With(
@@ -163,6 +177,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 				tag,
 				batchStart,
 				batchEnd,
+				miniBatchSize,
 				numConcurrentExtractors,
 				maxReprocessedPerBatch,
 				lastBlock,
@@ -183,7 +198,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 			}
 			lastBlock = batch[len(batch)-1]
 
-			metrics.Gauge("height").Update(float64(batchEnd - 1))
+			metrics.Gauge(backfillerHeightGauge).Update(float64(batchEnd - 1))
 			logger.Info(
 				"processed batch",
 				zap.Uint64("batchStart", batchStart),
@@ -217,10 +232,11 @@ func (w *Backfiller) readLastBlock(ctx workflow.Context, tag uint32, height uint
 func (w *Backfiller) processBatch(
 	ctx workflow.Context,
 	logger *zap.Logger,
-	metrics tally.Scope,
+	metrics client.MetricsHandler,
 	tag uint32,
 	batchStart uint64,
 	batchEnd uint64,
+	miniBatchSize uint64,
 	numConcurrentExtractors int,
 	maxReprocessedPerBatch uint64,
 	lastBlock *api.BlockMetadata,
@@ -254,14 +270,23 @@ func (w *Backfiller) processBatch(
 			defer wg.Done()
 
 			for {
-				var height uint64
-				if ok := inputChannel.Receive(ctx, &height); !ok {
+				heights := make([]uint64, 0, miniBatchSize)
+				for i := uint64(0); i < miniBatchSize; i++ {
+					var height uint64
+					if ok := inputChannel.Receive(ctx, &height); !ok {
+						break
+					}
+
+					heights = append(heights, height)
+				}
+
+				if len(heights) == 0 {
 					break
 				}
 
 				extractorRequest := &activity.ExtractorRequest{
 					Tag:              tag,
-					Height:           height,
+					Heights:          heights,
 					RehydrateFromTag: rehydrateFromTag,
 					UpgradeFromTag:   upgradeFromTag,
 					DataCompression:  dataCompression,
@@ -274,7 +299,7 @@ func (w *Backfiller) processBatch(
 					logger.Warn(
 						"queued extractor for reprocessing",
 						zap.Error(err),
-						zap.Uint64("height", height),
+						zap.Reflect("heights", heights),
 					)
 					continue
 				}
@@ -300,7 +325,7 @@ func (w *Backfiller) processBatch(
 	// Phase 2: reprocess any failed requests sequentially.
 	// This should happen rarely (only if we over stress the cluster or the cluster itself was crashing).
 	if numReprocessRequests := len(reprocessRequests); numReprocessRequests > 0 {
-		metrics.Counter("reprocessed").Inc(int64(numReprocessRequests))
+		metrics.Counter(backfillerReprocessedCounter).Inc(int64(numReprocessRequests))
 		logger.Info("reprocessing extractors", zap.Int("count", numReprocessRequests))
 
 		// If too many extractors have failed, there may be a bug on our end.
@@ -324,13 +349,20 @@ func (w *Backfiller) processBatch(
 		}
 	}
 
-	for i := 0; i < batchSize; i++ {
+	for i := 0; i < batchSize; {
 		var response *activity.ExtractorResponse
 		if ok := outputChannel.Receive(ctx, &response); !ok {
-			return nil, xerrors.New("failed to receive from output channel")
+			return nil, xerrors.Errorf("failed to receive from output channel: %v", i)
 		}
 
-		batchMetadata[i] = response.Metadata
+		if len(response.Metadatas) == 0 {
+			return nil, xerrors.Errorf("received invalid extractor response: %+v", response)
+		}
+
+		for _, metadata := range response.Metadatas {
+			batchMetadata[i] = metadata
+			i++
+		}
 	}
 
 	// Phase 3: run loader to commit the results.

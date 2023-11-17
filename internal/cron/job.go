@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap"
 	"golang.org/x/sync/semaphore"
 	"golang.org/x/xerrors"
@@ -19,7 +19,7 @@ type (
 	Job struct {
 		ctx        context.Context
 		logger     *zap.Logger
-		instrument instrument.Call
+		instrument instrument.Instrument
 		task       Task
 		semaphore  *semaphore.Weighted
 	}
@@ -61,7 +61,7 @@ func NewJob(ctx context.Context, cfg *config.Config, logger *zap.Logger, metrics
 	return &Job{
 		ctx:    ctx,
 		logger: log.WithPackage(logger),
-		instrument: instrument.NewCall(
+		instrument: instrument.New(
 			metrics,
 			taskName,
 			instrument.WithLogger(logger.With(zap.String(taskTag, taskName)), loggerMsg),

@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -92,15 +93,56 @@ func (s *ExtractorTestSuite) TestSuccess() {
 	s.blobStorage.EXPECT().Upload(gomock.Any(), block, api.Compression_NONE).Return(objectKey, nil)
 
 	response, err := s.extractor.Execute(s.env.BackgroundContext(), &ExtractorRequest{
-		Tag:    tag,
-		Height: height,
+		Tag:     tag,
+		Heights: []uint64{height},
 	})
 	require.NoError(err)
-	require.NotNil(response.Metadata)
-	require.Equal(tag, response.Metadata.Tag)
-	require.Equal(height, response.Metadata.Height)
-	require.Equal(hash, response.Metadata.Hash)
-	require.Equal(objectKey, response.Metadata.ObjectKeyMain)
+	require.Equal(1, len(response.Metadatas))
+	metadata := response.Metadatas[0]
+	require.Equal(tag, metadata.Tag)
+	require.Equal(height, metadata.Height)
+	require.Equal(hash, metadata.Hash)
+	require.Equal(objectKey, metadata.ObjectKeyMain)
+}
+
+func (s *ExtractorTestSuite) TestMiniBatch() {
+	const (
+		tag           uint32 = 1
+		height        uint64 = 123456
+		miniBatchSize uint64 = 5
+		hash                 = "0xabcd"
+		objectKey            = "foo/bar/"
+	)
+
+	require := testutil.Require(s.T())
+
+	heights := make([]uint64, miniBatchSize)
+	for i := uint64(0); i < miniBatchSize; i++ {
+		block := &api.Block{
+			Metadata: &api.BlockMetadata{
+				Tag:    tag,
+				Hash:   hash + strconv.Itoa(int(i)),
+				Height: height + i,
+			},
+		}
+		s.blockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), tag, height+i).Return(block, nil)
+		s.blobStorage.EXPECT().Upload(gomock.Any(), block, api.Compression_NONE).Return(objectKey+strconv.Itoa(int(i)), nil)
+		heights[i] = height + i
+	}
+
+	response, err := s.extractor.Execute(s.env.BackgroundContext(), &ExtractorRequest{
+		Tag:     tag,
+		Heights: heights,
+	})
+	require.NoError(err)
+	require.Equal(int(miniBatchSize), len(response.Metadatas))
+	for i := uint64(0); i < miniBatchSize; i++ {
+		metadata := response.Metadatas[i]
+		require.Equal(tag, metadata.Tag)
+		require.Equal(height+i, metadata.Height)
+		require.Equal(hash+strconv.Itoa(int(i)), metadata.Hash)
+		require.Equal(objectKey+strconv.Itoa(int(i)), metadata.ObjectKeyMain)
+	}
 }
 
 func (s *ExtractorTestSuite) TestWithBestEffort() {
@@ -124,16 +166,17 @@ func (s *ExtractorTestSuite) TestWithBestEffort() {
 	s.blobStorage.EXPECT().Upload(gomock.Any(), block, api.Compression_NONE).Return(objectKey, nil)
 	response, err := s.extractor.Execute(s.env.BackgroundContext(), &ExtractorRequest{
 		Tag:            tag,
-		Height:         height,
+		Heights:        []uint64{height},
 		WithBestEffort: true,
 	})
 
 	require.NoError(err)
-	require.NotNil(response.Metadata)
-	require.Equal(tag, response.Metadata.Tag)
-	require.Equal(height, response.Metadata.Height)
-	require.Equal(hash, response.Metadata.Hash)
-	require.Equal(objectKey, response.Metadata.ObjectKeyMain)
+	require.Equal(1, len(response.Metadatas))
+	metadata := response.Metadatas[0]
+	require.Equal(tag, metadata.Tag)
+	require.Equal(height, metadata.Height)
+	require.Equal(hash, metadata.Hash)
+	require.Equal(objectKey, metadata.ObjectKeyMain)
 }
 
 func (s *ExtractorTestSuite) TestUpgradeWithWrongTag() {
@@ -147,8 +190,8 @@ func (s *ExtractorTestSuite) TestUpgradeWithWrongTag() {
 
 	_, err := s.extractor.Execute(s.env.BackgroundContext(), &ExtractorRequest{
 		Tag:            newTag,
-		Height:         height,
-		UpgradeFromTag: pointer.Uint32(oldTag),
+		Heights:        []uint64{height},
+		UpgradeFromTag: pointer.Ref(oldTag),
 	})
 
 	require.Error(err)
@@ -189,16 +232,17 @@ func (s *ExtractorTestSuite) TestUpgradeSuccess() {
 	s.blobStorage.EXPECT().Upload(gomock.Any(), newBlock, api.Compression_NONE).Return(objectKey, nil)
 	response, err := s.extractor.Execute(s.env.BackgroundContext(), &ExtractorRequest{
 		Tag:            newTag,
-		Height:         height,
-		UpgradeFromTag: pointer.Uint32(oldTag),
+		Heights:        []uint64{height},
+		UpgradeFromTag: pointer.Ref(oldTag),
 	})
 
 	require.NoError(err)
-	require.NotNil(response.Metadata)
-	require.Equal(newTag, response.Metadata.Tag)
-	require.Equal(height, response.Metadata.Height)
-	require.Equal(hash, response.Metadata.Hash)
-	require.Equal(objectKey, response.Metadata.ObjectKeyMain)
+	require.Equal(1, len(response.Metadatas))
+	metadata = response.Metadatas[0]
+	require.Equal(tag, metadata.Tag)
+	require.Equal(height, metadata.Height)
+	require.Equal(hash, metadata.Hash)
+	require.Equal(objectKey, metadata.ObjectKeyMain)
 }
 
 func (s *ExtractorTestSuite) TestRehydrateSuccess() {
@@ -234,16 +278,17 @@ func (s *ExtractorTestSuite) TestRehydrateSuccess() {
 	s.blobStorage.EXPECT().Upload(gomock.Any(), newBlock, api.Compression_NONE).Return(objectKey, nil)
 	response, err := s.extractor.Execute(s.env.BackgroundContext(), &ExtractorRequest{
 		Tag:              newTag,
-		Height:           height,
-		RehydrateFromTag: pointer.Uint32(oldTag),
+		Heights:          []uint64{height},
+		RehydrateFromTag: pointer.Ref(oldTag),
 	})
 
 	require.NoError(err)
-	require.NotNil(response.Metadata)
-	require.Equal(newTag, response.Metadata.Tag)
-	require.Equal(height, response.Metadata.Height)
-	require.Equal(hash, response.Metadata.Hash)
-	require.Equal(objectKey, response.Metadata.ObjectKeyMain)
+	require.Equal(1, len(response.Metadatas))
+	metadata = response.Metadatas[0]
+	require.Equal(tag, metadata.Tag)
+	require.Equal(height, metadata.Height)
+	require.Equal(hash, metadata.Hash)
+	require.Equal(objectKey, metadata.ObjectKeyMain)
 }
 
 func (s *ExtractorTestSuite) TestWithDataCompression() {
@@ -267,14 +312,15 @@ func (s *ExtractorTestSuite) TestWithDataCompression() {
 	s.blobStorage.EXPECT().Upload(gomock.Any(), block, api.Compression_GZIP).Return(objectKey, nil)
 	response, err := s.extractor.Execute(s.env.BackgroundContext(), &ExtractorRequest{
 		Tag:             tag,
-		Height:          height,
+		Heights:         []uint64{height},
 		DataCompression: api.Compression_GZIP,
 	})
 
 	require.NoError(err)
-	require.NotNil(response.Metadata)
-	require.Equal(tag, response.Metadata.Tag)
-	require.Equal(height, response.Metadata.Height)
-	require.Equal(hash, response.Metadata.Hash)
-	require.Equal(objectKey, response.Metadata.ObjectKeyMain)
+	require.Equal(1, len(response.Metadatas))
+	metadata := response.Metadatas[0]
+	require.Equal(tag, metadata.Tag)
+	require.Equal(height, metadata.Height)
+	require.Equal(hash, metadata.Hash)
+	require.Equal(objectKey, metadata.ObjectKeyMain)
 }

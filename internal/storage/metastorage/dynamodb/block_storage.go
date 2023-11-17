@@ -32,11 +32,12 @@ type (
 	blockStorageImpl struct {
 		blockTable                       ddbTable
 		blockStartHeight                 uint64
-		instrumentPersistBlockMetas      instrument.Call
-		instrumentGetLatestBlock         instrument.Call
-		instrumentGetBlockByHash         instrument.Call
-		instrumentGetBlockByHeight       instrument.Call
-		instrumentGetBlocksByHeightRange instrument.Call
+		instrumentPersistBlockMetas      instrument.Instrument
+		instrumentGetLatestBlock         instrument.InstrumentWithResult[*api.BlockMetadata]
+		instrumentGetBlockByHash         instrument.InstrumentWithResult[*api.BlockMetadata]
+		instrumentGetBlockByHeight       instrument.InstrumentWithResult[*api.BlockMetadata]
+		instrumentGetBlocksByHeightRange instrument.InstrumentWithResult[[]*api.BlockMetadata]
+		instrumentGetBlocksByHeights     instrument.InstrumentWithResult[[]*api.BlockMetadata]
 	}
 )
 
@@ -76,11 +77,12 @@ func newBlockStorage(params Params) (internal.BlockStorage, error) {
 	accessor := blockStorageImpl{
 		blockTable:                       metadataTable,
 		blockStartHeight:                 params.Config.Chain.BlockStartHeight,
-		instrumentPersistBlockMetas:      instrument.NewCall(metrics, "persist_block_metas"),
-		instrumentGetLatestBlock:         instrument.NewCall(metrics, "get_latest_block"),
-		instrumentGetBlockByHash:         instrument.NewCall(metrics, "get_block_by_hash"),
-		instrumentGetBlockByHeight:       instrument.NewCall(metrics, "get_block_by_height"),
-		instrumentGetBlocksByHeightRange: instrument.NewCall(metrics, "get_blocks_by_height_range"),
+		instrumentPersistBlockMetas:      instrument.New(metrics, "persist_block_metas"),
+		instrumentGetLatestBlock:         instrument.NewWithResult[*api.BlockMetadata](metrics, "get_latest_block"),
+		instrumentGetBlockByHash:         instrument.NewWithResult[*api.BlockMetadata](metrics, "get_block_by_hash"),
+		instrumentGetBlockByHeight:       instrument.NewWithResult[*api.BlockMetadata](metrics, "get_block_by_height"),
+		instrumentGetBlocksByHeightRange: instrument.NewWithResult[[]*api.BlockMetadata](metrics, "get_blocks_by_height_range"),
+		instrumentGetBlocksByHeights:     instrument.NewWithResult[[]*api.BlockMetadata](metrics, "get_blocks_by_heights"),
 	}
 	return &accessor, nil
 }
@@ -154,47 +156,35 @@ func (a *blockStorageImpl) getBlocksByKeys(ctx context.Context, blockPids []stri
 
 func (a *blockStorageImpl) GetLatestBlock(
 	ctx context.Context, tag uint32) (*api.BlockMetadata, error) {
-	var block *api.BlockMetadata
-	if err := a.instrumentGetLatestBlock.Instrument(ctx, func(ctx context.Context) error {
-		var err error
+	return a.instrumentGetLatestBlock.Instrument(ctx, func(ctx context.Context) (*api.BlockMetadata, error) {
 		blockPid := getBlockPidForLatest(tag)
 		blockRid := getCanonicalBlockRid()
-		block, err = a.getBlockByKeys(ctx, blockPid, blockRid)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return block, nil
+		return a.getBlockByKeys(ctx, blockPid, blockRid)
+	})
 }
 
 func (a *blockStorageImpl) GetBlockByHeight(
 	ctx context.Context, tag uint32, height uint64) (*api.BlockMetadata, error) {
-	if height < a.blockStartHeight {
-		return nil, xerrors.Errorf(
-			"height(%d) should be no less than blockStartHeight(%d): %w",
-			height, a.blockStartHeight, errors.ErrInvalidHeight)
-	}
-	var block *api.BlockMetadata
-	if err := a.instrumentGetBlockByHeight.Instrument(ctx, func(ctx context.Context) error {
-		var err error
-		blockPid := getBlockPidForHeight(tag, height)
-		blockRid := getCanonicalBlockRid()
-		block, err = a.getBlockByKeys(ctx, blockPid, blockRid)
-		return err
-	}); err != nil {
+	if err := a.validateHeight(height); err != nil {
 		return nil, err
 	}
 
-	return block, nil
+	return a.instrumentGetBlockByHeight.Instrument(ctx, func(ctx context.Context) (*api.BlockMetadata, error) {
+		blockPid := getBlockPidForHeight(tag, height)
+		blockRid := getCanonicalBlockRid()
+		return a.getBlockByKeys(ctx, blockPid, blockRid)
+	})
 }
 
 func (a *blockStorageImpl) GetBlocksByHeightRange(
 	ctx context.Context, tag uint32, startHeight, endHeight uint64) ([]*api.BlockMetadata, error) {
-	if startHeight >= endHeight || startHeight < a.blockStartHeight {
+	if startHeight >= endHeight {
 		return nil, xerrors.Errorf(
-			"startHeight(%d) should be less than endHeight(%d) and startHeight should also be no less than blockStartHeight(%d): %w",
-			startHeight, endHeight, a.blockStartHeight, errors.ErrOutOfRange)
+			"startHeight(%d) should be less than endHeight(%d): %w",
+			startHeight, endHeight, errors.ErrOutOfRange)
+	}
+	if err := a.validateHeight(startHeight); err != nil {
+		return nil, err
 	}
 
 	blockPids := make([]string, endHeight-startHeight)
@@ -202,47 +192,82 @@ func (a *blockStorageImpl) GetBlocksByHeightRange(
 		blockPids[i] = getBlockPidForHeight(tag, startHeight+i)
 	}
 
-	var blocks []*api.BlockMetadata
-	if err := a.instrumentGetBlocksByHeightRange.Instrument(ctx, func(ctx context.Context) error {
-		var err error
+	return a.instrumentGetBlocksByHeightRange.Instrument(ctx, func(ctx context.Context) ([]*api.BlockMetadata, error) {
 		blockRid := getCanonicalBlockRid()
-		blocks, err = a.getBlocksByKeys(ctx, blockPids, blockRid)
+		blocks, err := a.getBlocksByKeys(ctx, blockPids, blockRid)
 		if err != nil {
-			return xerrors.Errorf("failed to get blocks by keys: %w", err)
+			return nil, xerrors.Errorf("failed to get blocks by keys: %w", err)
 		}
 
 		sort.Slice(blocks, func(i, j int) bool {
 			return blocks[i].Height < blocks[j].Height
 		})
 		if err = parser.ValidateChain(blocks, nil); err != nil {
-			return xerrors.Errorf("failed to validate chain: %w", err)
+			return nil, xerrors.Errorf("failed to validate chain: %w", err)
 		}
 
-		return nil
-	}); err != nil {
+		return blocks, nil
+	})
+}
+
+func (a *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, heights []uint64) ([]*api.BlockMetadata, error) {
+	if len(heights) == 0 {
+		return nil, nil
+	}
+
+	blockPids := make([]string, len(heights))
+	for i, height := range heights {
+		if err := a.validateHeight(height); err != nil {
+			return nil, err
+		}
+		blockPids[i] = getBlockPidForHeight(tag, height)
+	}
+
+	blocks, err := a.instrumentGetBlocksByHeights.Instrument(ctx, func(ctx context.Context) ([]*api.BlockMetadata, error) {
+		blockRid := getCanonicalBlockRid()
+		return a.getBlocksByKeys(ctx, blockPids, blockRid)
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	return blocks, nil
+	heightToBlockMap := make(map[uint64]*api.BlockMetadata)
+	for _, block := range blocks {
+		heightToBlockMap[block.Height] = block
+	}
+
+	// results is ordered based on input array `heights`
+	results := make([]*api.BlockMetadata, len(heights))
+	for i, height := range heights {
+		results[i] = heightToBlockMap[height]
+	}
+
+	return results, nil
 }
 
 func (a *blockStorageImpl) GetBlockByHash(
 	ctx context.Context, tag uint32, height uint64, blockHash string) (*api.BlockMetadata, error) {
-	var block *api.BlockMetadata
-	if err := a.instrumentGetBlockByHash.Instrument(ctx, func(ctx context.Context) error {
-		var err error
+	if err := a.validateHeight(height); err != nil {
+		return nil, err
+	}
+
+	return a.instrumentGetBlockByHash.Instrument(ctx, func(ctx context.Context) (*api.BlockMetadata, error) {
 		if blockHash == "" {
 			blockHash = canonicalBlockHash
 		}
 		blockPid := getBlockPidForHeight(tag, height)
 		blockRid := getBlockRidWithBlockHash(blockHash)
-		block, err = a.getBlockByKeys(ctx, blockPid, blockRid)
-		return err
-	}); err != nil {
-		return nil, err
-	}
+		return a.getBlockByKeys(ctx, blockPid, blockRid)
+	})
+}
 
-	return block, nil
+func (a *blockStorageImpl) validateHeight(height uint64) error {
+	if height < a.blockStartHeight {
+		return xerrors.Errorf(
+			"height(%d) should be no less than blockStartHeight(%d): %w",
+			height, a.blockStartHeight, errors.ErrInvalidHeight)
+	}
+	return nil
 }
 
 func makeBlockMetaDataDDBEntry(block *api.BlockMetadata) *model.BlockMetaDataDDBEntry {
@@ -295,8 +320,8 @@ func (a *blockStorageImpl) PersistBlockMetas(
 	})
 }
 
-func (a *blockStorageImpl) makeBlockMetaDataDDBEntries(includeWatermark bool, blocks []*api.BlockMetadata) []interface{} {
-	blockEntries := make([]interface{}, 0, len(blocks)*2+1)
+func (a *blockStorageImpl) makeBlockMetaDataDDBEntries(includeWatermark bool, blocks []*api.BlockMetadata) []any {
+	blockEntries := make([]any, 0, len(blocks)*2+1)
 	for _, block := range blocks {
 		// for each block append two entries, one under block hash, one under canonical alias
 		blockMetaDataDDBEntry := makeBlockMetaDataDDBEntry(block)

@@ -1,0 +1,16 @@
+{
+  "txid":"6425f19b62e07961ddba1519722b21a21e550fc417b64866b06a8f580d44848f",
+  "vout":[
+    {
+      "value":50.01,
+      "n":0,
+      "scriptPubKey":{
+        "asm":"046436c9fdb8ab0e69eef814a6783c396de988667814721e22a82b9d775a4f3b939b6b6cf989aca5b42935fb3bdd584baec8f9d9360c5c9bcc6ac60373d8b602bc OP_CHECKSIG",
+        "hex":"41046436c9fdb8ab0e69eef814a6783c396de988667814721e22a82b9d775a4f3b939b6b6cf989aca5b42935fb3bdd584baec8f9d9360c5c9bcc6ac60373d8b602bcac",
+        "reqSigs":0,
+        "type":"pubkey",
+        "addresses":null
+      }
+    }
+  ]
+}

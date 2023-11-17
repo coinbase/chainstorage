@@ -21,7 +21,7 @@ func (q *dlqImpl) resetLocalResources() error {
 
 	if q.config.AWS.IsResetLocal && q.queueURL != "" {
 		if _, err := q.client.DeleteQueue(&sqs.DeleteQueueInput{
-			QueueUrl: pointer.String(q.queueURL),
+			QueueUrl: pointer.Ref(q.queueURL),
 		}); err != nil {
 			return xerrors.Errorf("failed to delete queue: %w", err)
 		}
@@ -32,7 +32,7 @@ func (q *dlqImpl) resetLocalResources() error {
 
 	if q.queueURL == "" {
 		output, err := q.client.CreateQueue(&sqs.CreateQueueInput{
-			QueueName: pointer.String(q.config.AWS.DLQ.Name),
+			QueueName: pointer.Ref(q.config.AWS.DLQ.Name),
 		})
 		if err != nil {
 			return xerrors.Errorf("failed to create queue: %w", err)

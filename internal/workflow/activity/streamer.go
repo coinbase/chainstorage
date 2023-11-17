@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -51,7 +51,7 @@ type (
 	StreamerRequest struct {
 		BatchSize             uint64 `validate:"required"`
 		Tag                   uint32 `validate:"required"`
-		MaxAllowedReorgHeight uint64 `validate:"required"`
+		MaxAllowedReorgHeight uint64
 		EventTag              uint32
 	}
 
@@ -63,9 +63,11 @@ type (
 	}
 
 	StreamerMetrics struct {
-		instrumentHandleReorg instrument.Call
-		reorgCounter          tally.Counter
-		reorgDistanceGauge    tally.Gauge
+		instrumentHandleReorg               instrument.InstrumentWithResult[*streamerReorgResult]
+		reorgCounter                        tally.Counter
+		reorgDistanceExceedThresholdCounter tally.Counter
+		reorgDistanceWithinThresholdCounter tally.Counter
+		reorgDistanceGauge                  tally.Gauge
 	}
 
 	streamerReorgResult struct {
@@ -91,9 +93,11 @@ func NewStreamer(params StreamerParams) *Streamer {
 func newStreamerMetrics(scope tally.Scope) *StreamerMetrics {
 	scope = scope.SubScope(ActivityStreamer)
 	return &StreamerMetrics{
-		instrumentHandleReorg: instrument.NewCall(scope, "handle_reorg"),
-		reorgCounter:          scope.Counter("reorg"),
-		reorgDistanceGauge:    scope.Gauge("reorg_distance"),
+		instrumentHandleReorg:               instrument.NewWithResult[*streamerReorgResult](scope, "handle_reorg"),
+		reorgCounter:                        scope.Counter("reorg"),
+		reorgDistanceExceedThresholdCounter: scope.Tagged(errTags).Counter(reorgDistanceCheckMetric),
+		reorgDistanceWithinThresholdCounter: scope.Tagged(successTags).Counter(reorgDistanceCheckMetric),
+		reorgDistanceGauge:                  scope.Gauge("reorg_distance"),
 	}
 }
 
@@ -296,16 +300,15 @@ func (s *Streamer) getTailBlock(ctx context.Context, tag uint32, minBlockHeightF
 
 // algo is described here: https://docs.google.com/document/d/1_wVacdTtoSz-Gr24AADUGmVjLpu7d43KleBEvc8JV5g/edit#heading=h.4d0br9f39hl8
 func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *StreamerRequest) (*streamerReorgResult, error) {
-	var result *streamerReorgResult
 	eventTag := req.EventTag
-	if err := s.metrics.instrumentHandleReorg.Instrument(ctx, func(ctx context.Context) error {
+	return s.metrics.instrumentHandleReorg.Instrument(ctx, func(ctx context.Context) (*streamerReorgResult, error) {
 		maxEventId, err := s.metaStorage.GetMaxEventId(ctx, eventTag)
 		if err != nil {
-			return xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
+			return nil, xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
 		}
 		metaLatest, err := s.metaStorage.GetLatestBlock(ctx, req.Tag)
 		if err != nil {
-			return xerrors.Errorf("failed to get latest block from meta storage: %w", err)
+			return nil, xerrors.Errorf("failed to get latest block from meta storage: %w", err)
 		}
 
 		logger.Info("checking for chain reorg",
@@ -325,7 +328,7 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 		for {
 			headEvent, err = s.getEventForTailBlock(ctx, eventTag, &minEventIdFetched, eventsToChainAdaptor)
 			if err != nil {
-				return xerrors.Errorf("failed to get next event: %w", err)
+				return nil, xerrors.Errorf("failed to get next event: %w", err)
 			}
 			if eventWatermarkHeight == nil {
 				height := headEvent.BlockHeight
@@ -341,39 +344,48 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 				var headBlock *api.BlockMetadata
 				headBlock, err = s.getTailBlock(ctx, req.Tag, minBlockHeightFetched, &minBlockFetchedParentHash, blocksList)
 				if err != nil {
-					return xerrors.Errorf("failed to get next block meta: %w", err)
+					return nil, xerrors.Errorf("failed to get next block meta: %w", err)
 				}
 				if headEvent.BlockHeight != headBlock.Height {
-					return xerrors.Errorf("expect head event and head block to have the same height (headEvent = %v, headBlock=%v)", headEvent.BlockHeight, headBlock.Height)
+					return nil, xerrors.Errorf("expect head event and head block to have the same height (headEvent = %v, headBlock=%v)", headEvent.BlockHeight, headBlock.Height)
 				}
 				if headEvent.BlockHash == headBlock.Hash {
 					logger.Info("found fork block",
 						zap.Uint64("event_watermark_height", *eventWatermarkHeight),
-						zap.Uint64("fork_block_height", headEvent.BlockHeight))
+						zap.Uint64("fork_block_height", headEvent.BlockHeight),
+						zap.Int("reorg_distance", len(updateEvents)),
+					)
 
-					result = &streamerReorgResult{
+					maxAllowedReorgHeight := req.MaxAllowedReorgHeight
+					reorgDistance := len(updateEvents)
+					// Check reorg explanation in https://docs.google.com/document/d/18DhoFKh2lt7uJIg57XfiSHAFpnr-f0MVswT8wsZ6qgw/edit?usp=sharing
+					// Note: when maxAllowedReorgHeight = 0, it means NO reorg validation in streamer.
+					if maxAllowedReorgHeight > 0 && uint64(reorgDistance) >= maxAllowedReorgHeight {
+						logger.Error("reorg distance should be less than maxAllowedReorgHeight",
+							zap.Int("reorg_distance", reorgDistance),
+							zap.Uint64("max_allowed_reorg_height", maxAllowedReorgHeight),
+						)
+						s.metrics.reorgDistanceExceedThresholdCounter.Inc(1)
+					} else {
+						s.metrics.reorgDistanceWithinThresholdCounter.Inc(1)
+					}
+
+					result := &streamerReorgResult{
 						forkBlock:               headBlock,
 						canonicalChainTipHeight: metaLatest.Height,
 						updateEvents:            updateEvents,
 						eventTag:                eventTag,
 					}
-					return nil
+					return result, nil
 				}
 				// block hash does not match
 				if headEvent.EventId == metastorage.EventIdStartValue || headBlock.GetHeight() == s.blockStartHeight {
-					return errorChainCompletelyDifferent
+					return nil, errorChainCompletelyDifferent
 				}
 			}
 			// detected diff
 			newEvent := model.NewBlockEventFromEventEntry(api.BlockchainEvent_BLOCK_REMOVED, headEvent)
 			updateEvents = append(updateEvents, newEvent)
-			maxAllowedReorgHeight := req.MaxAllowedReorgHeight
-			if uint64(len(updateEvents)) > maxAllowedReorgHeight {
-				return xerrors.Errorf("detected reorg distance is too long (maxAllowedReorgHeight=%d)", maxAllowedReorgHeight)
-			}
 		}
-	}); err != nil {
-		return nil, err
-	}
-	return result, nil
+	})
 }

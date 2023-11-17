@@ -35,10 +35,10 @@ type (
 		logger                   *zap.Logger
 		client                   *sqs.SQS
 		queueURL                 string
-		instrumentSendMessage    instrument.Call
-		instrumentResendMessage  instrument.Call
-		instrumentReceiveMessage instrument.Call
-		instrumentDeleteMessage  instrument.Call
+		instrumentSendMessage    instrument.Instrument
+		instrumentResendMessage  instrument.Instrument
+		instrumentReceiveMessage instrument.Instrument
+		instrumentDeleteMessage  instrument.Instrument
 	}
 
 	dlqFactory struct {
@@ -74,10 +74,10 @@ func New(params DLQParams) (DLQ, error) {
 		config:                   params.Config,
 		logger:                   log.WithPackage(params.Logger),
 		client:                   client,
-		instrumentSendMessage:    instrument.NewCall(metrics, "send_message"),
-		instrumentResendMessage:  instrument.NewCall(metrics, "resend_message"),
-		instrumentReceiveMessage: instrument.NewCall(metrics, "receive_message", instrument.WithFilter(filterError)),
-		instrumentDeleteMessage:  instrument.NewCall(metrics, "delete_message"),
+		instrumentSendMessage:    instrument.New(metrics, "send_message"),
+		instrumentResendMessage:  instrument.New(metrics, "resend_message"),
+		instrumentReceiveMessage: instrument.New(metrics, "receive_message", instrument.WithFilter(filterError)),
+		instrumentDeleteMessage:  instrument.New(metrics, "delete_message"),
 	}
 	if params.Config.AWS.IsLocalStack {
 		if err := impl.resetLocalResources(); err != nil {
@@ -100,15 +100,15 @@ func (q *dlqImpl) SendMessage(ctx context.Context, message *Message) error {
 		messageBody := string(body)
 
 		input := &sqs.SendMessageInput{
-			QueueUrl: pointer.String(q.queueURL),
+			QueueUrl: pointer.Ref(q.queueURL),
 			MessageAttributes: map[string]*sqs.MessageAttributeValue{
 				topicAttributeName: {
-					DataType:    pointer.String(topicAttributeDateType),
-					StringValue: pointer.String(message.Topic),
+					DataType:    pointer.Ref(topicAttributeDateType),
+					StringValue: pointer.Ref(message.Topic),
 				},
 			},
-			MessageBody:  pointer.String(messageBody),
-			DelaySeconds: pointer.Int64(q.config.AWS.DLQ.DelaySecs),
+			MessageBody:  pointer.Ref(messageBody),
+			DelaySeconds: pointer.Ref(q.config.AWS.DLQ.DelaySecs),
 		}
 
 		if _, err := q.client.SendMessageWithContext(ctx, input); err != nil {
@@ -135,19 +135,19 @@ func (q *dlqImpl) ResendMessage(ctx context.Context, message *Message) error {
 		// Increment the retries counter and resend the same data.
 		retries := strconv.Itoa(message.Retries + 1)
 		input := &sqs.SendMessageInput{
-			QueueUrl: pointer.String(q.queueURL),
+			QueueUrl: pointer.Ref(q.queueURL),
 			MessageAttributes: map[string]*sqs.MessageAttributeValue{
 				topicAttributeName: {
-					DataType:    pointer.String(topicAttributeDateType),
-					StringValue: pointer.String(message.Topic),
+					DataType:    pointer.Ref(topicAttributeDateType),
+					StringValue: pointer.Ref(message.Topic),
 				},
 				retriesAttributeName: {
-					DataType:    pointer.String(retriesAttributeDataType),
-					StringValue: pointer.String(retries),
+					DataType:    pointer.Ref(retriesAttributeDataType),
+					StringValue: pointer.Ref(retries),
 				},
 			},
-			MessageBody:  pointer.String(messageBody),
-			DelaySeconds: pointer.Int64(q.config.AWS.DLQ.DelaySecs),
+			MessageBody:  pointer.Ref(messageBody),
+			DelaySeconds: pointer.Ref(q.config.AWS.DLQ.DelaySecs),
 		}
 
 		if _, err := q.client.SendMessageWithContext(ctx, input); err != nil {
@@ -156,8 +156,8 @@ func (q *dlqImpl) ResendMessage(ctx context.Context, message *Message) error {
 
 		// Delete the original message.
 		if _, err := q.client.DeleteMessageWithContext(ctx, &sqs.DeleteMessageInput{
-			QueueUrl:      pointer.String(q.queueURL),
-			ReceiptHandle: pointer.String(message.ReceiptHandle),
+			QueueUrl:      pointer.Ref(q.queueURL),
+			ReceiptHandle: pointer.Ref(message.ReceiptHandle),
 		}); err != nil {
 			return xerrors.Errorf("failed to delete message: %w", err)
 		}
@@ -176,14 +176,14 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 	var message *Message
 	if err := q.instrumentReceiveMessage.Instrument(ctx, func(ctx context.Context) error {
 		input := &sqs.ReceiveMessageInput{
-			QueueUrl:          pointer.String(q.queueURL),
-			VisibilityTimeout: pointer.Int64(q.config.AWS.DLQ.VisibilityTimeoutSecs),
+			QueueUrl:          pointer.Ref(q.queueURL),
+			VisibilityTimeout: pointer.Ref(q.config.AWS.DLQ.VisibilityTimeoutSecs),
 			AttributeNames: []*string{
-				pointer.String(sqs.MessageSystemAttributeNameSentTimestamp),
+				pointer.Ref(sqs.MessageSystemAttributeNameSentTimestamp),
 			},
 			MessageAttributeNames: []*string{
-				pointer.String(topicAttributeName),
-				pointer.String(retriesAttributeName),
+				pointer.Ref(topicAttributeName),
+				pointer.Ref(retriesAttributeName),
 			},
 		}
 
@@ -202,9 +202,9 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		}
 
 		outputMessage := output.Messages[0]
-		receiptHandle := pointer.StringDeref(outputMessage.ReceiptHandle)
+		receiptHandle := pointer.Deref(outputMessage.ReceiptHandle)
 
-		sentTimestampAttribute := pointer.StringDeref(outputMessage.Attributes[sqs.MessageSystemAttributeNameSentTimestamp])
+		sentTimestampAttribute := pointer.Deref(outputMessage.Attributes[sqs.MessageSystemAttributeNameSentTimestamp])
 		sentTimestampEpoch, err := strconv.ParseInt(sentTimestampAttribute, 10, 64)
 		if err != nil {
 			return xerrors.Errorf("failed to parse sent timestamp: %v", sentTimestampAttribute)
@@ -215,16 +215,16 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		if topicAttribute == nil {
 			return xerrors.Errorf("topic not found: %v", outputMessage)
 		}
-		topic := pointer.StringDeref(topicAttribute.StringValue)
+		topic := pointer.Deref(topicAttribute.StringValue)
 
 		var retries int
 		if attr := outputMessage.MessageAttributes[retriesAttributeName]; attr != nil {
-			if v, err := strconv.Atoi(pointer.StringDeref(attr.StringValue)); err == nil {
+			if v, err := strconv.Atoi(pointer.Deref(attr.StringValue)); err == nil {
 				retries = v
 			}
 		}
 
-		var data interface{}
+		var data any
 		switch topic {
 		case internal.FailedBlockTopic:
 			data = new(internal.FailedBlockData)
@@ -235,7 +235,7 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		}
 
 		if data != nil {
-			body := []byte(pointer.StringDeref(outputMessage.Body))
+			body := []byte(pointer.Deref(outputMessage.Body))
 			if err := json.Unmarshal(body, data); err != nil {
 				return xerrors.Errorf("failed to unmarshal message: %w", err)
 			}
@@ -266,8 +266,8 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 func (q *dlqImpl) DeleteMessage(ctx context.Context, message *Message) error {
 	return q.instrumentDeleteMessage.Instrument(ctx, func(ctx context.Context) error {
 		if _, err := q.client.DeleteMessageWithContext(ctx, &sqs.DeleteMessageInput{
-			QueueUrl:      pointer.String(q.queueURL),
-			ReceiptHandle: pointer.String(message.ReceiptHandle),
+			QueueUrl:      pointer.Ref(q.queueURL),
+			ReceiptHandle: pointer.Ref(message.ReceiptHandle),
 		}); err != nil {
 			return xerrors.Errorf("failed to delete message: %w", err)
 		}
@@ -282,14 +282,20 @@ func (q *dlqImpl) DeleteMessage(ctx context.Context, message *Message) error {
 }
 
 func (q *dlqImpl) initQueueURL() error {
-	output, err := q.client.GetQueueUrl(&sqs.GetQueueUrlInput{
-		QueueName: pointer.String(q.config.AWS.DLQ.Name),
-	})
+	queueURLInput := &sqs.GetQueueUrlInput{
+		QueueName: pointer.Ref(q.config.AWS.DLQ.Name),
+	}
+
+	if q.config.AWS.DLQ.OwnerAccountId != "" {
+		queueURLInput.SetQueueOwnerAWSAccountId(q.config.AWS.DLQ.OwnerAccountId)
+	}
+
+	output, err := q.client.GetQueueUrl(queueURLInput)
 	if err != nil {
 		return xerrors.Errorf("failed to get queue url (name=%v): %w", q.config.AWS.DLQ.Name, err)
 	}
 
-	queueURL := pointer.StringDeref(output.QueueUrl)
+	queueURL := pointer.Deref(output.QueueUrl)
 	if queueURL == "" {
 		return xerrors.New("empty queue url")
 	}

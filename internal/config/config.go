@@ -19,6 +19,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/config"
+	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -54,23 +55,35 @@ type (
 	DLQType         int32
 
 	ChainConfig struct {
-		Blockchain           common.Blockchain `mapstructure:"blockchain" validate:"required"`
-		Network              common.Network    `mapstructure:"network" validate:"required"`
-		BlockTag             BlockTagConfig    `mapstructure:"block_tag"`
-		EventTag             EventTagConfig    `mapstructure:"event_tag"`
-		Client               ClientConfig      `mapstructure:"client"`
-		Feature              FeatureConfig     `mapstructure:"feature"`
-		BlockStartHeight     uint64            `mapstructure:"block_start_height"`
-		IrreversibleDistance uint64            `mapstructure:"irreversible_distance" validate:"required"`
-		Rosetta              RosettaConfig     `mapstructure:"rosetta"`
-		BlockTime            time.Duration     `mapstructure:"block_time" validate:"required"`
+		Blockchain       common.Blockchain `mapstructure:"blockchain" validate:"required"`
+		Network          common.Network    `mapstructure:"network" validate:"required"`
+		Sidechain        api.SideChain     `mapstructure:"sidechain"`
+		BlockTag         BlockTagConfig    `mapstructure:"block_tag"`
+		EventTag         EventTagConfig    `mapstructure:"event_tag"`
+		Client           ClientConfig      `mapstructure:"client"`
+		Feature          FeatureConfig     `mapstructure:"feature"`
+		BlockStartHeight uint64            `mapstructure:"block_start_height"`
+		// IrreversibleDistance is the maximum distance between the current block height and the last irreversible block height, also
+		// known as the max reorg distance, finalization depth. This does not have a default value and must be set by the onboarding user.
+		// Instructions for setting this value:
+		// 1. Check finalization_depth in Nova's configuration first. It can be found in Nova repo under accounting_model directory(e.g.
+		// Ethereum finalization_depth: https://sourcegraph.cbhq.net/github.cbhq.net/payments/nova/-/blob/app/lib/accounting_model/ethereum.rb?L171:9)
+		// 2. If finalization_depth is not set, normally it means the chain does not have reorg or Nova is processing finalized blocks(See
+		// https://www.alchemy.com/overviews/ethereum-commitment-levels). Please cross check with the blockchain official doc. If the blockchain
+		// does not have reorg, set the value to 1, otherwise set it to the corresponding value.
+		// 3. If blockchain is not supported by Nova, please reference with the blockchain official doc and set it to corresponding value.
+		IrreversibleDistance uint64        `mapstructure:"irreversible_distance" validate:"required"`
+		Rosetta              RosettaConfig `mapstructure:"rosetta"`
+		BlockTime            time.Duration `mapstructure:"block_time" validate:"required"`
 	}
 
 	ClientConfig struct {
-		Master    JSONRPCConfig     `mapstructure:"master"`
-		Slave     JSONRPCConfig     `mapstructure:"slave"`
-		Validator JSONRPCConfig     `mapstructure:"validator"`
-		Retry     ClientRetryConfig `mapstructure:"retry"`
+		Master      JSONRPCConfig     `mapstructure:"master"`
+		Slave       JSONRPCConfig     `mapstructure:"slave"`
+		Validator   JSONRPCConfig     `mapstructure:"validator"`
+		Consensus   JSONRPCConfig     `mapstructure:"consensus"`
+		Retry       ClientRetryConfig `mapstructure:"retry"`
+		HttpTimeout time.Duration     `mapstructure:"http_timeout"`
 	}
 
 	JSONRPCConfig struct {
@@ -82,7 +95,12 @@ type (
 	}
 
 	FeatureConfig struct {
-		RosettaParser bool `mapstructure:"rosetta_parser"`
+		RosettaParser               bool `mapstructure:"rosetta_parser"`
+		DefaultStableEvent          bool `mapstructure:"default_stable_event"`
+		TransactionIndexing         bool `mapstructure:"transaction_indexing"`
+		BlockValidationEnabled      bool `mapstructure:"block_validation_enabled"`
+		BlockValidationMuted        bool `mapstructure:"block_validation_muted"`
+		VerifiedAccountStateEnabled bool `mapstructure:"verified_account_state_enabled"`
 	}
 
 	BlockTagConfig struct {
@@ -115,16 +133,19 @@ type (
 
 	DynamoDBConfig struct {
 		BlockTable                    string `mapstructure:"block_table" validate:"required"`
-		EventTable                    string `mapstructure:"event_table" validate:"required"`
-		EventTableHeightIndex         string `mapstructure:"event_table_height_index" validate:"required"`
+		EventTable                    string `mapstructure:"event_table"`
+		EventTableHeightIndex         string `mapstructure:"event_table_height_index"`
 		VersionedEventTable           string `mapstructure:"versioned_event_table" validate:"required"`
 		VersionedEventTableBlockIndex string `mapstructure:"versioned_event_table_block_index" validate:"required"`
+		TransactionTable              string `mapstructure:"transaction_table"`
+		Arn                           string `mapstructure:"arn"`
 	}
 
 	SQSConfig struct {
 		Name                  string `mapstructure:"name" validate:"required"`
 		VisibilityTimeoutSecs int64  `mapstructure:"visibility_timeout_secs"`
 		DelaySecs             int64  `mapstructure:"delay_secs"`
+		OwnerAccountId        string `mapstructure:"owner_account_id"`
 	}
 
 	CadenceConfig struct {
@@ -143,13 +164,14 @@ type (
 	}
 
 	WorkflowsConfig struct {
-		Workers        []WorkerConfig               `mapstructure:"workers"`
-		Backfiller     BackfillerWorkflowConfig     `mapstructure:"backfiller"`
-		Poller         PollerWorkflowConfig         `mapstructure:"poller"`
-		Benchmarker    BenchmarkerWorkflowConfig    `mapstructure:"benchmarker"`
-		Monitor        MonitorWorkflowConfig        `mapstructure:"monitor"`
-		Streamer       StreamerWorkflowConfig       `mapstructure:"streamer"`
-		CrossValidator CrossValidatorWorkflowConfig `mapstructure:"cross_validator"`
+		Workers         []WorkerConfig                `mapstructure:"workers"`
+		Backfiller      BackfillerWorkflowConfig      `mapstructure:"backfiller"`
+		Poller          PollerWorkflowConfig          `mapstructure:"poller"`
+		Benchmarker     BenchmarkerWorkflowConfig     `mapstructure:"benchmarker"`
+		Monitor         MonitorWorkflowConfig         `mapstructure:"monitor"`
+		Streamer        StreamerWorkflowConfig        `mapstructure:"streamer"`
+		CrossValidator  CrossValidatorWorkflowConfig  `mapstructure:"cross_validator"`
+		EventBackfiller EventBackfillerWorkflowConfig `mapstructure:"event_backfiller"`
 	}
 
 	WorkerConfig struct {
@@ -169,27 +191,46 @@ type (
 		BlockTag                       BlockTagConfig `mapstructure:"block_tag"`
 		EventTag                       EventTagConfig `mapstructure:"event_tag"`
 		Storage                        StorageConfig  `mapstructure:"storage"`
-		IrreversibleDistance           uint64         `validate:"required"`
+		IrreversibleDistance           uint64         `mapstructure:"irreversible_distance" validate:"required"`
 		FailoverEnabled                bool           `mapstructure:"failover_enabled"`
+		ConsensusFailoverEnabled       bool           `mapstructure:"consensus_failover_enabled"`
+		SLA                            SLAConfig      `mapstructure:"sla"`
 	}
 
 	BackfillerWorkflowConfig struct {
 		WorkflowConfig          `mapstructure:",squash"`
 		BatchSize               uint64 `mapstructure:"batch_size" validate:"required"`
+		MiniBatchSize           uint64 `mapstructure:"mini_batch_size" validate:"required"`
 		CheckpointSize          uint64 `mapstructure:"checkpoint_size" validate:"required,gtfield=BatchSize"`
 		MaxReprocessedPerBatch  uint64 `mapstructure:"max_reprocessed_per_batch"`
 		NumConcurrentExtractors int    `mapstructure:"num_concurrent_extractors" validate:"required"`
 	}
 
+	EventBackfillerWorkflowConfig struct {
+		WorkflowConfig `mapstructure:",squash"`
+		BatchSize      uint64 `mapstructure:"batch_size" validate:"required"`
+		CheckpointSize uint64 `mapstructure:"checkpoint_size" validate:"required,gtfield=BatchSize"`
+	}
+
 	PollerWorkflowConfig struct {
-		WorkflowConfig          `mapstructure:",squash"`
-		MaxBlocksToSyncPerCycle uint64        `mapstructure:"max_blocks_to_sync_per_cycle" validate:"required"`
-		CheckpointSize          uint64        `mapstructure:"checkpoint_size" validate:"required"`
-		BackoffInterval         time.Duration `mapstructure:"backoff_interval" validate:"required"`
-		Parallelism             int           `mapstructure:"parallelism" validate:"required"`
-		SessionCreationTimeout  time.Duration `mapstructure:"session_creation_timeout" validate:"required"`
-		SessionEnabled          bool          `mapstructure:"session_enabled"`
-		FastSync                bool          `mapstructure:"fast_sync"`
+		WorkflowConfig               `mapstructure:",squash"`
+		MaxBlocksToSyncPerCycle      uint64        `mapstructure:"max_blocks_to_sync_per_cycle" validate:"required"`
+		CheckpointSize               uint64        `mapstructure:"checkpoint_size" validate:"required"`
+		BackoffInterval              time.Duration `mapstructure:"backoff_interval"`
+		Parallelism                  int           `mapstructure:"parallelism" validate:"required"`
+		SessionCreationTimeout       time.Duration `mapstructure:"session_creation_timeout" validate:"required"`
+		SessionEnabled               bool          `mapstructure:"session_enabled"`
+		FastSync                     bool          `mapstructure:"fast_sync"`
+		NumBlocksToSkip              uint64        `mapstructure:"num_blocks_to_skip"`
+		TransactionsWriteParallelism int           `mapstructure:"transactions_write_parallelism"`
+		ConsensusValidation          bool          `mapstructure:"consensus_validation"`
+		ConsensusValidationMuted     bool          `mapstructure:"consensus_validation_muted"`
+		LivenessCheckEnabled         bool          `mapstructure:"liveness_check_enabled"`
+		// LivenessCheckViolationLimit is threshold for liveness check violations before poller failover is triggered.
+		// time to trigger failover = LivenessCheckInterval * LivenessCheckViolationLimit
+		LivenessCheckViolationLimit uint64 `mapstructure:"liveness_check_violation_limit"`
+		// LivenessCheckInterval is the interval between liveness checks.
+		LivenessCheckInterval time.Duration `mapstructure:"liveness_check_interval"`
 	}
 
 	BenchmarkerWorkflowConfig struct {
@@ -201,15 +242,17 @@ type (
 		WorkflowConfig  `mapstructure:",squash"`
 		BatchSize       uint64        `mapstructure:"batch_size" validate:"required"`
 		CheckpointSize  uint64        `mapstructure:"checkpoint_size" validate:"required"`
-		BackoffInterval time.Duration `mapstructure:"backoff_interval" validate:"required"`
+		BackoffInterval time.Duration `mapstructure:"backoff_interval"`
 		Parallelism     int           `mapstructure:"parallelism" validate:"required,gt=0"`
+		BlockGapLimit   uint64        `mapstructure:"block_gap_limit" validate:"required"`
+		EventGapLimit   int64         `mapstructure:"event_gap_limit" validate:"required"`
 	}
 
 	CrossValidatorWorkflowConfig struct {
 		WorkflowConfig        `mapstructure:",squash"`
 		BatchSize             uint64        `mapstructure:"batch_size" validate:"required"`
 		CheckpointSize        uint64        `mapstructure:"checkpoint_size" validate:"required"`
-		BackoffInterval       time.Duration `mapstructure:"backoff_interval" validate:"required"`
+		BackoffInterval       time.Duration `mapstructure:"backoff_interval"`
 		Parallelism           int           `mapstructure:"parallelism" validate:"required,gt=0"`
 		ValidationStartHeight uint64        `mapstructure:"validation_start_height"`
 		ValidationPercentage  int           `mapstructure:"validation_percentage" validate:"min=0,max=100"`
@@ -219,38 +262,47 @@ type (
 		WorkflowConfig  `mapstructure:",squash"`
 		BatchSize       uint64        `mapstructure:"batch_size" validate:"required"`
 		CheckpointSize  uint64        `mapstructure:"checkpoint_size" validate:"required"`
-		BackoffInterval time.Duration `mapstructure:"backoff_interval" validate:"required"`
+		BackoffInterval time.Duration `mapstructure:"backoff_interval"`
 	}
 
 	RosettaConfig struct {
 		Blockchain              string  `mapstructure:"blockchain"`
 		Network                 string  `mapstructure:"network" validate:"required_with=Blockchain"`
-		BlockNotFoundErrorCodes []int32 `mapstructure:"block_not_found_error_codes" validate:"required_with=Blockchain Network"`
+		BlockNotFoundErrorCodes []int32 `mapstructure:"block_not_found_error_codes"`
+		EnableRawBlockApi       bool    `mapstructure:"enable_raw_block_api"`
+		FromRosetta             bool    `mapstructure:"from_rosetta"`
 	}
 
 	EndpointGroup struct {
-		Endpoints             []Endpoint          `json:"endpoints"`
-		EndpointsFailover     []Endpoint          `json:"endpoints_failover"`
-		UseFailover           bool                `json:"use_failover"`
-		StickySession         StickySessionConfig `json:"sticky_session"`
-		StickySessionFailover StickySessionConfig `json:"sticky_session_failover"`
+		Endpoints              []Endpoint     `json:"endpoints"`
+		EndpointsFailover      []Endpoint     `json:"endpoints_failover"`
+		UseFailover            bool           `json:"use_failover"`
+		EndpointConfig         EndpointConfig `json:"endpoint_config"`
+		EndpointConfigFailover EndpointConfig `json:"endpoint_config_failover"`
 	}
 
 	// endpointGroup must be in sync with EndpointGroup
 	endpointGroup struct {
-		Endpoints             []Endpoint          `json:"endpoints"`
-		EndpointsFailover     []Endpoint          `json:"endpoints_failover"`
-		UseFailover           bool                `json:"use_failover"`
-		StickySession         StickySessionConfig `json:"sticky_session"`
-		StickySessionFailover StickySessionConfig `json:"sticky_session_failover"`
+		Endpoints              []Endpoint     `json:"endpoints"`
+		EndpointsFailover      []Endpoint     `json:"endpoints_failover"`
+		UseFailover            bool           `json:"use_failover"`
+		EndpointConfig         EndpointConfig `json:"endpoint_config"`
+		EndpointConfigFailover EndpointConfig `json:"endpoint_config_failover"`
 	}
 
 	Endpoint struct {
-		Name     string `json:"name"`
-		Url      string `json:"url"`
-		User     string `json:"user"`
-		Password string `json:"password"`
-		Weight   uint8  `json:"weight"`
+		Name       string            `json:"name"`
+		ProviderID string            `json:"provider_id"`
+		Url        string            `json:"url"`
+		User       string            `json:"user"`
+		Password   string            `json:"password"`
+		Weight     uint8             `json:"weight"`
+		ExtraUrls  map[string]string `json:"extra_urls"`
+	}
+
+	EndpointConfig struct {
+		StickySession StickySessionConfig `json:"sticky_session"`
+		Headers       map[string]string   `json:"headers"`
 	}
 
 	StickySessionConfig struct {
@@ -265,12 +317,14 @@ type (
 	}
 
 	ApiConfig struct {
-		MaxNumBlocks            uint64        `mapstructure:"max_num_blocks" validate:"required"`
-		MaxNumBlockFiles        uint64        `mapstructure:"max_num_block_files" validate:"required"`
-		NumWorkers              uint64        `mapstructure:"num_workers" validate:"required"`
-		StreamingInterval       time.Duration `mapstructure:"streaming_interval" validate:"required"`
-		StreamingBatchSize      uint64        `mapstructure:"streaming_batch_size" validate:"required"`
-		StreamingMaxNoEventTime time.Duration `mapstructure:"streaming_max_no_event_time" validate:"required"`
+		MaxNumBlocks            uint64          `mapstructure:"max_num_blocks" validate:"required"`
+		MaxNumBlockFiles        uint64          `mapstructure:"max_num_block_files" validate:"required"`
+		NumWorkers              uint64          `mapstructure:"num_workers" validate:"required"`
+		StreamingInterval       time.Duration   `mapstructure:"streaming_interval" validate:"required"`
+		StreamingBatchSize      uint64          `mapstructure:"streaming_batch_size" validate:"required"`
+		StreamingMaxNoEventTime time.Duration   `mapstructure:"streaming_max_no_event_time" validate:"required"`
+		Auth                    AuthConfig      `mapstructure:"auth"`
+		RateLimit               RateLimitConfig `mapstructure:"rate_limit"`
 	}
 
 	SDKConfig struct {
@@ -299,12 +353,16 @@ type (
 	}
 
 	SLAConfig struct {
-		Tier                  int           `mapstructure:"tier" validate:"required"` // 1 for high urgency; 2 for low urgency; 3 for work in progress.
-		BlockHeightDelta      uint64        `mapstructure:"block_height_delta" validate:"required"`
-		BlockTimeDelta        time.Duration `mapstructure:"block_time_delta" validate:"required"`
-		TimeSinceLastBlock    time.Duration `mapstructure:"time_since_last_block" validate:"required"`
-		OutOfSyncNodeDistance uint64        `mapstructure:"out_of_sync_node_distance" validate:"required"`
-		ExpectedWorkflows     []string      `mapstructure:"expected_workflows"`
+		Tier                           int           `mapstructure:"tier" validate:"required"` // 1 for high urgency; 2 for low urgency; 3 for work in progress.
+		BlockHeightDelta               uint64        `mapstructure:"block_height_delta" validate:"required"`
+		BlockTimeDelta                 time.Duration `mapstructure:"block_time_delta" validate:"required"`
+		TimeSinceLastBlock             time.Duration `mapstructure:"time_since_last_block" validate:"required"`
+		EventHeightDelta               uint64        `mapstructure:"event_height_delta" validate:"required"`
+		EventTimeDelta                 time.Duration `mapstructure:"event_time_delta" validate:"required"`
+		TimeSinceLastEvent             time.Duration `mapstructure:"time_since_last_event" validate:"required"`
+		OutOfSyncNodeDistance          uint64        `mapstructure:"out_of_sync_node_distance" validate:"required"`
+		OutOfSyncValidatorNodeDistance uint64        `mapstructure:"out_of_sync_validator_node_distance"` // If not set, use OutOfSyncNodeDistance.
+		ExpectedWorkflows              []string      `mapstructure:"expected_workflows"`
 	}
 
 	FunctionalTestConfig struct {
@@ -313,6 +371,28 @@ type (
 
 	FunctionalTest struct {
 		ConfigName string `json:"config_name"`
+	}
+
+	AuthConfig struct {
+		Clients    []AuthClient `json:"clients"`
+		DefaultRPS int          `json:"default_rps"`
+	}
+
+	// authConfig must be in sync with AuthConfig.
+	authConfig struct {
+		Clients    []AuthClient `json:"clients"`
+		DefaultRPS int          `json:"default_rps"`
+	}
+
+	AuthClient struct {
+		ClientID string `json:"client_id"`
+		Token    string `json:"token"`
+		RPS      int    `json:"rps"`
+	}
+
+	RateLimitConfig struct {
+		GlobalRPS    int `mapstructure:"global_rps"`
+		PerClientRPS int `mapstructure:"per_client_rps"`
 	}
 
 	ConfigOption func(options *configOptions)
@@ -330,6 +410,7 @@ type (
 		Blockchain common.Blockchain `validate:"required"`
 		Network    common.Network    `validate:"required"`
 		Env        Env               `validate:"required,oneof=production development local"`
+		Sidechain  api.SideChain
 	}
 
 	// derivedConfig defines a callback where a config struct can override its fields based on the global config.
@@ -343,8 +424,10 @@ var (
 	_ derivedConfig = (*WorkflowConfig)(nil)
 	_ derivedConfig = (*AwsConfig)(nil)
 	_ derivedConfig = (*CadenceConfig)(nil)
+	_ derivedConfig = (*SDKConfig)(nil)
 
 	AWSAccountEnvMap = map[AWSAccount]Env{
+		"":                    EnvLocal,
 		AWSAccountDevelopment: EnvDevelopment,
 		AWSAccountProduction:  EnvProduction,
 	}
@@ -382,6 +465,9 @@ const (
 	DefaultNamespace  = "chainstorage"
 	DefaultConfigName = "ethereum-mainnet"
 
+	BootcampConfig    = "bootcamp-mainnet"
+	BootcampNamespace = "bootcamp"
+
 	EnvBase        Env = "base"
 	EnvLocal       Env = "local"
 	EnvDevelopment Env = "development"
@@ -400,23 +486,36 @@ const (
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
 
-	placeholderPassword      = "<placeholder>"
-	tagBlockchain            = "blockchain"
-	tagNetwork               = "network"
-	tagTier                  = "tier"
-	s3BucketFormat           = "example-chainstorage-%v-%v"
-	cadenceAddressLocal      = "localhost:7233"
+	placeholderPassword = "<placeholder>"
+
+	tagBlockchain = "blockchain"
+	tagNetwork    = "network"
+	tagTier       = "tier"
+	tagSidechain  = "sidechain"
+
+	devConsoleConfigName = "devconsole"
+	defaultReleaseID     = "default_release_id"
+)
+
+const (
+	s3BucketFormat = "cba-chainstorage-%v-%v"
+)
+
+const (
+	cadenceAddressLocal = "localhost:7233"
+)
+
+const (
 	chainstorageAddressLocal = "http://localhost:9090"
 )
 
 func New(opts ...ConfigOption) (*Config, error) {
 	validate := validator.New()
 
-	configName, ok := os.LookupEnv(EnvVarConfigName)
-	if !ok {
-		configName = DefaultConfigName
-	}
+	// Get configname, such as "ethereum-mainnet"
+	configName := getConfigName()
 
+	// Get "blockchain", "network" "env"
 	configOpts, err := getConfigOptions(configName, opts...)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get config options %w", err)
@@ -426,23 +525,26 @@ func New(opts ...ConfigOption) (*Config, error) {
 		return nil, xerrors.Errorf("failed to validate config options: %w", err)
 	}
 
-	configReader, err := getConfigData(configOpts.Namespace, EnvBase, configOpts.Blockchain, configOpts.Network)
+	// Get data in base.yml for the target blockchain-network-env
+	configReader, err := getConfigData(configOpts.Namespace, EnvBase, configOpts.Blockchain, configOpts.Network, configOpts.Sidechain)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to locate config file: %w", err)
 	}
-
-	v := viper.New()
-	v.SetConfigName(string(EnvBase))
-	v.SetConfigType("yaml")
-	v.AutomaticEnv()
-	v.AllowEmptyEnv(true)
-	v.SetEnvPrefix("CHAINSTORAGE")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	cfg := Config{
 		namespace: configOpts.Namespace,
 		env:       configOpts.Env,
 	}
+
+	v := viper.New()
+	// First, read the data in base.yml
+	v.SetConfigName(string(EnvBase))
+	v.SetConfigType("yaml")
+	v.AutomaticEnv()
+	v.AllowEmptyEnv(true)
+	// All env set by codeflow has the prefix of CHAINSTORAGE
+	v.SetEnvPrefix("CHAINSTORAGE")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Set default values.
 	// Note that the default values may be overridden by environment variable or config file.
@@ -454,6 +556,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 		v.SetDefault("aws.reset_local", true)
 	}
 
+	// Read the data in base.yml
 	if err := v.ReadConfig(configReader); err != nil {
 		return nil, xerrors.Errorf("failed to read config: %w", err)
 	}
@@ -463,7 +566,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 		return nil, xerrors.Errorf("failed to merge in %v config: %w", configOpts.Env, err)
 	}
 
-	// Merge in secrets.yml
+	// Merge in .secrets.yml. Note that this is a no-op for development and production env.
 	if err := mergeInConfig(v, configOpts, envSecrets); err != nil {
 		return nil, xerrors.Errorf("failed to merge in %v config: %w", envSecrets, err)
 	}
@@ -478,6 +581,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 		stringToBlockchainHookFunc(),
 		stringToNetworkHookFunc(),
 		stringToCompressionHookFunc(),
+		stringToSidechainHookFunc(),
 	))); err != nil {
 		return nil, xerrors.Errorf("failed to unmarshal config: %w", err)
 	}
@@ -513,9 +617,25 @@ func GetEnv() Env {
 	return env
 }
 
+func getConfigName() string {
+	configName, ok := os.LookupEnv(EnvVarConfigName)
+	if !ok {
+		configName = DefaultConfigName
+	}
+	return configName
+}
+
+func GetProjectName() string {
+	projectName, ok := os.LookupEnv("CODEFLOW_PROJECT_NAME")
+	if !ok {
+		projectName = consts.ProjectName
+	}
+	return projectName
+}
+
 func mergeInConfig(v *viper.Viper, configOpts *configOptions, env Env) error {
 	// Merge in the env-specific config if available.
-	if configReader, err := getConfigData(configOpts.Namespace, env, configOpts.Blockchain, configOpts.Network); err == nil {
+	if configReader, err := getConfigData(configOpts.Namespace, env, configOpts.Blockchain, configOpts.Network, configOpts.Sidechain); err == nil {
 		v.SetConfigName(string(env))
 		if err := v.MergeConfig(configReader); err != nil {
 			return xerrors.Errorf("failed to merge config %v: %w", env, err)
@@ -540,6 +660,10 @@ func (c *Config) Network() common.Network {
 	return c.Chain.Network
 }
 
+func (c *Config) Sidechain() api.SideChain {
+	return c.Chain.Sidechain
+}
+
 func (c *Config) Tier() int {
 	return c.SLA.Tier
 }
@@ -549,6 +673,7 @@ func (c *Config) GetCommonTags() map[string]string {
 		tagBlockchain: c.Blockchain().GetName(),
 		tagNetwork:    c.Network().GetName(),
 		tagTier:       strconv.Itoa(c.Tier()),
+		tagSidechain:  c.Sidechain().GetName(),
 	}
 }
 
@@ -656,6 +781,12 @@ func WithNetwork(network common.Network) ConfigOption {
 	}
 }
 
+func WithSidechain(sidechain api.SideChain) ConfigOption {
+	return func(opts *configOptions) {
+		opts.Sidechain = sidechain
+	}
+}
+
 func WithEnvironment(env Env) ConfigOption {
 	return func(opts *configOptions) {
 		opts.Env = env
@@ -682,45 +813,62 @@ func getConfigOptions(configName string, opts ...ConfigOption) (*configOptions, 
 	}
 
 	if configOpts.Blockchain == common.Blockchain_BLOCKCHAIN_UNKNOWN && configOpts.Network == common.Network_NETWORK_UNKNOWN {
-		blockchain, network, err := ParseConfigName(configName)
+		blockchain, network, sidechain, err := ParseConfigName(configName)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to parse config name: %w", err)
 		}
 
 		configOpts.Blockchain = blockchain
 		configOpts.Network = network
+		configOpts.Sidechain = sidechain
 	}
 
 	return configOpts, nil
 }
 
-func ParseConfigName(configName string) (common.Blockchain, common.Network, error) {
+func ParseConfigName(configName string) (common.Blockchain, common.Network, api.SideChain, error) {
+	// Use ethereum-mainnet chain for bootcamp config
+	if configName == BootcampConfig {
+		return common.Blockchain_BLOCKCHAIN_ETHEREUM, common.Network_NETWORK_ETHEREUM_MAINNET, api.SideChain_SIDECHAIN_NONE, nil
+	}
+
 	// Normalize the config name by replacing "-" with "_".
 	configName = strings.ReplaceAll(configName, "-", "_")
 
 	splitString := strings.Split(configName, "_")
-	if len(splitString) != 2 {
-		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, xerrors.Errorf("config name is invalid: %v", configName)
+	if len(splitString) < 2 || len(splitString) > 3 {
+		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("config name is invalid: %v", configName)
 	}
 
 	blockchainName := splitString[0]
 	blockchain, err := utils.ParseBlockchain(blockchainName)
 	if err != nil {
-		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, xerrors.Errorf("failed to parse blockchain from config name %v: %w", configName, err)
+		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse blockchain from config name %v: %w", configName, err)
 	}
 
 	networkName := fmt.Sprintf("%v_%v", splitString[0], splitString[1])
 	network, err := utils.ParseNetwork(networkName)
 	if err != nil {
-		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, xerrors.Errorf("failed to parse network from config name %v: %w", configName, err)
+		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse network from config name %v: %w", configName, err)
 	}
 
-	return blockchain, network, nil
+	if len(splitString) == 3 {
+		sidechainName := fmt.Sprintf("%v_%v_%v", splitString[0], splitString[1], splitString[2])
+		sidechain, err := utils.ParseSidechain(sidechainName)
+		if err != nil {
+			return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse sidechain from config name %v: %w", configName, err)
+		}
+
+		return blockchain, network, sidechain, nil
+	}
+
+	return blockchain, network, api.SideChain_SIDECHAIN_NONE, nil
 }
 
-func getConfigData(namespace string, env Env, blockchain common.Blockchain, network common.Network) (io.Reader, error) {
+func getConfigData(namespace string, env Env, blockchain common.Blockchain, network common.Network, sidechain api.SideChain) (io.Reader, error) {
 	blockchainName := blockchain.GetName()
 	networkName := strings.TrimPrefix(network.GetName(), blockchainName+"-")
+	sidechainName := strings.TrimPrefix(sidechain.GetName(), blockchainName+"-"+networkName+"-")
 
 	if env == envSecrets {
 		// secrets.yml contains credentials and therefore is not embedded in config.go.
@@ -730,7 +878,10 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 			return nil, xerrors.Errorf("failed to recover the filename information")
 		}
 		rootDir := strings.TrimSuffix(filename, CurrentFileName)
-		configPath := fmt.Sprintf("%v/config/%v/%v/%v/%v.yml", rootDir, namespace, blockchainName, networkName, env)
+		configPath := fmt.Sprintf("%v/config/%v/%v/%v/.secrets.yml", rootDir, namespace, blockchainName, networkName)
+		if sidechain != api.SideChain_SIDECHAIN_NONE {
+			configPath = fmt.Sprintf("%v/config/%v/%v/%v/%v/.secrets.yml", rootDir, namespace, blockchainName, networkName, sidechainName)
+		}
 		reader, err := os.Open(configPath)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to read config file %v: %w", configPath, err)
@@ -738,13 +889,17 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 		return reader, nil
 	}
 
-	configPath := fmt.Sprintf("config/%v/%v/%v/%v.yml", namespace, blockchainName, networkName, env)
+	configPath := fmt.Sprintf("%v/%v/%v/%v.yml", namespace, blockchainName, networkName, env)
+	if sidechain != api.SideChain_SIDECHAIN_NONE {
+		configPath = fmt.Sprintf("%v/%v/%v/%v/%v.yml", namespace, blockchainName, networkName, sidechainName, env)
+	}
 
+	//TODO: update the change to use config.Store.ReadFile(configPath)
 	data, err := config.Asset(configPath)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to read config file %v: %w", configPath, err)
 	}
-	return bytes.NewBuffer((data)), nil
+	return bytes.NewBuffer(data), nil
 }
 
 func keysWithoutUnspecified[V interface{}](m map[string]V) []string {
@@ -821,7 +976,7 @@ func stringToDLQTypeHookFunc() mapstructure.DecodeHookFunc {
 }
 
 func stringToBlockchainHookFunc() mapstructure.DecodeHookFunc {
-	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
 		if f.Kind() != reflect.String {
 			return data, nil
 		}
@@ -835,7 +990,7 @@ func stringToBlockchainHookFunc() mapstructure.DecodeHookFunc {
 }
 
 func stringToNetworkHookFunc() mapstructure.DecodeHookFunc {
-	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
 		if f.Kind() != reflect.String {
 			return data, nil
 		}
@@ -849,7 +1004,7 @@ func stringToNetworkHookFunc() mapstructure.DecodeHookFunc {
 }
 
 func stringToCompressionHookFunc() mapstructure.DecodeHookFunc {
-	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
 		if f.Kind() != reflect.String {
 			return data, nil
 		}
@@ -859,6 +1014,20 @@ func stringToCompressionHookFunc() mapstructure.DecodeHookFunc {
 		}
 
 		return api.Compression_value[data.(string)], nil
+	}
+}
+
+func stringToSidechainHookFunc() mapstructure.DecodeHookFunc {
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+
+		if t != reflect.TypeOf(api.SideChain_SIDECHAIN_NONE) {
+			return data, nil
+		}
+
+		return api.SideChain_value[data.(string)], nil
 	}
 }
 
@@ -884,16 +1053,6 @@ func (f *FunctionalTestConfig) Empty() bool {
 	return len(f.SkipFunctionalTest) == 0
 }
 
-func (c *ClientConfig) Empty() bool {
-	for _, cfg := range []*JSONRPCConfig{&c.Master, &c.Slave, &c.Validator} {
-		if cfg.EndpointGroup.Empty() {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (e *EndpointGroup) Empty() bool {
 	if len(e.Endpoints) == 0 {
 		return true
@@ -910,10 +1069,10 @@ func (e *EndpointGroup) Empty() bool {
 
 func (e *EndpointGroup) ActiveStickySession() *StickySessionConfig {
 	if e.UseFailover {
-		return &e.StickySessionFailover
+		return &e.EndpointConfigFailover.StickySession
 	}
 
-	return &e.StickySession
+	return &e.EndpointConfig.StickySession
 }
 
 func (e *EndpointGroup) UnmarshalText(text []byte) error {
@@ -937,14 +1096,14 @@ func (e *EndpointGroup) UnmarshalText(text []byte) error {
 	e.Endpoints = eg.Endpoints
 	e.EndpointsFailover = eg.EndpointsFailover
 	e.UseFailover = eg.UseFailover
-	e.StickySession = eg.StickySession
-	e.StickySessionFailover = eg.StickySessionFailover
+	e.EndpointConfig = eg.EndpointConfig
+	e.EndpointConfigFailover = eg.EndpointConfigFailover
 
-	if err := e.StickySession.validateStickySession(); err != nil {
+	if err := e.EndpointConfig.StickySession.validateStickySession(); err != nil {
 		return xerrors.Errorf("invalid sticky session config for the primary endpoint group: %w", err)
 	}
 
-	if err := e.StickySessionFailover.validateStickySession(); err != nil {
+	if err := e.EndpointConfigFailover.StickySession.validateStickySession(); err != nil {
 		return xerrors.Errorf("invalid sticky session config for the failover endpoint group: %w", err)
 	}
 
@@ -1012,7 +1171,11 @@ func (c *WorkflowConfig) DeriveConfig(cfg *Config) {
 	// Derive from the global Storage config.
 	c.Storage = cfg.AWS.Storage
 
-	c.IrreversibleDistance = cfg.Chain.IrreversibleDistance
+	if c.IrreversibleDistance == 0 {
+		c.IrreversibleDistance = cfg.Chain.IrreversibleDistance
+	}
+
+	c.SLA = cfg.SLA
 }
 
 // GetEffectiveBlockTag returns the effective tag value.
@@ -1055,4 +1218,44 @@ func (c *CadenceConfig) DeriveConfig(cfg *Config) {
 	if c.Address == "" && cfg.Env() == EnvLocal {
 		c.Address = cadenceAddressLocal
 	}
+}
+
+func (c *SDKConfig) DeriveConfig(cfg *Config) {
+	if c.ChainstorageAddress == "" && cfg.Env() == EnvLocal {
+		c.ChainstorageAddress = chainstorageAddressLocal
+	}
+}
+
+func (c *AuthConfig) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		return nil
+	}
+
+	var tmp authConfig
+	err := json.Unmarshal(text, &tmp)
+	if err != nil {
+		return xerrors.Errorf("failed to parse AuthConfig: %w", err)
+	}
+
+	for _, client := range tmp.Clients {
+		if client.ClientID == "" {
+			return xerrors.New("empty client_id")
+		}
+		if client.Token == "" {
+			return xerrors.New("empty token")
+		}
+	}
+
+	c.Clients = tmp.Clients
+	c.DefaultRPS = tmp.DefaultRPS
+	return nil
+}
+
+func (c *AuthConfig) AsMap() map[string]*AuthClient {
+	res := make(map[string]*AuthClient, len(c.Clients))
+	for i := range c.Clients {
+		client := &c.Clients[i]
+		res[client.Token] = client
+	}
+	return res
 }

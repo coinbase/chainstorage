@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap/zaptest"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -34,8 +35,9 @@ func TestIntegrationALBStickySession(t *testing.T) {
 	params := EndpointProviderParams{
 		Config: cfg,
 		Logger: zaptest.NewLogger(t),
+		Scope:  tally.NoopScope,
 	}
-	master, err := newEndpointProvider(params.Logger, params.Config, &params.Config.Chain.Client.Master.EndpointGroup, "master")
+	master, err := newEndpointProvider(params.Logger, params.Config, params.Scope, &params.Config.Chain.Client.Master.EndpointGroup, "master")
 	require.NoError(err)
 
 	endpoint, err := master.GetEndpoint(context.Background())

@@ -35,14 +35,20 @@ type (
 	StreamerRequest struct {
 		BatchSize             uint64 // Optional. If not specified, it is read from the workflow config.
 		CheckpointSize        uint64 // Optional. If not specified, it is read from the workflow config.
-		BackoffIntervalSecs   uint64 // Optional. If not specified, it is read from the workflow config.
+		BackoffInterval       string // Optional. If not specified, it is read from the workflow config.
 		MaxAllowedReorgHeight uint64 // Optional. If not specified, it is read from the workflow config.
 		EventTag              uint32 // Optional.
+		Tag                   uint32 // Optional.
 	}
 )
 
 const (
 	defaultStreamerEventTag = 0
+
+	// metrics for streamer. need to have "workflow.streamer" as prefix
+	streamerHeightGauge             = "workflow.streamer.height"
+	streamerGapGauge                = "workflow.streamer.gap"
+	streamerTimeSinceLastBlockGauge = "workflow.streamer.time_since_last_block"
 )
 
 var (
@@ -53,7 +59,6 @@ func NewStreamer(params StreamerParams) *Streamer {
 	w := &Streamer{
 		baseWorkflow: newBaseWorkflow(&params.Config.Workflows.Streamer, params.Runtime),
 		streamer:     params.Streamer,
-		tag:          params.Config.GetStableBlockTag(),
 	}
 	w.registerWorkflow(w.execute)
 
@@ -90,29 +95,39 @@ func (w *Streamer) execute(ctx workflow.Context, request *StreamerRequest) error
 			checkpointSize = request.CheckpointSize
 		}
 
+		var err error
 		backoffInterval := cfg.BackoffInterval
-		if request.BackoffIntervalSecs > 0 {
-			backoffInterval = time.Duration(request.BackoffIntervalSecs) * time.Second
+		if request.BackoffInterval != "" {
+			backoffInterval, err = time.ParseDuration(request.BackoffInterval)
+			if err != nil {
+				return xerrors.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
+			}
 		}
+		zeroBackoff := backoffInterval == 0
 
 		maxAllowedReorgHeight := cfg.IrreversibleDistance
 		if request.MaxAllowedReorgHeight > 0 {
 			maxAllowedReorgHeight = request.MaxAllowedReorgHeight
 		}
 
-		eventTag := request.EventTag
+		eventTag := cfg.GetEffectiveEventTag(request.EventTag)
+		tag := cfg.GetEffectiveBlockTag(request.Tag)
 
 		logger.Info("workflow started")
 		ctx = w.withActivityOptions(ctx)
 
-		metrics := w.getScope(ctx).Tagged(map[string]string{
+		metrics := w.getMetricsHandler(ctx).WithTags(map[string]string{
 			tagEventTag: strconv.Itoa(int(eventTag)),
 		})
+		var backoff workflow.Future
 		for i := 0; i < int(checkpointSize); i++ {
-			backoff := workflow.NewTimer(ctx, backoffInterval)
+			if !zeroBackoff {
+				backoff = workflow.NewTimer(ctx, backoffInterval)
+			}
+
 			streamerRequest := &activity.StreamerRequest{
 				BatchSize:             batchSize,
-				Tag:                   w.tag,
+				Tag:                   tag,
 				MaxAllowedReorgHeight: maxAllowedReorgHeight,
 				EventTag:              eventTag,
 			}
@@ -121,15 +136,18 @@ func (w *Streamer) execute(ctx workflow.Context, request *StreamerRequest) error
 				return xerrors.Errorf("failed to execute streamer activity: %w", err)
 			}
 			lastStreamedHeight := response.LatestStreamedHeight
-			metrics.Gauge("height").Update(float64(lastStreamedHeight))
-			metrics.Gauge("gap").Update(float64(response.Gap))
+			metrics.Gauge(streamerHeightGauge).Update(float64(lastStreamedHeight))
+			metrics.Gauge(streamerGapGauge).Update(float64(response.Gap))
 			if response.TimeSinceLastBlock > 0 {
-				metrics.Gauge("time_since_last_block").Update(response.TimeSinceLastBlock.Seconds())
+				metrics.Gauge(streamerTimeSinceLastBlockGauge).Update(response.TimeSinceLastBlock.Seconds())
 			}
 
 			logger.Info("streamer", zap.Int("iteration", i), zap.Reflect("response", response))
-			if err := backoff.Get(ctx, nil); err != nil {
-				return xerrors.Errorf("failed to sleep: %w", err)
+
+			if !zeroBackoff {
+				if err := backoff.Get(ctx, nil); err != nil {
+					return xerrors.Errorf("failed to sleep: %w", err)
+				}
 			}
 		}
 		return workflow.NewContinueAsNewError(ctx, w.name, request)

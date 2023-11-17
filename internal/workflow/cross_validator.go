@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
@@ -36,11 +37,18 @@ type (
 		BatchSize               uint64 // Optional. If not specified, it is read from the workflow config.
 		CheckpointSize          uint64 // Optional. If not specified, it is read from the workflow config.
 		Parallelism             int    // Optional. If not specified, it is read from the workflow config.
+		BackoffInterval         string // Optional. If not specified, it is read from the workflow config.
 	}
 )
 
 var (
 	_ InstrumentedRequest = (*CrossValidatorRequest)(nil)
+)
+
+const (
+	// crossValidator metrics. need to have `workflow.cross_validator` as prefix
+	crossValidatorHeightGauge   = "workflow.cross_validator.height"
+	crossValidatorBlockGapGauge = "workflow.cross_validator.block_gap"
 )
 
 func NewCrossValidator(params CrossValidatorParams) *CrossValidator {
@@ -93,16 +101,29 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 			parallelism = request.Parallelism
 		}
 
+		var err error
+		backoffInterval := cfg.BackoffInterval
+		if request.BackoffInterval != "" {
+			backoffInterval, err = time.ParseDuration(request.BackoffInterval)
+			if err != nil {
+				return xerrors.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
+			}
+		}
+		zeroBackoff := backoffInterval == 0
+
 		logger.Info("workflow started")
 		ctx = w.withActivityOptions(ctx)
 
 		tag := cfg.GetEffectiveBlockTag(request.Tag)
-		metrics := w.getScope(ctx).Tagged(map[string]string{
+		metrics := w.getMetricsHandler(ctx).WithTags(map[string]string{
 			tagBlockTag: strconv.Itoa(int(tag)),
 		})
 
+		var backoff workflow.Future
 		for i := 0; i < int(checkpointSize); i++ {
-			backoff := workflow.NewTimer(ctx, cfg.BackoffInterval)
+			if !zeroBackoff {
+				backoff = workflow.NewTimer(ctx, backoffInterval)
+			}
 
 			crossValidatorRequest := &activity.CrossValidatorRequest{
 				Tag:                     tag,
@@ -110,7 +131,6 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 				ValidationHeightPadding: validationHeightPadding,
 				MaxHeightsToValidate:    batchSize,
 				Parallelism:             parallelism,
-				MaxReorgDistance:        cfg.IrreversibleDistance,
 			}
 			crossValidatorResponse, err := w.crossValidator.Execute(ctx, crossValidatorRequest)
 			if err != nil {
@@ -118,12 +138,14 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 			}
 
 			logger.Info("validated blocks", zap.Reflect("response", crossValidatorResponse))
-
 			startHeight = crossValidatorResponse.EndHeight
-			metrics.Gauge("height").Update(float64(startHeight - 1))
-			metrics.Gauge("block_gap").Update(float64(crossValidatorResponse.BlockGap))
-			if err := backoff.Get(ctx, nil); err != nil {
-				return xerrors.Errorf("failed to sleep: %w", err)
+			metrics.Gauge(crossValidatorHeightGauge).Update(float64(startHeight - 1))
+			metrics.Gauge(crossValidatorBlockGapGauge).Update(float64(crossValidatorResponse.BlockGap))
+
+			if !zeroBackoff {
+				if err := backoff.Get(ctx, nil); err != nil {
+					return xerrors.Errorf("failed to sleep: %w", err)
+				}
 			}
 		}
 

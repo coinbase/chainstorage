@@ -1,13 +1,11 @@
 package instrument
 
 import (
-	"context"
-
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/zap"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
-	"github.com/coinbase/chainstorage/internal/utils/instrument"
 )
 
 type (
@@ -17,14 +15,33 @@ type (
 		msg     string
 	}
 
-	Option func(options *instrumentOptions)
+	Fn       func() error
+	FilterFn func(err error) bool
 
-	Fn = func() error
+	Option func(options *instrumentOptions)
 
 	instrumentOptions struct {
 		scopeTags    map[string]string
 		loggerFields []zap.Field
 		filter       func(err error) bool
+	}
+)
+
+const (
+	resultType        = "result_type"
+	resultTypeError   = "error"
+	resultTypeSuccess = "success"
+	latencySuffix     = "latency"
+	durationTag       = "duration"
+)
+
+var (
+	errTags = map[string]string{
+		resultType: resultTypeError,
+	}
+
+	successTags = map[string]string{
+		resultType: resultTypeSuccess,
 	}
 )
 
@@ -54,31 +71,41 @@ func WithFilter(filter func(err error) bool) Option {
 	}
 }
 
-func (i *Instrument) Instrument(ctx workflow.Context, fn Fn, opts ...Option) error {
+func (i *Instrument) Instrument(ctx workflow.Context, operation Fn, opts ...Option) error {
 	options := newOptions(opts...)
 
-	scope := i.runtime.GetScope(ctx)
+	metricsHandler := i.runtime.GetMetricsHandler(ctx)
 	if len(options.scopeTags) > 0 {
-		scope = scope.Tagged(options.scopeTags)
+		metricsHandler = metricsHandler.WithTags(options.scopeTags)
 	}
+	errCounter := metricsHandler.WithTags(errTags).Counter(i.name)
+	successCounter := metricsHandler.WithTags(successTags).Counter(i.name)
+	latencyTimer := metricsHandler.Timer(i.name + "." + latencySuffix)
 
-	logger := i.runtime.GetLogger(ctx)
+	timeSource := i.runtime.GetTimeSource(ctx)
+	startTime := timeSource.Now()
+
+	err := operation()
+
+	finishTime := timeSource.Now()
+	duration := finishTime.Sub(startTime)
+	latencyTimer.Record(duration)
+
+	logger := i.runtime.GetLogger(ctx).With(zap.String(durationTag, duration.String()))
 	if len(options.loggerFields) > 0 {
 		logger = logger.With(options.loggerFields...)
 	}
+	if err != nil {
+		if options.filter != nil && options.filter(err) {
+			i.onSuccess(successCounter, logger, err)
+		} else {
+			i.onError(errCounter, logger, err)
+		}
+		return err
+	}
 
-	call := instrument.NewCall(
-		scope,
-		i.name,
-		instrument.WithLogger(logger, i.msg),
-		instrument.WithFilter(options.filter),
-		instrument.WithTimeSource(i.runtime.GetTimeSource(ctx)),
-	)
-	// workflow.Context is incompatible with context.Context;
-	// therefore, an empty context.Context is used here.
-	return call.Instrument(context.Background(), func(ctx context.Context) error {
-		return fn()
-	})
+	i.onSuccess(successCounter, logger, nil)
+	return nil
 }
 
 func newOptions(opts ...Option) *instrumentOptions {
@@ -91,4 +118,14 @@ func newOptions(opts ...Option) *instrumentOptions {
 	}
 
 	return options
+}
+
+func (i *Instrument) onSuccess(successCounter client.MetricsCounter, logger *zap.Logger, err error) {
+	successCounter.Inc(1)
+	logger.Debug(i.msg, zap.Error(err))
+}
+
+func (i *Instrument) onError(errCounter client.MetricsCounter, logger *zap.Logger, err error) {
+	errCounter.Inc(1)
+	logger.Error(i.msg, zap.Error(err))
 }

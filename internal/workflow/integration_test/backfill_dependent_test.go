@@ -11,6 +11,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
+	"github.com/coinbase/chainstorage/internal/blockchain/restapi"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/dlq"
 	"github.com/coinbase/chainstorage/internal/s3"
@@ -51,6 +52,7 @@ func (s *backfillerDependentTestSuite) backfillData(startHeight, endHeight uint6
 		workflow.Module,
 		client.Module,
 		jsonrpc.Module,
+		restapi.Module,
 		s3.Module,
 		storage.Module,
 		dlq.Module,

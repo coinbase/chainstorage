@@ -192,6 +192,33 @@ func (c *restClient) GetVersionedChainEvent(ctx context.Context, request *api.Ge
 	return &response, nil
 }
 
+func (c *restClient) GetBlockByTransaction(ctx context.Context, in *api.GetBlockByTransactionRequest, opts ...grpc.CallOption) (*api.GetBlockByTransactionResponse, error) {
+	var response api.GetBlockByTransactionResponse
+	if err := c.makeRequest(ctx, "GetBlockByTransaction", in, &response); err != nil {
+		return nil, xerrors.Errorf("failed to make request: %w", err)
+	}
+
+	return &response, nil
+}
+
+func (c *restClient) GetNativeTransaction(ctx context.Context, in *api.GetNativeTransactionRequest, opts ...grpc.CallOption) (*api.GetNativeTransactionResponse, error) {
+	var response api.GetNativeTransactionResponse
+	if err := c.makeRequest(ctx, "GetNativeTransaction", in, &response); err != nil {
+		return nil, xerrors.Errorf("failed to make request: %w", err)
+	}
+
+	return &response, nil
+}
+
+func (c *restClient) GetVerifiedAccountState(ctx context.Context, in *api.GetVerifiedAccountStateRequest, opts ...grpc.CallOption) (*api.GetVerifiedAccountStateResponse, error) {
+	var response api.GetVerifiedAccountStateResponse
+	if err := c.makeRequest(ctx, "GetVerifiedAccountState", in, &response); err != nil {
+		return nil, xerrors.Errorf("failed to make request: %w", err)
+	}
+
+	return &response, nil
+}
+
 func (c *restClient) makeRequest(ctx context.Context, method string, request proto.Message, response proto.Message) error {
 	return c.retry.Retry(ctx, func(ctx context.Context) error {
 		marshaler := protojson.MarshalOptions{}

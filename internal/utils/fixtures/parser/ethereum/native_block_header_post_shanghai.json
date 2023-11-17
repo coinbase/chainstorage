@@ -20,6 +20,7 @@
   "size":             "47340",
   "gasLimit":         "12463394",
   "gasUsed":          "12461357",
+  "mixHash":          "0x7cfd7be6442751ccf7019016fc6e0fcebe2734fd3456e7a2b65fb48e3723a9f9",
   "withdrawals": [
     {
       "index":          "115096",

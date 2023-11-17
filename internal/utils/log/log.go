@@ -54,6 +54,11 @@ func WithPackage(logger *zap.Logger) *zap.Logger {
 	}
 
 	packageName := filepath.Base(filepath.Dir(file))
+	if packageName == "internal" {
+		// If the caller is in the internal package, use the parent directory name.
+		packageName = filepath.Base(filepath.Dir(filepath.Dir(file)))
+	}
+
 	return logger.With(zap.String("package", packageName))
 }
 
