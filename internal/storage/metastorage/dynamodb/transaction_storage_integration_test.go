@@ -43,7 +43,7 @@ func (s *transactionStorageTestSuite) SetupTest() {
 	s.config = cfg
 	app := testapp.New(
 		s.T(),
-		Module,
+		fx.Provide(NewMetaStorage),
 		testapp.WithIntegration(),
 		testapp.WithConfig(s.config),
 		fx.Populate(&storage),
