@@ -1,0 +1,4 @@
+aws:
+  bucket: example-chainstorage-bootcamp-mainnet-prod
+sdk:
+  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/bootcamp/mainnet/v1

@@ -1,33 +1,31 @@
 aws:
   aws_account: development
-  storage:
-    data_compression: GZIP
+  dynamodb:
+    event_table: example_chainstorage_block_events_{{blockchain}}_{{network}}
+    event_table_height_index: example_chainstorage_block_events_by_height_{{blockchain}}_{{network}}
 chain:
-  block_time: 13s
+  block_time: 12s
   event_tag:
     latest: 0
     stable: 0
-  irreversible_distance: 14
+  irreversible_distance: 36
   feature:
     rosetta_parser: true
+    block_validation_enabled: true
+    block_validation_muted: true
 sla:
-  block_height_delta: 40
-  block_time_delta: 10m
-  out_of_sync_node_distance: 40
-  tier: 1
-  time_since_last_block: 15m
-  expected_workflows:
-    - monitor
-    - poller
-    - streamer
-    - datalake/block_tag=1
+  block_height_delta: 20
+  block_time_delta: 5m
+  out_of_sync_node_distance: 20
+  tier: 2
+  time_since_last_block: 5m
+  event_height_delta: 20
+  event_time_delta: 5m
+  time_since_last_event: 5m
 workflows:
   backfiller:
     num_concurrent_extractors: 24
   poller:
-    backoff_interval: 10s
-    failover_enabled: true
-  streamer:
-    backoff_interval: 10s
-  monitor:
-    failover_enabled: true
+    session_enabled: true
+    consensus_validation: true
+    consensus_validation_muted: true

@@ -173,16 +173,16 @@ func (c *ConfigGenerator) getEnvFromCloudConfig(path string) (*ConfigVars, error
 		return nil, xerrors.Errorf("unable to extract Env from path [%s]: %w", path, err)
 	}
 	configSplit := strings.Split(configName, "_")
-	if len(configSplit) != 2 {
-		return nil, xerrors.Errorf("unable to extract blockchain and network from config_name [%s]", configName)
-	}
-	if err != nil {
-		return nil, xerrors.Errorf("unable to extract configName from path [%s]: %w", path, err)
+	if len(configSplit) < 2 || len(configSplit) > 3 {
+		return nil, xerrors.Errorf("unable to extract blockchain, network and sidechain from config_name [%s]", configName)
 	}
 	configVars := &ConfigVars{
 		Blockchain:  configSplit[0],
 		Network:     configSplit[1],
 		Environment: env,
+	}
+	if len(configSplit) == 3 {
+		configVars.SideChain = configSplit[2]
 	}
 	return configVars, nil
 }
@@ -195,9 +195,16 @@ func (c *ConfigGenerator) getEnvFromChainStorageConfig(path string) (*ConfigVars
 	}
 
 	dir, _ := filepath.Split(path)
-	network := filepath.Base(dir)
+	sidechain := filepath.Base(dir)
 	dir = filepath.Dir(filepath.Dir(dir))
+	network := filepath.Base(dir)
+	dir = filepath.Dir(dir)
 	blockchain := filepath.Base(dir)
+
+	if blockchain == "chainstorage" || blockchain == "bootcamp" {
+		blockchain = network
+		network = sidechain
+	}
 
 	err = c.validateBlockchainNetwork(blockchain, network)
 	if err != nil {
@@ -207,6 +214,7 @@ func (c *ConfigGenerator) getEnvFromChainStorageConfig(path string) (*ConfigVars
 		Blockchain:  blockchain,
 		Network:     network,
 		Environment: env,
+		SideChain:   sidechain,
 	}
 	return configVars, nil
 }

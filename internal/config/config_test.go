@@ -123,8 +123,8 @@ func TestConfig(t *testing.T) {
 		// Verify derived configs.
 		dynamoDB := config.DynamoDBConfig{
 			BlockTable:                    fmt.Sprintf("example_chainstorage_blocks_%v", configName),
-			EventTable:                    fmt.Sprintf("example_chainstorage_block_events_%v", configName),
-			EventTableHeightIndex:         fmt.Sprintf("example_chainstorage_block_events_by_height_%v", configName),
+			EventTable:                    cfg.AWS.DynamoDB.EventTable,
+			EventTableHeightIndex:         cfg.AWS.DynamoDB.EventTableHeightIndex,
 			VersionedEventTable:           fmt.Sprintf("example_chainstorage_versioned_block_events_%v", configName),
 			VersionedEventTableBlockIndex: fmt.Sprintf("example_chainstorage_versioned_block_events_by_block_id_%v", configName),
 			TransactionTable:              cfg.AWS.DynamoDB.TransactionTable,

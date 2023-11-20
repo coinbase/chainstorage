@@ -71,7 +71,7 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 		return nil, xerrors.Errorf("failed to parse block time: %w", err)
 	}
 
-	latestHeight, err := client.GetLatestBlock(ctx)
+	latestHeight, err := client.GetLatestBlockWithTag(ctx, client.GetTag())
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get latest block: %w", err)
 	}
@@ -101,9 +101,10 @@ func (w *Worker) Run() error {
 		zap.Uint64("irreversibleDistance", w.irreversibleDistance),
 	)
 
+	blockTag := w.session.Client().GetTag()
 	for {
 		startHeight := w.checkpoint
-		latestHeight, err := w.session.Client().GetLatestBlock(ctx)
+		latestHeight, err := w.session.Client().GetLatestBlockWithTag(ctx, blockTag)
 		if err != nil {
 			return xerrors.Errorf("failed to get latest block: %w", err)
 		}

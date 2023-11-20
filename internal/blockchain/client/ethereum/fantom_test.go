@@ -105,7 +105,7 @@ func (s *fantomClientTestSuite) TestFantomTest_GetBlockByHeight() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -154,7 +154,7 @@ func (s *fantomClientTestSuite) TestFantomTest_GetBlockByHash_WithoutBestEffort(
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByHashMethod {
 				return blockResponse, nil
 			}
@@ -201,7 +201,7 @@ func (s *fantomClientTestSuite) TestFantomTest_GetBlockByHeight_ServerError() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}

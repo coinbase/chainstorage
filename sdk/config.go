@@ -1,6 +1,8 @@
 package sdk
 
 import (
+	"time"
+
 	"github.com/go-playground/validator/v10"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -10,10 +12,15 @@ import (
 
 type (
 	Config struct {
-		Blockchain common.Blockchain `validate:"required"`
-		Network    common.Network    `validate:"required"`
-		Env        Env               `validate:"required,oneof=production development local"`
-		Tag        uint32
+		Blockchain      common.Blockchain `validate:"required"`
+		Network         common.Network    `validate:"required"`
+		Env             Env               `validate:"required,oneof=production development local"`
+		Sidechain       api.SideChain
+		Tag             uint32
+		ClientID        string
+		ServerAddress   string
+		ClientTimeout   time.Duration
+		BlockValidation *bool
 	}
 
 	Env = config.Env

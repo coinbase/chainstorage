@@ -201,6 +201,21 @@ func (s *SDKTestSuite) TestStreamBlocks_EventOnly() {
 	require.Equal(numOfEvents, count)
 }
 
+func (s *SDKTestSuite) TestGetLatestBlock() {
+	const (
+		tag    = uint32(1)
+		height = uint64(14850148)
+	)
+	require := testutil.Require(s.T())
+
+	ctx := context.Background()
+	client := s.session.Client()
+
+	latestBlock, err := client.GetLatestBlockWithTag(ctx, tag)
+	require.NoError(err)
+	require.Equal(height, latestBlock)
+}
+
 func (s *SDKTestSuite) TestGetBlock() {
 	const (
 		tag    = uint32(1)
@@ -263,4 +278,24 @@ func (s *SDKTestSuite) TestGetBlocksByRange() {
 		require.Equal(int(numTransactions), len(rawBlock.GetEthereum().TransactionTraces))
 		require.Equal(int(numTransactions), len(ethereumBlock.Transactions))
 	}
+}
+
+func (s *SDKTestSuite) TestGetBlock_ValidateBlock() {
+	const (
+		tag    = uint32(1)
+		height = uint64(14_000_000)
+		hash   = "0x9bff49171de27924fa958faf7b7ce605c1ff0fdee86f4c0c74239e6ae20d9446"
+	)
+	require := testutil.Require(s.T())
+
+	ctx := context.Background()
+	client := s.session.Client()
+	parser := s.session.Parser()
+
+	client.SetBlockValidation(true)
+	rawBlock, err := client.GetBlockWithTag(ctx, tag, height, hash)
+	require.NoError(err)
+
+	_, err = parser.ParseNativeBlock(context.Background(), rawBlock)
+	require.NoError(err)
 }

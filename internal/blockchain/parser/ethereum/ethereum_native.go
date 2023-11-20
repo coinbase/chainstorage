@@ -155,9 +155,13 @@ type (
 		EffectiveGasPrice *EthereumQuantity    `json:"effectiveGasPrice"`
 		GasUsedForL1      *EthereumQuantity    `json:"gasUsedForL1"` // For Arbitrum network https://github.com/OffchainLabs/arbitrum/blob/6ca0d163417470b9d2f7eea930c3ad71d702c0b2/packages/arb-evm/evm/result.go#L336
 		L1GasUsed         *EthereumBigQuantity `json:"l1GasUsed"`    // For Optimism and Base networks https://github.com/ethereum-optimism/optimism/blob/3c3e1a88b234a68bcd59be0c123d9f3cc152a91e/l2geth/core/types/receipt.go#L73
-		L1GasPrice        *EthereumBigQuantity `json:"l1GasPrice"`   //
-		L1Fee             *EthereumBigQuantity `json:"l1Fee"`        //
-		L1FeeScaler       *EthereumBigFloat    `json:"l1FeeScalar"`  //
+		L1GasPrice        *EthereumBigQuantity `json:"l1GasPrice"`
+		L1Fee             *EthereumBigQuantity `json:"l1Fee"`
+		L1FeeScaler       *EthereumBigFloat    `json:"l1FeeScalar"`
+
+		// Base/Optimism specific fields.
+		DepositNonce          *EthereumQuantity `json:"depositNonce"`
+		DepositReceiptVersion *EthereumQuantity `json:"depositReceiptVersion"`
 	}
 
 	EthereumTransactionReceiptLit struct {
@@ -698,7 +702,6 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 
 		// Calculate PriorityFeePerGas Instead of using `effectiveGasPrice - baseFeePerGas` since effectiveGasPrice is in receipts only
 		// Ref: https://medium.com/liquity/how-eip-1559-changes-the-transaction-fees-of-ethereum-47a6c513050c
-		// Ref Code: https://github.cbhq.net/c3/chainstdio/blob/2f2d96e58d692340a3881eadefaab40405c7a7c5/pkg/blockchain/ethereum.go#L883-L887
 		if block.BaseFeePerGas != nil {
 			var priorityFeePerGas uint64
 			if transaction.MaxFeePerGas != nil && transaction.MaxPriorityFeePerGas != nil {
@@ -862,6 +865,18 @@ func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.Ethere
 		} else {
 			receipts[i].EffectiveGasPrice = transactions[i].GasPrice
 		}
+
+		if receipt.DepositNonce != nil {
+			receipts[i].OptionalDepositNonce = &api.EthereumTransactionReceipt_DepositNonce{
+				DepositNonce: receipt.DepositNonce.Value(),
+			}
+		}
+
+		if receipt.DepositReceiptVersion != nil {
+			receipts[i].OptionalDepositReceiptVersion = &api.EthereumTransactionReceipt_DepositReceiptVersion{
+				DepositReceiptVersion: receipt.DepositReceiptVersion.Value(),
+			}
+		}
 	}
 
 	return receipts, nil
@@ -974,7 +989,6 @@ func (p *ethereumNativeParserImpl) parseTransactionFlattenedTraces(trace *api.Et
 
 	// Errors on parent traces are set on children.
 	// Child traces that already have errors are not overridden with the parent error.
-	// See https://github.cbhq.net/c3/chainstdio/pull/1471
 	if parentError != "" && flattenedTrace.Error == "" {
 		flattenedTrace.Error = parentError
 	}

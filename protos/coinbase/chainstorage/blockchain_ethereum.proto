@@ -144,6 +144,12 @@ message EthereumTransactionReceipt {
   oneof optional_l1_fee_info {
     L1FeeInfo l1_fee_info = 17;
   }
+  oneof optional_deposit_nonce {
+    uint64 deposit_nonce = 18;
+  }
+  oneof optional_deposit_receipt_version {
+    uint64 deposit_receipt_version = 19;
+  }
 }
 
 message EthereumEventLog {

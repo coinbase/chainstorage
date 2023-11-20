@@ -988,7 +988,7 @@ func (s *handlerTestSuite) TestGetRosettaBlock_NotImplemented() {
 	var server *Server
 	app := testapp.New(
 		s.T(),
-		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_SOLANA, common.Network_NETWORK_SOLANA_MAINNET), // Solana RosettaParser is not implemented
+		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_AVACCHAIN, common.Network_NETWORK_AVACCHAIN_MAINNET), // AVACCHAIN RosettaParser is not implemented
 		parser.Module,
 		fx.Provide(func() metastorage.MetaStorage { return s.metaStorage }),
 		fx.Provide(func() blobstorage.BlobStorage { return s.blobStorage }),
@@ -1103,7 +1103,7 @@ func (s *handlerTestSuite) TestGetRosettaBlocksByRange_NotImplemented() {
 	var server *Server
 	app := testapp.New(
 		s.T(),
-		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_SOLANA, common.Network_NETWORK_SOLANA_MAINNET), // Solana RosettaParser is not implemented
+		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_AVACCHAIN, common.Network_NETWORK_AVACCHAIN_MAINNET), // Avacchain RosettaParser is not implemented
 		parser.Module,
 		fx.Provide(func() metastorage.MetaStorage { return s.metaStorage }),
 		fx.Provide(func() blobstorage.BlobStorage { return s.blobStorage }),

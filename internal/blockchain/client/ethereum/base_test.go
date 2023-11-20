@@ -102,7 +102,7 @@ func (s *baseClientTestSuite) TestBaseTest_GetBlockByHeight_WithBestEffort() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -165,7 +165,7 @@ func (s *baseClientTestSuite) TestBaseTest_GetBlockByHeight_WithoutBestEffort() 
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByHashMethod {
 				return blockResponse, nil
 			}

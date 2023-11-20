@@ -105,7 +105,7 @@ func (s *arbitrumClientTestSuite) TestArbitrumTest_GetBlockByHeight() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -154,7 +154,7 @@ func (s *arbitrumClientTestSuite) TestArbitrumTest_GetBlockByHash_WithoutBestEff
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByHashMethod {
 				return blockResponse, nil
 			}
@@ -201,7 +201,7 @@ func (s *arbitrumClientTestSuite) TestArbitrumTest_GetBlockByHeight_ServerError(
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -247,7 +247,7 @@ func (s *arbitrumClientTestSuite) TestArbitrumTest_SkipTxnForSpecificBlocks() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -322,7 +322,7 @@ func (s *arbitrumClientTestSuite) TestArbitrum_GetTracesByDebugEndpoint_Success(
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}

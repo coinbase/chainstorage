@@ -20,6 +20,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/log"
+	"github.com/coinbase/chainstorage/internal/utils/pointer"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
@@ -477,6 +478,14 @@ func toGethReceipt(receipt *api.EthereumTransactionReceipt) (*types.Receipt, err
 		}
 
 		result.PostState = root
+	}
+
+	if receipt.GetOptionalDepositNonce() != nil {
+		result.DepositNonce = pointer.Ref(receipt.GetDepositNonce())
+	}
+
+	if receipt.GetOptionalDepositReceiptVersion() != nil {
+		result.DepositReceiptVersion = pointer.Ref(receipt.GetDepositReceiptVersion())
 	}
 
 	return result, nil

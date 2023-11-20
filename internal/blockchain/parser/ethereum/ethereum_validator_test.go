@@ -182,9 +182,6 @@ func TestValidateAccountState_Success(t *testing.T) {
 	defer app.Close()
 	require.NotNil(parser)
 
-	// Generate the fixture with:
-	// curl -s https://nodes2.nodeservice.us-east-1.development.cbhq.net:11800 -H "Content-Type: application/json" -d '{ "jsonrpc": "2.0", "id": 1, "method": "eth_getProof", "params": ["0x8e5ca1872062bee63b8a46493f6de36d4870ff88", [], "0x103EE79"] }' | jq '.result' > internal/utils/fixtures/parser/ethereum/account_proof_block_17034873.json
-
 	// For this test, we cover multiple types of blocks:
 	// 1. block 1000: empty transactions/receipts.
 	// 2. block 2000000: pre EIP-155, no chainid in transaction.
@@ -403,9 +400,6 @@ func TestValidateAccountState_ERC20_Success(t *testing.T) {
 	)
 	defer app.Close()
 	require.NotNil(parser)
-
-	// Generate the fixture with:
-	// curl -s https://nodes2.nodeservice.us-east-1.development.cbhq.net:11800 -H "Content-Type: application/json" -d '{ "jsonrpc": "2.0", "id": 1, "method": "eth_getProof", "params": ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", ["0x4065d4ec50c2a4fc400b75cca2760227b773c3e315ed2f2a7784cd505065cb07"], "0x107FA20"] }' | jq '.result' > internal/utils/fixtures/parser/ethereum/account_proof_block_17034873.json
 
 	// For each test block, we pick an account in that block to test.
 	blocks := []int{17300000}

@@ -124,6 +124,9 @@ func (s *optimismIntegrationTestSuite) TestOptimismGetBlock() {
 			nativeBlock, err := s.parser.ParseNativeBlock(context.Background(), rawBlock)
 			if updateFixture {
 				fixtures.MustMarshalPB(nativeFixture, nativeBlock)
+
+				// Don't forget to reset the flag before you commit.
+				require.False(updateFixture)
 			}
 
 			// check native parsing logic
@@ -146,9 +149,6 @@ func (s *optimismIntegrationTestSuite) TestOptimismGetBlock() {
 
 			err = s.parser.ValidateBlock(context.Background(), nativeBlock)
 			require.NoError(err)
-
-			// Don't forget to reset the flag before you commit.
-			require.False(updateFixture)
 		})
 	}
 }

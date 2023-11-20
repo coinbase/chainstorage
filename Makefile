@@ -83,7 +83,6 @@ codegen:
 config:
 	@echo "--- config"
 	go run ./tools/config_gen ./config_templates/config .
-	go-bindata -ignore secrets\.yml -ignore config/config.go -nometadata -o config/config.go -pkg config config/...
 
 .PHONY: fmt
 fmt:

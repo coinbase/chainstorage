@@ -61,12 +61,19 @@ var (
 				"bsc-mainnet",
 				"dogecoin-mainnet",
 				"ethereum-goerli",
+				"ethereum-holesky",
 				"ethereum-mainnet",
 				"fantom-mainnet",
 				"optimism-mainnet",
 				"polygon-mainnet",
 				"polygon-testnet",
 				"solana-mainnet",
+			},
+		},
+		{
+			Namespace: "bootcamp",
+			ConfigNames: []string{
+				"bootcamp-mainnet",
 			},
 		},
 	}
@@ -192,6 +199,20 @@ var AWSAccountsToTest = []config.AWSAccount{
 	"",
 	config.AWSAccountDevelopment,
 	config.AWSAccountProduction,
+}
+
+func TestAllEnvs(t *testing.T, fn TestFn) {
+	for _, env := range EnvsToTest {
+		t.Run(string(env), func(t *testing.T) {
+			require := testutil.Require(t)
+
+			cfg, err := config.New(config.WithEnvironment(env))
+			require.NoError(err)
+			require.Equal(env, cfg.Env())
+
+			fn(t, cfg)
+		})
+	}
 }
 
 func TestAllConfigs(t *testing.T, fn TestFn) {

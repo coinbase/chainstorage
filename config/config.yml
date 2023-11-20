@@ -1,0 +1,6 @@
+health:
+  port: 3001
+http:
+  port: 8000
+grpc:
+  port: 9090

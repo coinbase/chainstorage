@@ -9,6 +9,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
+	"github.com/coinbase/chainstorage/internal/blockchain/restapi"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/cron"
@@ -18,7 +19,9 @@ import (
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/tally"
 	"github.com/coinbase/chainstorage/internal/tracer"
+	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
+	"github.com/coinbase/chainstorage/sdk"
 	"github.com/coinbase/chainstorage/sdk/services"
 )
 
@@ -41,10 +44,13 @@ func startManager(opts ...fx.Option) services.SystemManager {
 		config.Module,
 		cron.Module,
 		dlq.Module,
+		sdk.Module,
 		endpoints.Module,
 		fxparams.Module,
 		gateway.Module,
+		gateway.WithClientID(consts.ProjectName),
 		jsonrpc.Module,
+		restapi.Module,
 		parser.Module,
 		s3.Module,
 		storage.Module,

@@ -24,12 +24,16 @@
       "weight": 4
     }
   ],
-  "sticky_session": {
-    "cookie_hash": "baz"
+  "endpoint_config": {
+    "sticky_session": {
+      "cookie_hash": "baz"
+    }
   },
-  "sticky_session_failover": {
-    "cookie_passive": true,
-    "cookie_hash": "baz"
+  "endpoint_config_failover": {
+    "sticky_session": {
+      "cookie_passive": true,
+      "cookie_hash": "baz"
+    }
   },
   "use_failover": true
 }

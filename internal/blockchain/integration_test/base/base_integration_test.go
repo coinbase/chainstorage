@@ -91,6 +91,19 @@ func TestIntegrationBaseTestSuite_Goerli(t *testing.T) {
 			updateFixture:  false,
 		},
 	})
+
+	suite.Run(t, &baseIntegrationTestSuite{
+		config: testConfig{
+			blockchain:     common.Blockchain_BLOCKCHAIN_BASE,
+			network:        common.Network_NETWORK_BASE_GOERLI,
+			tag:            1,
+			blockNumber:    12_399_126,
+			blockHash:      "0xdd0242add9d1351d13adda68d440b19514254a20a71717bed16fc39f1763aa5d",
+			nativeFixture:  "parser/base/goerli/native_block_12399126.json",
+			rosettaFixture: "parser/base/goerli/rosetta_block_12399126.json",
+			updateFixture:  false,
+		},
+	})
 }
 
 func TestIntegrationBaseTestSuite_Mainnet(t *testing.T) {
@@ -156,6 +169,9 @@ func (s *baseIntegrationTestSuite) TestBaseGetBlock() {
 			if s.config.updateFixture {
 				fixtures.MustMarshalPB(s.config.nativeFixture, nativeBlock)
 				fixtures.MustMarshalPB(s.config.rosettaFixture, rosettaBlock)
+
+				// Don't forget to reset the flag before you commit.
+				require.False(s.config.updateFixture)
 			}
 
 			// check native parser
@@ -180,9 +196,6 @@ func (s *baseIntegrationTestSuite) TestBaseGetBlock() {
 
 			err = s.parser.ValidateBlock(context.Background(), nativeBlock)
 			require.NoError(err)
-
-			// Don't forget to reset the flag before you commit.
-			require.False(s.config.updateFixture)
 		})
 	}
 }

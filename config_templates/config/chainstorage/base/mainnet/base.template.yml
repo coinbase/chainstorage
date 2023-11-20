@@ -1,0 +1,40 @@
+chain:
+  block_time: 2s
+  feature:
+    block_validation_enabled: true
+    block_validation_muted: true
+    rosetta_parser: true
+  irreversible_distance: 10
+sla:
+  block_height_delta: 60
+  block_time_delta: 2m
+  out_of_sync_node_distance: 60
+  tier: 1
+  time_since_last_block: 2m30s
+  event_height_delta: 60
+  event_time_delta: 2m
+  time_since_last_event: 2m30s
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer
+    - cross_validator
+workflows:
+  backfiller:
+    num_concurrent_extractors: 20
+    activity_start_to_close_timeout: 20m
+  cross_validator:
+    backoff_interval: 1s
+    parallelism: 10
+    validation_percentage: 100
+  poller:
+    backoff_interval: 0s
+    consensus_validation: true
+    consensus_validation_muted: true
+    failover_enabled: true
+    parallelism: 10
+    session_enabled: true
+  monitor:
+    failover_enabled: true
+  streamer:
+    backoff_interval: 0s

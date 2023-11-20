@@ -11,6 +11,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
+	"github.com/coinbase/chainstorage/internal/utils/pointer"
 	"github.com/coinbase/chainstorage/sdk/services"
 )
 
@@ -41,6 +42,7 @@ func New(manager services.SystemManager, cfg *Config) (Session, error) {
 		config.WithBlockchain(cfg.Blockchain),
 		config.WithNetwork(cfg.Network),
 		config.WithEnvironment(cfg.Env),
+		config.WithSidechain(cfg.Sidechain),
 	)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create config %w", err)
@@ -53,6 +55,8 @@ func New(manager services.SystemManager, cfg *Config) (Session, error) {
 		parser.Module,
 		downloader.Module,
 		gateway.Module,
+		gateway.WithClientID(cfg.ClientID),
+		gateway.WithServerAddress(cfg.ServerAddress),
 		fx.NopLogger,
 		fx.Provide(func() services.SystemManager { return manager }),
 		fx.Provide(func() *zap.Logger { return manager.Logger() }),
@@ -72,6 +76,18 @@ func New(manager services.SystemManager, cfg *Config) (Session, error) {
 
 	if cfg.Tag != 0 {
 		session.Client().SetTag(cfg.Tag)
+	}
+
+	if cfg.ClientID != "" {
+		session.Client().SetClientID(cfg.ClientID)
+	}
+
+	if cfg.ClientTimeout > 0 {
+		session.Client().SetClientTimeout(cfg.ClientTimeout)
+	}
+
+	if cfg.BlockValidation != nil {
+		session.Client().SetBlockValidation(pointer.Deref(cfg.BlockValidation))
 	}
 
 	return session, nil

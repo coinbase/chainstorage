@@ -3,6 +3,8 @@ package sdk
 import (
 	"testing"
 
+	"github.com/coinbase/chainstorage/internal/utils/pointer"
+
 	"go.uber.org/fx"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
@@ -52,6 +54,25 @@ func TestNew_Tag(t *testing.T) {
 	require.Equal(uint32(123), session.Client().GetTag())
 }
 
+func TestNew_ClientID(t *testing.T) {
+	require := testutil.Require(t)
+	manager := services.NewMockSystemManager()
+	defer manager.Shutdown()
+
+	clientID := "fake-id"
+	session, err := New(manager, &Config{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		Env:        EnvDevelopment,
+		ClientID:   clientID,
+	})
+	require.NoError(err)
+	require.NotNil(session)
+	require.NotNil(session.Client())
+	require.NotNil(session.Parser())
+	require.Equal(clientID, session.Client().GetClientID())
+}
+
 func TestNew_InvalidEnv(t *testing.T) {
 	require := testutil.Require(t)
 	manager := services.NewMockSystemManager()
@@ -82,4 +103,40 @@ func TestNew_WithFx(t *testing.T) {
 	require.NotNil(session)
 	require.NotNil(session.Client())
 	require.NotNil(session.Parser())
+}
+
+func TestNew_BlockValidation_Enabled(t *testing.T) {
+	require := testutil.Require(t)
+	manager := services.NewMockSystemManager()
+	defer manager.Shutdown()
+
+	session, err := New(manager, &Config{
+		Blockchain:      common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:         common.Network_NETWORK_ETHEREUM_MAINNET,
+		Env:             EnvDevelopment,
+		BlockValidation: pointer.Ref(true),
+	})
+	require.NoError(err)
+	require.NotNil(session)
+	require.NotNil(session.Client())
+	require.NotNil(session.Parser())
+	require.True(session.Client().GetBlockValidation())
+}
+
+func TestNew_BlockValidation_Disabled(t *testing.T) {
+	require := testutil.Require(t)
+	manager := services.NewMockSystemManager()
+	defer manager.Shutdown()
+
+	session, err := New(manager, &Config{
+		Blockchain:      common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:         common.Network_NETWORK_ETHEREUM_MAINNET,
+		Env:             EnvDevelopment,
+		BlockValidation: pointer.Ref(false),
+	})
+	require.NoError(err)
+	require.NotNil(session)
+	require.NotNil(session.Client())
+	require.NotNil(session.Parser())
+	require.False(session.Client().GetBlockValidation())
 }

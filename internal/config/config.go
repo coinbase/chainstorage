@@ -65,13 +65,6 @@ type (
 		BlockStartHeight uint64            `mapstructure:"block_start_height"`
 		// IrreversibleDistance is the maximum distance between the current block height and the last irreversible block height, also
 		// known as the max reorg distance, finalization depth. This does not have a default value and must be set by the onboarding user.
-		// Instructions for setting this value:
-		// 1. Check finalization_depth in Nova's configuration first. It can be found in Nova repo under accounting_model directory(e.g.
-		// Ethereum finalization_depth: https://sourcegraph.cbhq.net/github.cbhq.net/payments/nova/-/blob/app/lib/accounting_model/ethereum.rb?L171:9)
-		// 2. If finalization_depth is not set, normally it means the chain does not have reorg or Nova is processing finalized blocks(See
-		// https://www.alchemy.com/overviews/ethereum-commitment-levels). Please cross check with the blockchain official doc. If the blockchain
-		// does not have reorg, set the value to 1, otherwise set it to the corresponding value.
-		// 3. If blockchain is not supported by Nova, please reference with the blockchain official doc and set it to corresponding value.
 		IrreversibleDistance uint64        `mapstructure:"irreversible_distance" validate:"required"`
 		Rosetta              RosettaConfig `mapstructure:"rosetta"`
 		BlockTime            time.Duration `mapstructure:"block_time" validate:"required"`
@@ -486,27 +479,14 @@ const (
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
 
-	placeholderPassword = "<placeholder>"
-
-	tagBlockchain = "blockchain"
-	tagNetwork    = "network"
-	tagTier       = "tier"
-	tagSidechain  = "sidechain"
-
-	devConsoleConfigName = "devconsole"
-	defaultReleaseID     = "default_release_id"
-)
-
-const (
-	s3BucketFormat = "cba-chainstorage-%v-%v"
-)
-
-const (
-	cadenceAddressLocal = "localhost:7233"
-)
-
-const (
+	placeholderPassword      = "<placeholder>"
+	tagBlockchain            = "blockchain"
+	tagNetwork               = "network"
+	tagTier                  = "tier"
+	s3BucketFormat           = "example-chainstorage-%v-%v"
+	cadenceAddressLocal      = "localhost:7233"
 	chainstorageAddressLocal = "http://localhost:9090"
+	tagSidechain             = "sidechain"
 )
 
 func New(opts ...ConfigOption) (*Config, error) {
@@ -871,7 +851,7 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 	sidechainName := strings.TrimPrefix(sidechain.GetName(), blockchainName+"-"+networkName+"-")
 
 	if env == envSecrets {
-		// secrets.yml contains credentials and therefore is not embedded in config.go.
+		// .secrets.yml is intentionally not embedded in config.Store.
 		// Read it from the file system instead.
 		_, filename, _, ok := runtime.Caller(0)
 		if !ok {
@@ -894,8 +874,7 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 		configPath = fmt.Sprintf("%v/%v/%v/%v/%v.yml", namespace, blockchainName, networkName, sidechainName, env)
 	}
 
-	//TODO: update the change to use config.Store.ReadFile(configPath)
-	data, err := config.Asset(configPath)
+	data, err := config.Store.ReadFile(configPath)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to read config file %v: %w", configPath, err)
 	}

@@ -42,9 +42,9 @@ func (s *configTemplateTestSuite) TestNewConfigTemplateFromString() {
 		expected   string
 		successful bool
 	}{
-		{&ConfigVars{"ethereum", "mainnet", "development", "development"}, "8000-ethereum-mainnet-development-ETHEREUM-MAINNET-dev", true},
-		{&ConfigVars{"ethereum", "mainnet", "production", "production"}, "8000-ethereum-mainnet-production-ETHEREUM-MAINNET-prod", true},
-		{&ConfigVars{"ethereum", "mainnet", "base", "base"}, "", false},
+		{&ConfigVars{"ethereum", "mainnet", "development", "development", ""}, "8000-ethereum-mainnet-development-ETHEREUM-MAINNET-dev", true},
+		{&ConfigVars{"ethereum", "mainnet", "production", "production", ""}, "8000-ethereum-mainnet-production-ETHEREUM-MAINNET-prod", true},
+		{&ConfigVars{"ethereum", "mainnet", "base", "base", ""}, "", false},
 	}
 
 	config := `
@@ -88,7 +88,7 @@ foo:
 	require.Nil(err)
 	actual, err := NewConfigTemplateFromFile(filename)
 	require.Nil(err)
-	actualBuffer, err := actual.executeTemplate(&ConfigVars{"foo", "", "bar", "bar"})
+	actualBuffer, err := actual.executeTemplate(&ConfigVars{"foo", "", "bar", "bar", ""})
 	require.Nil(err)
 	require.Equal(expected, actualBuffer.Bytes())
 }
@@ -129,7 +129,7 @@ foo:
 
 	ymlFile := filepath.Join(s.tempDir, "test.yml")
 
-	err = template.WriteToFile(&ConfigVars{"foo", "baz", "bar", "development"}, ymlFile)
+	err = template.WriteToFile(&ConfigVars{"foo", "baz", "bar", "development", ""}, ymlFile)
 	require.Nil(err)
 	actual, err := ioutil.ReadFile(ymlFile)
 	require.Nil(err)

@@ -146,7 +146,7 @@ func (s *backfillerTestSuite) TestBackfiller() {
 		})
 	s.blockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(int(endHeight - startHeight)).
-		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64) (*api.Block, error) {
+		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64, opts ...client.ClientOption) (*api.Block, error) {
 			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
 			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
 			require.Equal(tag, tag_)
@@ -214,7 +214,7 @@ func (s *backfillerTestSuite) TestBackfiller_MiniBatch() {
 		})
 	s.blockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(int(endHeight - startHeight)).
-		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64) (*api.Block, error) {
+		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64, opts ...client.ClientOption) (*api.Block, error) {
 			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
 			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
 			require.Equal(tag, tag_)

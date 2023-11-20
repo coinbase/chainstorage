@@ -105,7 +105,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -175,7 +175,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight_TransactionWit
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -240,7 +240,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight_TransactionWit
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			if method == ethGetBlockByNumberMethod {
 				return blockResponse, nil
 			}
@@ -309,7 +309,7 @@ func (s *polygonClientTestSuite) TestPolygonClient_UpgradeBlock_2_2_HeaderUpdate
 	s.rpcClient.EXPECT().Call(
 		gomock.Any(), ethGetBlockByNumberMethod, gomock.Any(),
 	).DoAndReturn(
-		func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			return blockResponse, nil
 		})
 
@@ -345,7 +345,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_RetryBorAuthor_ServerErr() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			switch method {
 			case ethGetBlockByNumberMethod:
 				return &jsonrpc.Response{
@@ -418,7 +418,7 @@ func (s *polygonClientTestSuite) TestRetryTraceBlock_NotFound() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			switch method {
 			case ethGetBlockByHashMethod:
 				return &jsonrpc.Response{
@@ -468,7 +468,7 @@ func (s *polygonClientTestSuite) TestRetryTraceBlock_ExecutionAborted() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			switch method {
 			case ethGetBlockByHashMethod:
 				return &jsonrpc.Response{
@@ -517,7 +517,7 @@ func (s *polygonClientTestSuite) TestRetryTraceBlock_RetryLimitExceeded() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			switch method {
 			case ethGetBlockByHashMethod:
 				return &jsonrpc.Response{
@@ -561,7 +561,7 @@ func (s *polygonClientTestSuite) TestRetryTraceTransaction() {
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			switch method {
 			case ethGetBlockByNumberMethod:
 				return &jsonrpc.Response{
@@ -632,7 +632,7 @@ func (s *polygonClientTestSuite) TestRetryTraceTransaction_RetryLimitExceeded() 
 		gomock.Any(), gomock.Any(), gomock.Any(),
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params) (*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params jsonrpc.Params, opts ...jsonrpc.Option) (*jsonrpc.Response, error) {
 			switch method {
 			case ethGetBlockByNumberMethod:
 				return &jsonrpc.Response{
@@ -700,7 +700,7 @@ func (s *polygonClientTestSuite) TestRetryBatchGetBlockMetadata() {
 		},
 	).
 		AnyTimes().
-		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params []jsonrpc.Params) ([]*jsonrpc.Response, error) {
+		DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, params []jsonrpc.Params, opts ...jsonrpc.Option) ([]*jsonrpc.Response, error) {
 			retryAttempts += 1
 			if retryAttempts < retry.DefaultMaxAttempts {
 				return nil, &jsonrpc.RPCError{

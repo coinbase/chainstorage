@@ -5,6 +5,7 @@ import (
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 
+	"github.com/coinbase/chainstorage/internal/blockchain/parser/aptos"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/bitcoin"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/ethereum"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -27,6 +28,7 @@ var (
 
 var Module = fx.Options(
 	internal.Module,
+	aptos.Module,
 	bitcoin.Module,
 	ethereum.Module,
 	rosetta.Module,

@@ -244,7 +244,8 @@ func TestEndpointProvider_StickySessionCookieHash(t *testing.T) {
 	jar, ok := client.Jar.(*stickySessionJar)
 	require.True(ok)
 	require.Equal("sync_session", jar.cookieKey)
-	require.Equal("411cde94b897c4355f8abcc08c6c3b3aa438ac7269e251f37baa861a49f83678", jar.cookieValue)
+	//require.Equal("411cde94b897c4355f8abcc08c6c3b3aa438ac7269e251f37baa861a49f83678", jar.cookieValue)
+	require.Equal("59007272a2c3194048d7336914efa19a4338b8fdc202942c58056f5d977901ac", jar.cookieValue)
 }
 
 func TestEndpointProvider_StickySessionHeaderHash(t *testing.T) {
@@ -463,7 +464,8 @@ func TestEndpointProvider_StickySessionFailover(t *testing.T) {
 	require.True(ok)
 	require.Equal("https://cloud.coinbase.com", jar.url)
 	require.Equal("sync_session", jar.cookieKey)
-	require.Equal("411cde94b897c4355f8abcc08c6c3b3aa438ac7269e251f37baa861a49f83678", jar.cookieValue)
+	//require.Equal("411cde94b897c4355f8abcc08c6c3b3aa438ac7269e251f37baa861a49f83678", jar.cookieValue)
+	require.Equal("59007272a2c3194048d7336914efa19a4338b8fdc202942c58056f5d977901ac", jar.cookieValue)
 }
 
 func TestEndpointProviderResult(t *testing.T) {

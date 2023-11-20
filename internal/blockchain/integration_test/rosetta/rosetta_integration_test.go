@@ -239,7 +239,7 @@ func testGetRosettaBlock_NotFound(t *testing.T, asset rosettaTestAsset) {
 func BenchmarkDogecoinRosettaGetBlockByHeight(b *testing.B) {
 	// cmd: TEST_FILTER=BenchmarkDogecoinRosettaGetBlockByHeight make benchmark | awk 'match($4, "throughput") {print $0}'
 
-	// Benchmark results (api.rosetta.us-east-1.development.cbhq.net)
+	// Benchmark results
 	// -------------------------------------
 	// | parallelism | blocks | blocks/sec |
 	// -------------------------------------

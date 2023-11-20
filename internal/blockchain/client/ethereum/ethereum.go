@@ -999,7 +999,6 @@ func (c *EthereumClient) getTransactionTraces(ctx context.Context, tag uint32, b
 				// Skip the transaction if its op count is greater than the threshold.
 				// Without this check, debug_traceTransaction below may cause the node to crash.
 				// For example, 0xb1e822c280cd9a3f8e58abeb1ef8ddd4642787c555cdc6da54d4ce46f959daf2, which has 40528 ops, will be filtered out.
-				// See https://analytics.cbhq.net/eth/transactions/0xb1e822c280cd9a3f8e58abeb1ef8ddd4642787c555cdc6da54d4ce46f959daf2
 				opCount = c.traceTransactionOpCount(ctx, transactionHash, height)
 				if opCount == ethTraceTransactionUnknownOpCount || opCount > ethTraceTransactionMaxOpCount {
 					c.logger.Warn(

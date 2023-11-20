@@ -286,7 +286,6 @@ func TestIntegrationEthereumGetBlock(t *testing.T) {
 			require.Equal("CALL_0xf00ba2651120a60f5605cf81b793b3f22cc7c6a10437ecc5b47574e017d4cb61_3_0", transactionFlattenedTraces[8].TraceId)
 			require.Equal(uint64(1), transactionFlattenedTraces[8].Status)
 
-			// See https://analytics.cbhq.net/eth/transactions/0x6bfc9a796f90256d840f78789963f99e764a099cb4ab79ee2b2a60671435ea8b_erc20
 			tokenTransfers := block.Transactions[4].TokenTransfers
 			require.Equal(1, len(tokenTransfers))
 			tokenTransfer := tokenTransfers[0]
@@ -680,7 +679,6 @@ func TestIntegrationEthereumGetBlockByHeight_TraceTransactions(t *testing.T) {
 		blockNumberWithMaliciousTraces = 2370721
 
 		// The following transaction belongs to the Geth DoS Attach.
-		// See https://analytics.cbhq.net/eth/transactions/0x700cef0fed7263158b410d61e9f95e15e5de5d6662025a25e63733d6d385ff24
 		transactionHashWithMaliciousTraces = "0x700cef0fed7263158b410d61e9f95e15e5de5d6662025a25e63733d6d385ff24"
 	)
 

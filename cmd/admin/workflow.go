@@ -39,12 +39,13 @@ var (
 
 type executors struct {
 	fx.In
-	Backfiller     *workflow.Backfiller
-	Monitor        *workflow.Monitor
-	Poller         *workflow.Poller
-	Streamer       *workflow.Streamer
-	Benchmarker    *workflow.Benchmarker
-	CrossValidator *workflow.CrossValidator
+	Backfiller      *workflow.Backfiller
+	Monitor         *workflow.Monitor
+	Poller          *workflow.Poller
+	Streamer        *workflow.Streamer
+	Benchmarker     *workflow.Benchmarker
+	CrossValidator  *workflow.CrossValidator
+	EventBackfiller *workflow.EventBackfiller
 }
 
 var (
@@ -151,6 +152,12 @@ func startWorkflow() error {
 			return xerrors.Errorf("error converting to request type")
 		}
 		run, err = executors.CrossValidator.Execute(ctx, &request)
+	case workflow.EventBackfillerIdentity:
+		request, ok := req.(workflow.EventBackfillerRequest)
+		if !ok {
+			return xerrors.Errorf("error converting to request type")
+		}
+		run, err = executors.EventBackfiller.Execute(ctx, &request)
 	default:
 		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}
@@ -217,6 +224,8 @@ func stopWorkflow() error {
 		err = executors.Benchmarker.StopWorkflow(ctx, workflowIdentityString, reason)
 	case workflow.CrossValidatorIdentity:
 		err = executors.CrossValidator.StopWorkflow(ctx, workflowIdentityString, reason)
+	case workflow.EventBackfillerIdentity:
+		err = executors.EventBackfiller.StopWorkflow(ctx, workflowIdentityString, reason)
 	default:
 		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}
@@ -248,30 +257,37 @@ func initApp() (CmdApp, *executors, error) {
 	return app, &executors, nil
 }
 
-func confirmWorkflowOperation(operation string, workflowIdentity string, input interface{}) bool {
+func confirmWorkflowOperation(operation string, workflowIdentity string, input any) bool {
 	logger.Info(
 		"workflow arguments",
 		zap.String("workflow", workflowIdentity),
 		zap.String("env", string(env)),
 		zap.String("blockchain", blockchain.GetName()),
 		zap.String("network", network.GetName()),
+		zap.String("sidechain", sidechain.GetName()),
 		zap.Reflect("input", input),
 	)
+
+	chainInfo := fmt.Sprintf("%v-%v", commonFlags.blockchain, commonFlags.network)
+	if commonFlags.sidechain != "" {
+		chainInfo = fmt.Sprintf("%v-%v", chainInfo, commonFlags.sidechain)
+	}
 
 	prompt := fmt.Sprintf(
 		"%v%v%v%v%v",
 		color.CyanString(fmt.Sprintf("Are you sure you want to %v ", operation)),
 		color.MagentaString(fmt.Sprintf("\"%v\" ", workflowIdentity)),
 		color.CyanString("in "),
-		color.MagentaString(fmt.Sprintf("%v::%v-%v", env, commonFlags.blockchain, commonFlags.network)),
+		color.MagentaString(fmt.Sprintf("%v::%v", env, chainInfo)),
 		color.CyanString("? (y/N) "),
 	)
+
 	return confirm(prompt)
 }
 
 func getWorkflowURL(app CmdApp, run client.WorkflowRun) string {
 	return fmt.Sprintf(
-		"%s/namespaces/%s/workflows/%s/%s/summary",
+		"%s/namespaces/%s/workflows/%s/%s/history",
 		cadenceHost[env],
 		app.Config().Cadence.Domain,
 		url.PathEscape(run.GetID()),

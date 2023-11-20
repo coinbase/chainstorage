@@ -1,5 +1,1 @@
-sla:
-  expected_workflows:
-    - monitor
-    - poller
-    - streamer
+

@@ -70,6 +70,10 @@ func NewEthereumRosettaParser(params internal.ParserParams, nativeParser interna
 }
 
 func (p *ethereumRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.RosettaBlock, error) {
+	// TODO(ben): Contact rosetta team to get genesis info for holesky.
+	if p.config.Network() == common.Network_NETWORK_ETHEREUM_HOLESKY {
+		return nil, internal.ErrNotImplemented
+	}
 	nativeBlock, err := p.nativeParser.ParseBlock(ctx, rawBlock)
 
 	if err != nil {

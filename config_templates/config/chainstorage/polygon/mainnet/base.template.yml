@@ -3,33 +3,39 @@ api:
 chain:
   block_tag:
     latest: 2
-    stable: 1
+    stable: 2
   block_time: 2s
   event_tag:
-    latest: 0
-    stable: 0
+    latest: 2
+    stable: 2
   client:
     retry:
       max_attempts: 5
-  irreversible_distance: 300
+  irreversible_distance: 400
   feature:
     rosetta_parser: true
+    default_stable_event: true
+    block_validation_enabled: true
+    block_validation_muted: true
 aws:
   aws_account: development
-  storage:
-    data_compression: GZIP
+  dynamodb:
+    event_table: example_chainstorage_block_events_{{blockchain}}_{{network}}
+    event_table_height_index: example_chainstorage_block_events_by_height_{{blockchain}}_{{network}}
 sla:
   block_height_delta: 100 # reorg distance is high according to https://polygonscan.com/blocks_forked
-  block_time_delta: 5m
-  out_of_sync_node_distance: 100
-  tier: 2
-  time_since_last_block: 10m
+  block_time_delta: 4m
+  out_of_sync_node_distance: 400
+  tier: 1
+  time_since_last_block: 5m
+  event_height_delta: 100
+  event_time_delta: 4m
+  time_since_last_event: 5m
   expected_workflows:
     - monitor
     - poller
     - streamer
-    - streamer/event_tag=1
-    - datalake/block_tag=2
+    - cross_validator
 workflows:
   backfiller:
     batch_size: 2500
@@ -40,19 +46,22 @@ workflows:
   benchmarker:
     child_workflow_execution_start_to_close_timeout: 2h
   cross_validator:
-    batch_size: 1000
-    backoff_interval: 500ms
-    validation_start_height: 3500000
-    validation_percentage: 1
+    backoff_interval: 0s
+    checkpoint_size: 500
+    validation_start_height: 44000000
+    validation_percentage: 100
   monitor:
-    backoff_interval: 3s
+    backoff_interval: 2s
     failover_enabled: true
   poller:
-    backoff_interval: 500ms
+    backoff_interval: 0s
     checkpoint_size: 250
     max_blocks_to_sync_per_cycle: 300
     parallelism: 24
-    session_enabled: true
     failover_enabled: true
+    consensus_failover_enabled: true
+    consensus_validation: true
+    consensus_validation_muted: true
+    session_enabled: true
   streamer:
-    backoff_interval: 500ms
+    backoff_interval: 0s

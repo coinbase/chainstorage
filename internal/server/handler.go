@@ -150,9 +150,6 @@ const (
 	requestCounter = "request"
 	clientIDTag    = "clientID"
 
-	// The client id header in the request
-	clientIDHeader = "x-client-id"
-
 	// If the client ID is not set, set it as unknown.
 	unknownClientID = "unknown"
 
@@ -857,7 +854,7 @@ func (s *Server) newAuthContext(ctx context.Context) context.Context {
 
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		// Use "x-client-id" if available.
-		if v := md.Get(clientIDHeader); len(v) > 0 {
+		if v := md.Get(consts.ClientIDHeader); len(v) > 0 {
 			clientID = v[0]
 		}
 
