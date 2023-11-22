@@ -192,35 +192,5 @@ func setupTemplatesDirFromFixturesWithSideChain(rootPath string) (string, error)
 		return "", err
 	}
 
-	// make bootcamp dir
-	err = os.MkdirAll(filepath.Join(templatesDir, "config", "bootcamp", "ethereum", "mainnet"), os.ModePerm)
-	if err != nil {
-		return "", err
-	}
-	baseConfigDat, err = fixtures.ReadFile("tools/config_gen_with_sidechain/config_templates/config/bootcamp/ethereum/mainnet/base.template.yml")
-	if err != nil {
-		return "", err
-	}
-	err = ioutil.WriteFile(filepath.Join(templatesDir, "config", "bootcamp", "ethereum", "mainnet", "base.template.yml"), baseConfigDat, 0644)
-	if err != nil {
-		return "", err
-	}
-	devConfigDat, err = fixtures.ReadFile("tools/config_gen_with_sidechain/config_templates/config/bootcamp/ethereum/mainnet/development.template.yml")
-	if err != nil {
-		return "", err
-	}
-	err = ioutil.WriteFile(filepath.Join(templatesDir, "config", "bootcamp", "ethereum", "mainnet", "development.template.yml"), devConfigDat, 0644)
-	if err != nil {
-		return "", err
-	}
-	prodConfigDat, err = fixtures.ReadFile("tools/config_gen_with_sidechain/config_templates/config/bootcamp/ethereum/mainnet/production.template.yml")
-	if err != nil {
-		return "", err
-	}
-	err = ioutil.WriteFile(filepath.Join(templatesDir, "config", "bootcamp", "ethereum", "mainnet", "production.template.yml"), prodConfigDat, 0644)
-	if err != nil {
-		return "", err
-	}
-
 	return templatesDir, nil
 }

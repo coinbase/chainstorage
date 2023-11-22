@@ -1,8 +1,0 @@
-aws:
-  bucket: example-chainstorage-bootcamp-mainnet-dev
-  dlq:
-    owner_account_id: 564673040929
-  dynamodb:
-    arn: arn:aws:iam::564673040929:role/chainstorage_bootcamp_mainnet_ddb_cross_account_role
-sdk:
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/bootcamp/mainnet/v1

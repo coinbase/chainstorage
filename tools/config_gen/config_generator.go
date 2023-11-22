@@ -201,7 +201,7 @@ func (c *ConfigGenerator) getEnvFromChainStorageConfig(path string) (*ConfigVars
 	dir = filepath.Dir(dir)
 	blockchain := filepath.Base(dir)
 
-	if blockchain == "chainstorage" || blockchain == "bootcamp" {
+	if blockchain == "chainstorage" {
 		blockchain = network
 		network = sidechain
 	}

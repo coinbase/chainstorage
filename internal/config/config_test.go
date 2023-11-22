@@ -203,7 +203,7 @@ func TestConfig_OverrideBlockchainNetwork(t *testing.T) {
 func TestConfig_OverrideNamespace(t *testing.T) {
 	require := testutil.Require(t)
 
-	const namespace = "bootcamp"
+	const namespace = "chainstorage"
 	cfg, err := config.New(
 		config.WithNamespace(namespace),
 		config.WithBlockchain(common.Blockchain_BLOCKCHAIN_ETHEREUM),
@@ -799,12 +799,6 @@ func TestParseConfigName(t *testing.T) {
 		},
 		{
 			configName: "ethereum-mainnet",
-			blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
-			network:    common.Network_NETWORK_ETHEREUM_MAINNET,
-			sidechain:  api.SideChain_SIDECHAIN_NONE,
-		},
-		{
-			configName: "bootcamp-mainnet",
 			blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 			network:    common.Network_NETWORK_ETHEREUM_MAINNET,
 			sidechain:  api.SideChain_SIDECHAIN_NONE,

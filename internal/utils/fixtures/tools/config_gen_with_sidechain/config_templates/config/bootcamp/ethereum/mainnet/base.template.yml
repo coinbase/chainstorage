@@ -1,5 +1,0 @@
-chain:
-  block_start_height: 1111
-  config_name: "{{blockchain}}-{{network}}"
-  details:
-    sub_details: "my-details-{{blockchain}}-{{network}}-{{env}}"

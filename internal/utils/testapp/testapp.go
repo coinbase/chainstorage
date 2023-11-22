@@ -70,12 +70,6 @@ var (
 				"solana-mainnet",
 			},
 		},
-		{
-			Namespace: "bootcamp",
-			ConfigNames: []string{
-				"bootcamp-mainnet",
-			},
-		},
 	}
 )
 

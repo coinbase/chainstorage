@@ -458,9 +458,6 @@ const (
 	DefaultNamespace  = "chainstorage"
 	DefaultConfigName = "ethereum-mainnet"
 
-	BootcampConfig    = "bootcamp-mainnet"
-	BootcampNamespace = "bootcamp"
-
 	EnvBase        Env = "base"
 	EnvLocal       Env = "local"
 	EnvDevelopment Env = "development"
@@ -807,11 +804,6 @@ func getConfigOptions(configName string, opts ...ConfigOption) (*configOptions, 
 }
 
 func ParseConfigName(configName string) (common.Blockchain, common.Network, api.SideChain, error) {
-	// Use ethereum-mainnet chain for bootcamp config
-	if configName == BootcampConfig {
-		return common.Blockchain_BLOCKCHAIN_ETHEREUM, common.Network_NETWORK_ETHEREUM_MAINNET, api.SideChain_SIDECHAIN_NONE, nil
-	}
-
 	// Normalize the config name by replacing "-" with "_".
 	configName = strings.ReplaceAll(configName, "-", "_")
 
