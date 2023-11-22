@@ -121,7 +121,6 @@ func New(t testing.TB, opts ...fx.Option) TestApp {
 		tracer.Module,
 		fx.NopLogger,
 		fx.Provide(func() testing.TB { return t }),
-		fx.Provide(func() *zap.Logger { return manager.Logger() }),
 		fx.Provide(func() *zap.Logger { return logger }),
 		fx.Provide(func() tally.Scope { return tally.NoopScope }),
 		fx.Provide(func() services.SystemManager { return manager }),
