@@ -1015,7 +1015,6 @@ func (c *EthereumClient) getTransactionTraces(ctx context.Context, tag uint32, b
 				}
 			}
 
-			// TODO: https://jira.coinbase-corp.com/browse/CDF-2360
 			call := ethTraceTransactionMethod
 			timeout := ethTraceTransactionTimeout
 			if c.config.Blockchain() == common.Blockchain_BLOCKCHAIN_OPTIMISM {

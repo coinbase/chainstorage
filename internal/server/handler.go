@@ -112,7 +112,6 @@ type (
 
 const (
 	// Custom interceptors
-	// Note that they are all prefixed with "x" to prevent naming conflict with the CSF interceptors.
 	errorInterceptorID     = "xerror"
 	requestInterceptorID   = "xrequest"
 	statsdInterceptorID    = "xstatsd"
