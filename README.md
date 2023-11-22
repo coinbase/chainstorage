@@ -4,14 +4,6 @@
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
-- [Configuration](#configuration)
-  - [Dependency overview](#dependency-overview)
-  - [Template location and generated config](#template-location-and-generated-config)
-  - [Environment Variables](#environment-variables)
-  - [Creating New Configurations](#creating-new-configurations)
-  - [Template Format and Inheritance](#template-format-and-inheritance)
-  - [Endpoint Group](#endpoint-group)
-  - [Overriding the Configuration](#overriding-the-configuration)
 - [Command Line](#command-line)
   - [Block Command](#block-command)
   - [Backfill Command (development)](#backfill-command-development)
@@ -20,13 +12,34 @@
   - [Unit Test](#unit-test)
   - [Integration Test](#integration-test)
   - [Functional Test](#functional-test)
+- [Configuration](#configuration)
+  - [Dependency overview](#dependency-overview)
+  - [Template location and generated config](#template-location-and-generated-config)
+  - [Environment Variables](#environment-variables)
+  - [Creating New Configurations](#creating-new-configurations)
+  - [Template Format and Inheritance](#template-format-and-inheritance)
+  - [Endpoint Group](#endpoint-group)
+  - [Overriding the Configuration](#overriding-the-configuration)
 - [Development](#development)
   - [Running Server](#running-server)
   - [AWS localstack](#aws-localstack)
   - [Temporal Workflow](#temporal-workflow)
   - [Checking Workflow Statuses](#checking-workflow-statuses)
-  - [APIs](#apis)
+- [Failover](#failover)
+  - [Nodes Failover](#nodes-failover)
+  - [Failover in Workflows](#failover-in-workflows)
+  - [Automatic Failover in Poller Workflow](#automatic-failover-in-poller-workflow)
+- [Deployment](#deployment)
+  - [Deploy Local Changes](#deploy-local-changes)
+  - [Deploy with Codeflow UI](#deploy-with-codeflow-ui)
+    - [Deploy a PR](#deploy-a-pr)
+    - [Deploy from Master](#deploy-from-master)
+  - [Deploy with Script](#deploy-with-script)
+  - [Post-deployment Validation](#post-deployment-validation)
+- [APIs](#apis)
+  - [APIs List](#apis-list)
 - [SDK](#sdk)
+  - [Data Processing Pattern](#data-processing-pattern)
 - [Examples](#examples)
   - [Batch](#batch)
   - [Stream](#stream)
@@ -52,7 +65,6 @@ It aims to provide an efficient and flexible way to access the on-chain data:
 ## Quick Start
 
 Make sure your local go version is 1.20 by running the following commands:
-
 ```shell
 brew install go@1.20
 brew unlink go
@@ -65,15 +77,121 @@ brew link protobuf
 ```
 
 To set up for the first time (only done once):
-
 ```shell
 make bootstrap
 ```
 
 Rebuild everything:
-
 ```shell
 make build
+```
+
+Generate Protos:
+```shell
+make proto
+```
+
+## Command Line
+
+the `cmd/admin` tool consists of multiple sub command.
+
+```
+admin is a utility for managing chainstorage
+
+Usage:
+  admin [command]
+
+Available Commands:
+  backfill    Backfill a block
+  block       Fetch a block
+  completion  Generate the autocompletion script for the specified shell
+  event       tool for managing events storage
+  help        Help about any command
+  sdk
+  validator
+  workflow    tool for managing chainstorage workflows
+
+Flags:
+      --blockchain string   blockchain full name (e.g. ethereum)
+      --env string          one of [local, development, production]
+  -h, --help                help for admin
+      --meta                output metadata only
+      --network string      network name (e.g. mainnet)
+      --out string          output filepath: default format is json; use a .pb extension for protobuf format
+      --parser string       parser type: one of native, rosetta, or raw (default "native")
+
+Use "admin [command] --help" for more information about a command.
+```
+
+All sub-commands require the `blockchain`, `env`, `network` flags.
+
+### Block Command
+
+Fetch a block from ethereum mainnet:
+```shell
+go run ./cmd/admin block --blockchain ethereum --network mainnet --env local --height 46147
+```
+
+Fetch a block from ethereum goerli:
+```shell
+go run ./cmd/admin block --blockchain ethereum --network goerli --env local --height 46147
+```
+
+### Backfill Command (development)
+
+Backfill a block from BSC mainnet:
+```
+go run ./cmd/admin backfill --blockchain bsc --network mainnet --env development --start-height 10408613 --end-height 10408614
+```
+
+### Stream Command
+
+Stream block events from a specific event sequence id:
+```shell
+go run ./cmd/admin sdk stream --blockchain ethereum --network mainnet --env development --sequence 2228575 --event-tag 1
+```
+
+
+## Testing
+### Unit Test
+
+```shell
+# Run everything
+make test
+
+# Run the blockchain package only
+make test TARGET=internal/blockchain/...
+```
+
+### Integration Test
+```shell
+# Run everything
+make integration
+
+# Run the storage package only
+make integration TARGET=internal/storage/...
+
+# If test class implemented with test suite, add suite name before the test name
+make integration TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygonTestSuite/TestPolygonGetBlock
+```
+
+### Functional Test
+
+Before running the functional test, you need to provide the endpoint group config by creating `secrets.yml`.
+See [here](#endpoint-group) for more details.
+
+```shell
+# Run everything
+make functional
+
+# Run the workflow package only
+make functional TARGET=internal/workflow/...
+
+# Run TestIntegrationEthereumGetBlock only
+make functional TARGET=internal/blockchain/... TEST_FILTER='TestIntegrationEthereumGetBlock$$'
+
+# If test class implemented with test suite, add suite name before the test name
+make functional TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygonTestSuite/TestPolygonGetBlock
 ```
 
 ## Configuration
@@ -124,7 +242,6 @@ respective config directories
 
 ### Template Format and Inheritance
 
-
 Configuration templates are composable and inherit configuration properties from
 "parent templates", which can be defined in `base.template.yml`, `local.template.yml`, `development.template.yml`,
 and `production.template.yml`.
@@ -173,17 +290,18 @@ are derived from the directory and file naming schemes associated with cloud and
 ### Endpoint Group
 
 Endpoint group is an abstraction for one or more JSON-RPC endpoints.
-[EndpointProvider](/internal/blockchain/endpoints/endpoint_provider.go) uses the `endpoint_group` config to implement
+[EndpointProvider](./internal/blockchain/endpoints/endpoint_provider.go) uses the `endpoint_group` config to implement
 client-side routing to the node provider.
 
 ChainStorage utilizes two endpoint groups to speed up data ingestion:
+* master: This endpoint group is used to resolve the canonical chain and determine what blocks to ingest next.
+  Typically, sticky session is turned on for this group to ensure stronger data consistency between the requests.
+* slave: This endpoint group is used to ingest the data from the blockchain. During data ingestion, the new blocks are
+  ingested in parallel and out of order. Typically, the endpoints are selected in a round-robin fashion, but you may
+  increase the weights to send more traffic to certain endpoints.
 
-- master: This endpoint group is used to resolve the canonical chain and determine what blocks to ingest next. Typically, sticky session is turned on for this group to ensure stronger data consistency between the requests.
-- slave: This endpoint group is used to ingest the data from the blockchain. During data ingestion, the new blocks are ingested in parallel and out of order. Typically, the endpoints are selected in a round-robin fashion, but you may increase the weights to send more traffic to certain endpoints.
-
-If your node provider, e.g. QuickNode, already has built-in load balancing, your endpoint group may contain only one
+If your node provider, e.g. QuickNode, already has built-in load balancing, your endpoint group may contain only one 
 endpoint, as illustrated by the following configuration:
-
 ```yaml
 chain:
   client:
@@ -220,128 +338,25 @@ You may override any configuration using an environment variable. The environmen
 "CHAINSTORAGE_". For nested dictionary, use underscore to separate the keys.
 
 For example, you may override the endpoint group config at runtime by injecting the following environment variables:
-
-- master: CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP
-- slave: CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP
+* master: CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP
+* slave: CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP
 
 Alternatively, you may override the configuration by creating `secrets.yml` within the same directory. Its attributes
 will be merged into the runtime configuration and take the highest precedence. Note that this file may contain
 credentials and is excluded from check-in by `.gitignore`.
 
-## Command Line
-
-the `cmd/admin` tool consists of multiple sub command.
-
-```
-admin is a utility for managing chainstorage
-
-Usage:
-  admin [command]
-
-Available Commands:
-  backfill    Backfill a block
-  block       Fetch a block
-  completion  Generate the autocompletion script for the specified shell
-  event       tool for managing events storage
-  help        Help about any command
-  sdk
-  validator
-  workflow    tool for managing chainstorage workflows
-
-Flags:
-      --blockchain string   blockchain full name (e.g. ethereum)
-      --env string          one of [local, development, production]
-  -h, --help                help for admin
-      --meta                output metadata only
-      --network string      network name (e.g. mainnet)
-      --out string          output filepath: default format is json; use a .pb extension for protobuf format
-      --parser string       parser type: one of native, rosetta, or raw (default "native")
-
-Use "admin [command] --help" for more information about a command.
-```
-
-All sub-commands require the `blockchain`, `env`, `network` flags.
-
-### Block Command
-
-Fetch a block from ethereum mainnet:
-
-```shell
-go run ./cmd/admin block --blockchain ethereum --network mainnet --env local --height 46147
-```
-
-Fetch a block from ethereum goerli:
-
-```shell
-go run ./cmd/admin block --blockchain ethereum --network goerli --env local --height 46147
-```
-
-### Backfill Command (development)
-
-Backfill a block from BSC mainnet:
-
-```
-go run ./cmd/admin backfill --blockchain bsc --network mainnet --env development --start-height 10408613 --end-height 10408614
-```
-
-### Stream Command
-
-Stream block events from a specific event sequence id:
-
-```shell
-go run ./cmd/admin sdk stream --blockchain ethereum --network mainnet --env development --sequence 2228575 --event-tag 1
-```
-
-## Testing
-
-### Unit Test
-
-```shell
-# Run everything
-make test
-
-# Run the blockchain package only
-make test TARGET=internal/blockchain/...
-```
-
-### Integration Test
-
-```shell
-# Run everything
-make integration
-
-# Run the storage package only
-make integration TARGET=internal/storage/...
-```
-
-### Functional Test
-
-Before running the functional test, you need to provide the endpoint group config by creating `secrets.yml`.
-See [here](#endpoint-group) for more details.
-
-```shell
-# Run everything
-make functional
-
-# Run the workflow package only
-make functional TARGET=internal/workflow/...
-
-# Run TestIntegrationEthereumGetBlock only
-make functional TARGET=internal/blockchain/... TEST_FILTER='TestIntegrationEthereumGetBlock$$'
-
-# If test class implemented with test suite, add suite name before the test name
-make functional TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygonTestSuite/TestPolygonGetBlock
-```
-
 ## Development
 
 ### Running Server
-
 Start the dockers by the docker-compose file from project root folder:
-
 ```shell
 make localstack
 ```
+> If you have developed ChainStorage before locally with previous docker compose file and got below error message
+> ```shell
+> nc: bad address 'postgresql'
+> ```
+> Please remove existing ChainStorage container and reran `make localstack`
 
 The next step is to start the server locally:
 
@@ -358,21 +373,17 @@ make server CHAINSTORAGE_CONFIG=ethereum_goerli
 ### AWS localstack
 
 Check S3 files:
-
 You can checkout the config from `config/chainstorage/{{Blockchain}}/{{network}}/{{evironment}}`  for the value of S3 bucket name, dynamoDB tables, and SQS name.
-
 ```shell
 aws s3 --no-sign-request --region local --endpoint-url http://localhost:4566 ls --recursive example-chainstorage-ethereum-mainnet-dev/
 ```
 
 Check DynamoDB rows:
-
 ```shell
 aws dynamodb --no-sign-request --region local --endpoint-url http://localhost:4566 scan --table-name example_chainstorage_blocks_ethereum_mainnet
 ```
 
 Check DLQ:
-
 ```shell
 aws sqs --no-sign-request --region local --endpoint-url http://localhost:4566/000000000000/example_chainstorage_blocks_ethereum_mainnet_dlq receive-message --queue-url "http://localhost:4566/000000000000/example_chainstorage_blocks_ethereum_mainnet_dlq" --max-number-of-messages 10 --visibility-timeout 2
 ```
@@ -383,43 +394,71 @@ Open Temporal UI in a browser by entering the
 URL: http://localhost:8088/namespaces/chainstorage-ethereum-mainnet/workflows
 
 Start the backfill workflow:
-
 ```shell
 go run ./cmd/admin workflow start --workflow backfiller --input '{"StartHeight": 11000000, "EndHeight": 11000100, "NumConcurrentExtractors": 24}' --blockchain ethereum --network mainnet --env local
 ```
 
 Start the benchmarker workflow:
-
 ```shell
 go run ./cmd/admin workflow start --workflow benchmarker --input '{"StartHeight": 1, "EndHeight": 12000000, "NumConcurrentExtractors": 24, "StepSize":1000000, "SamplesToTest":500}' --blockchain ethereum --network mainnet --env local
 ```
 
 Start the monitor workflow:
-
 ```shell
-go run ./cmd/admin workflow start --workflow monitor --input '{"StartHeight": 0, "Tag": 0}' --blockchain ethereum --network mainnet --env local
+go run ./cmd/admin workflow start --workflow monitor --blockchain ethereum --network mainnet --env local --input '{"StartHeight": 11000000}'
 ```
 
 Start the poller workflow:
-
 ```shell
-go run ./cmd/admin workflow start --workflow poller --input '{"Tag": 0, "MaxBlocksToSync": 200, "Parallelism":32}' --blockchain ethereum --network mainnet --env local
+go run ./cmd/admin workflow start --workflow poller --input '{"Tag": 0, "MaxBlocksToSync": 100, "Parallelism":4}' --blockchain ethereum --network mainnet --env local
 ```
-
 NOTE: the recommended value for "parallelism" depend on the capacity of your node provider. If you are not sure what
 value should be used, just drop it from the command.
 
 Start the streamer workflow:
-
 ```shell
 go run ./cmd/admin workflow start --workflow streamer --input '{}' --blockchain ethereum --network goerli --env local
 ```
 
 Stop the monitor workflow:
-
 ```shell
-go run ./cmd/admin workflow stop --workflow monitor --input '' --blockchain ethereum --network mainnet --env local
+go run ./cmd/admin workflow stop --workflow monitor --blockchain ethereum --network mainnet --env local
 ```
+
+Stop a versioned streamer workflow:
+```shell
+go run ./cmd/admin workflow stop --workflow streamer --blockchain ethereum --network mainnet --env local --workflowID {workflowID}
+```
+
+## Failover
+
+### Nodes Failover
+ChainStorage supports nodes failover feature to mitigate the issue from nodes which may impact our SLA.
+When primary clusters are down, we can choose to switch over to failover clusters to mitigate incidents, instead of waiting for nodes get fully recovered.
+
+Check [this comment](https://github.com/coinbase/chainstorage/blob/master/internal/blockchain/endpoints/endpoint_provider.go#L21-26) to get more details of the primary/secondary cluster definition.
+
+To check if failover clusters are provided, please go to config service and check the endpoints configurations.
+
+
+### Failover in Workflows
+Both `Backfiller` and `Poller` workflows provide failover feature without updating configs in the config service which requires approvals as well as redeployment.
+
+To use failover clusters for those two workflows, you simply need to set the `Failover` workflow param as `true` when you trigger it.
+
+Note: By default, the `Failover` workflow param should be set as `false`, which means the primary clusters should always be first choice.
+If you intend to use failover clusters, please update endpoints configs in config service instead.
+
+
+### Automatic Failover in Poller Workflow
+`Poller` workflow provides an automatic failover mechanism so that we don't need to manually restart workflows with `Failover` param.
+
+This feature is guarded by the `failover_enabled` configuration.
+Once this feature is enabled, when the workflow execution using primary clusters fails, it will automatically trigger a new workflow run with `Failover=true`.
+[Implementation Code](https://github.com/coinbase/chainstorage/blob/master/internal/workflow/poller.go#L186).
+
+Ref: [Temporal Continue-As-New](https://docs.temporal.io/concepts/what-is-continue-as-new/#:~:text=Continue%2DAs%2DNew%20is%20a,warn%20you%20every%2010%2C000%20Events.)
+
 
 ### Checking Workflow Statuses
 
@@ -432,6 +471,9 @@ brew install tctl
 
 ### APIs
 
+### APIs List
+[Supported APIs List](https://github.com/coinbase/chainstorage/blob/master/protos/coinbase/chainstorage/api.proto)
+
 ```shell
 # local
 grpcurl --plaintext localhost:9090 coinbase.chainstorage.ChainStorage/GetLatestBlock
@@ -443,12 +485,10 @@ grpcurl --plaintext -d '{"initial_position_in_stream": "13222054"}' localhost:90
 ```
 
 ## SDK
-
 Chainstorage also provides SDK, and you can find supported
 methods [here](https://github.com/coinbase/chainstorage/blob/master/sdk/client.go)
 
 Note:
-
 - `GetBlocksByRangeWithTag` is not equivalent to the batch version of `GetBlockWithTag` since you don't have a way to
   specify the block hash.
   So when you use `GetBlocksByRangeWithTag` and if it goes beyond the current tip of chain due to reorg, you'll get back
@@ -456,6 +496,28 @@ Note:
 
   In conclusion, it's safe to use `GetBlocksByRangeWithTag` for backfilling since the reorg will not happen for past
   blocks, however, you'd be suggested to use `GetBlockWithTag` for recent blocks (e.g. streaming case).
+
+### Data Processing Pattern
+Below are several patterns you can choose for data processing.
+
+1. If you want the most up-to-date blocks, you need to use the streaming APIs to handle the chain reorg events:
+  1. Unified batch and streaming:
+    - Download, let's say 10k events, using `GetChainEvents`.
+    - Break down 10k events into small batches, e.g. 20 events/batch.
+    - Process those batches in parallel.
+    - For events in each batch, it can be processed either sequentially or in parallel using `GetBlockWithTag`.
+    - Update watermark once all small batches have been processed.
+    - Repeat above steps.
+
+     With the above pattern, you can unify batch and streaming use cases. When your data pipeline is close to the tip,
+     `GetChainEvents` will simply return all available blocks.
+  2. Separate workflows for backfilling and live streaming:
+     Use `GetBlocksByRangeWithTag` for backfilling and then switch over to `StreamChainEvents` for live streaming.
+2. If you don't want to deal with chain reorg, you may use the batch APIs as follows:
+  - Maintain a distance (`irreversibleDistance`) to the tip, the irreversible distance can be queried using `GetChainMetadata`.
+  - Get the latest block height (`latest`) using `GetLatestBlock`.
+  - Poll for new data from current watermark block to the block (`latest - irreversibleDistance`) using `GetBlocksByRangeWithTag`.
+  - Repeat above steps periodically.
 
 ## Examples
 
@@ -496,13 +558,13 @@ go run ./examples/stream
 The [last example](/examples/unified/main.go) showcases how to turn the data processing into an embarrassingly parallel
 problem by leveraging the mono-increasing sequence number. In this example, though the events are processed in parallel
 and out of order, the logical ordering guarantee is preserved.
-1. Download, say 10k events, using `GetChainEvents`. Note that this API is non-blocking, and it returns all the 
+1. Download, say 10k events, using `GetChainEvents`. Note that this API is non-blocking, and it returns all the
    available events if the requested amount is not available. This enables us to unify batch and stream processing.
 2. Break down 10k events into small batches, e.g. 20 events/batch.
 3. Distribute those batches to a number of workers for parallel processing.
    Note that this step is not part of the example.
 4. For events in each batch, it can be processed either sequentially or in parallel using `GetBlockWithTag`.
-5. Implement versioning using the mono-increasing sequence numbers provided by the events. 
+5. Implement versioning using the mono-increasing sequence numbers provided by the events.
    See [here](https://aws.amazon.com/blogs/database/implementing-version-control-using-amazon-dynamodb/) for more details.
 6. Update watermark once all the batches have been processed.
 7. Repeat above steps.

@@ -131,7 +131,7 @@ func (s *PollerIntegrationTestSuite) TestPollerIntegration_WithFailover() {
 }
 
 func (s *PollerIntegrationTestSuite) TestPollerIntegration_WithFastSync() {
-	tag := uint32(1)
+	tag := uint32(2)
 	startHeight := uint64(204_800_230)
 	endHeight := uint64(204_800_240)
 	s.backfillData(startHeight, endHeight, tag, common.Blockchain_BLOCKCHAIN_SOLANA, common.Network_NETWORK_SOLANA_MAINNET)

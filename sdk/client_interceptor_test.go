@@ -33,7 +33,7 @@ func TestClientInterceptor(t *testing.T) {
 func (s *clientInterceptorTestSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
 	s.client = sdkmocks.NewMockClient(s.ctrl)
-	s.interceptor = sdk.WithClientRetryInterceptor(s.client, zap.NewNop())
+	s.interceptor = sdk.WithTimeoutableClientInterceptor(s.client, zap.NewNop())
 }
 
 func (s *clientInterceptorTestSuite) TearDownTest() {
@@ -50,7 +50,7 @@ func (s *clientInterceptorTestSuite) TestGetLatestBlockWithTag() {
 	ctx := context.Background()
 	attempts := 0
 	s.client.EXPECT().
-		GetLatestBlockWithTag(ctx, tag).
+		GetLatestBlockWithTag(gomock.Any(), tag).
 		DoAndReturn(func(ctx context.Context, tag uint32) (uint64, error) {
 			attempts += 1
 			if attempts < retry.DefaultMaxAttempts {
@@ -73,7 +73,7 @@ func (s *clientInterceptorTestSuite) TestGetLatestBlockWithTag_RetryLimitExceede
 	require := testutil.Require(s.T())
 	ctx := context.Background()
 	s.client.EXPECT().
-		GetLatestBlockWithTag(ctx, tag).
+		GetLatestBlockWithTag(gomock.Any(), tag).
 		DoAndReturn(func(ctx context.Context, tag uint32) (uint64, error) {
 			return 0, context.DeadlineExceeded
 		}).
@@ -90,7 +90,7 @@ func (s *clientInterceptorTestSuite) TestGetLatestBlockWithTag_NonRetryableError
 	require := testutil.Require(s.T())
 	ctx := context.Background()
 	s.client.EXPECT().
-		GetLatestBlockWithTag(ctx, tag).
+		GetLatestBlockWithTag(gomock.Any(), tag).
 		DoAndReturn(func(ctx context.Context, tag uint32) (uint64, error) {
 			return 0, context.Canceled
 		}).
@@ -111,7 +111,7 @@ func (s *clientInterceptorTestSuite) TestGetBlockWithTag() {
 	ctx := context.Background()
 	attempts := 0
 	s.client.EXPECT().
-		GetBlockWithTag(ctx, tag, height, hash).
+		GetBlockWithTag(gomock.Any(), tag, height, hash).
 		DoAndReturn(func(ctx context.Context, tag uint32, height uint64, hash string) (*api.Block, error) {
 			attempts += 1
 			if attempts < retry.DefaultMaxAttempts {
@@ -138,7 +138,7 @@ func (s *clientInterceptorTestSuite) TestGetChainEvents() {
 	ctx := context.Background()
 	attempts := 0
 	s.client.EXPECT().
-		GetChainEvents(ctx, req).
+		GetChainEvents(gomock.Any(), req).
 		DoAndReturn(func(ctx context.Context, req *api.GetChainEventsRequest) ([]*api.BlockchainEvent, error) {
 			attempts += 1
 			if attempts < retry.DefaultMaxAttempts {

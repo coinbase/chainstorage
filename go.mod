@@ -13,7 +13,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.1
 	github.com/fatih/color v1.13.0
 	github.com/gagliardetto/solana-go v1.6.0
-	github.com/go-playground/validator/v10 v10.15.5
+	github.com/go-playground/validator/v10 v10.16.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/go-cmp v0.5.9
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -31,8 +31,8 @@ require (
 	go.temporal.io/api v1.19.1-0.20230322213042-07fb271d475b
 	go.temporal.io/sdk v1.22.1
 	go.temporal.io/sdk/contrib/tally v0.2.0
-	go.uber.org/atomic v1.10.0
-	go.uber.org/fx v1.19.2
+	go.uber.org/atomic v1.11.0
+	go.uber.org/fx v1.20.0
 	go.uber.org/mock v0.3.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.14.0
@@ -156,7 +156,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.uber.org/dig v1.16.1 // indirect
+	go.uber.org/dig v1.17.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect

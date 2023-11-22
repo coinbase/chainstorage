@@ -33,8 +33,7 @@ type solanaClientTestSuite struct {
 }
 
 const (
-	solanaTag           = uint32(1)
-	solanaTagV2         = uint32(2)
+	solanaTag           = uint32(2)
 	solanaHeight        = uint64(100_000_000)
 	solanaParentHeight  = uint64(99_999_999)
 	solanaHash          = "GdY1gj7F8vq1nCy4dgCZK42WV19bkfQ4cp2e9evK18ry"
@@ -171,7 +170,7 @@ func (s *solanaClientTestSuite) TestBatchGetBlockMetadata_MiniBatch() {
 	require := testutil.Require(s.T())
 
 	blockResponse := &jsonrpc.Response{
-		Result: fixtures.MustReadFile("client/solana/block.json"),
+		Result: fixtures.MustReadFile("client/solana/block_v2.json"),
 	}
 
 	tests := []struct {
@@ -231,7 +230,7 @@ func (s *solanaClientTestSuite) TestGetBlockByHeight() {
 	require := testutil.Require(s.T())
 
 	blockResponse := &jsonrpc.Response{
-		Result: fixtures.MustReadFile("client/solana/block.json"),
+		Result: fixtures.MustReadFile("client/solana/block_v2.json"),
 	}
 	s.rpcClient.EXPECT().Call(
 		gomock.Any(),
@@ -248,45 +247,6 @@ func (s *solanaClientTestSuite) TestGetBlockByHeight() {
 	require.Equal(common.Blockchain_BLOCKCHAIN_SOLANA, block.Blockchain)
 	require.Equal(common.Network_NETWORK_SOLANA_MAINNET, block.Network)
 	require.Equal(solanaTag, block.Metadata.Tag)
-	require.Equal(solanaHeight, block.Metadata.Height)
-	require.Equal(solanaParentHeight, block.Metadata.ParentHeight)
-	require.Equal(solanaHash, block.Metadata.Hash)
-	require.Equal(solanaParentHash, block.Metadata.ParentHash)
-	require.False(block.Metadata.Skipped)
-	require.Equal(testutil.MustTimestamp(solanaTimestamp), block.Metadata.Timestamp)
-	require.Less(0, len(block.GetSolana().GetHeader()))
-
-	txnMetadata := block.GetTransactionMetadata()
-	require.NotNil(txnMetadata)
-	transactions := txnMetadata.GetTransactions()
-	require.NotNil(transactions)
-	require.Equal(10, len(transactions))
-	require.Equal("2xRnwfAMxAvv5z2eiWC1YCR6bdcPj7ebPRTKFiFZuBHvWNc8QjM33W4Ev71T8C18g3yARJcHtMzC3VWTdASDybkU", transactions[0])
-	require.Equal("37Zd6zGdAeusPm4TQkxLh5P5jUvjmz27kgCYjx6xdF8Wh4WQG61hzkWD8uw3RcVfxk9dbWccZnUiwxJZ7oNDsuoP", transactions[3])
-	require.Equal("57VvLyUYMWpLb3n63LXNWZb1KQW1n9o6r9HGYuvi5BW7Futd9BMVwChyemyMawKUbU8n3J5vSaMwBEADgYQ29GTQ", transactions[9])
-}
-
-func (s *solanaClientTestSuite) TestGetBlockByHeightV2() {
-	require := testutil.Require(s.T())
-
-	blockResponse := &jsonrpc.Response{
-		Result: fixtures.MustReadFile("client/solana/block_v2.json"),
-	}
-	s.rpcClient.EXPECT().Call(
-		gomock.Any(),
-		solanaMethodGetBlock,
-		jsonrpc.Params{
-			solanaHeight,
-			solanaGetBlockConfigurationV2,
-		},
-		gomock.Any(),
-	).AnyTimes().Return(blockResponse, nil)
-
-	block, err := s.client.GetBlockByHeight(context.Background(), solanaTagV2, solanaHeight)
-	require.NoError(err)
-	require.Equal(common.Blockchain_BLOCKCHAIN_SOLANA, block.Blockchain)
-	require.Equal(common.Network_NETWORK_SOLANA_MAINNET, block.Network)
-	require.Equal(solanaTagV2, block.Metadata.Tag)
 	require.Equal(solanaHeight, block.Metadata.Height)
 	require.Equal(solanaParentHeight, block.Metadata.ParentHeight)
 	require.Equal(solanaHash, block.Metadata.Hash)
@@ -390,7 +350,7 @@ func (s *solanaClientTestSuite) TestGetBlockByHash() {
 	require := testutil.Require(s.T())
 
 	blockResponse := &jsonrpc.Response{
-		Result: fixtures.MustReadFile("client/solana/block.json"),
+		Result: fixtures.MustReadFile("client/solana/block_v2.json"),
 	}
 	s.rpcClient.EXPECT().Call(
 		gomock.Any(),
@@ -420,7 +380,7 @@ func (s *solanaClientTestSuite) TestGetBlockByHash_UnexpectedHash() {
 	require := testutil.Require(s.T())
 
 	blockResponse := &jsonrpc.Response{
-		Result: fixtures.MustReadFile("client/solana/block.json"),
+		Result: fixtures.MustReadFile("client/solana/block_v2.json"),
 	}
 	s.rpcClient.EXPECT().Call(
 		gomock.Any(),

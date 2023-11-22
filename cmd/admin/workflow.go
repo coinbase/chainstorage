@@ -31,7 +31,7 @@ const (
 
 var (
 	cadenceHost = map[config.Env]string{
-		config.EnvLocal:       "http://localhost:8088",
+		config.EnvLocal:       "http://localhost:8080",
 		config.EnvDevelopment: "https://temporal-dev.example.com",
 		config.EnvProduction:  "https://temporal.example.com",
 	}

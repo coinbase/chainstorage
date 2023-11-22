@@ -116,8 +116,6 @@ func NewChainstorageClient(params Params) (Client, error) {
 	streamChains := []grpc.StreamClientInterceptor{
 		// XXX: Add your own interceptors here.
 		streamAuthInterceptor(authHeader, authToken),
-		grpc_retry.StreamClientInterceptor(retryOpts...),
-		grpc_retry.StreamClientInterceptor(retryOpts...),
 	}
 	if cfg.clientID != "" {
 		unaryChains = append(unaryChains, unaryClientTaggingInterceptor(cfg.clientID))

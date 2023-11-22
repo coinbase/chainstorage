@@ -120,7 +120,7 @@ func (s *BackfillerIntegrationTestSuite) TestBackfiller() {
 func (s *BackfillerIntegrationTestSuite) TestBackfiller_MiniBatch() {
 	const (
 		timeout       = 30 * time.Minute
-		tag           = uint32(1)
+		tag           = uint32(2)
 		startHeight   = uint64(194000000)
 		endHeight     = uint64(194000100)
 		parallelism   = 20

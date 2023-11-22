@@ -85,10 +85,14 @@ benchmark:
 	go test -v ./internal/blockchain/integration_test -tags=integration -run=^_ -bench=$(TEST_FILTER) -benchtime=200x
 	$(call docker_compose_down)
 
-.PHONY: codegen
-codegen:
-	@echo "--- codegen"
+.PHONY: proto
+proto:
+	@echo "--- proto"
 	./scripts/protogen.sh
+
+.PHONY: codegen
+codegen: proto
+	@echo "--- codegen"
 	./scripts/mockgen.sh
 
 .PHONY: config

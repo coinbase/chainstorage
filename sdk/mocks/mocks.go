@@ -11,7 +11,6 @@ package sdkmocks
 import (
 	context "context"
 	reflect "reflect"
-	time "time"
 
 	chainstorage "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	sdk "github.com/coinbase/chainstorage/sdk"
@@ -255,18 +254,6 @@ func (m *MockClient) SetClientID(arg0 string) {
 func (mr *MockClientMockRecorder) SetClientID(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetClientID", reflect.TypeOf((*MockClient)(nil).SetClientID), arg0)
-}
-
-// SetClientTimeout mocks base method.
-func (m *MockClient) SetClientTimeout(arg0 time.Duration) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetClientTimeout", arg0)
-}
-
-// SetClientTimeout indicates an expected call of SetClientTimeout.
-func (mr *MockClientMockRecorder) SetClientTimeout(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetClientTimeout", reflect.TypeOf((*MockClient)(nil).SetClientTimeout), arg0)
 }
 
 // SetTag mocks base method.

@@ -41,7 +41,7 @@ workflows:
     num_concurrent_extractors: 50
   monitor:
     backoff_interval: 0s
-    batch_size: 25
+    batch_size: 300
     parallelism: 25
     irreversible_distance: 1500
     block_gap_limit: 8000

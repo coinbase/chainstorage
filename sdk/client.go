@@ -2,7 +2,6 @@ package sdk
 
 import (
 	"context"
-	"time"
 
 	"google.golang.org/grpc/codes"
 
@@ -37,9 +36,6 @@ type (
 
 		// SetClientID sets the clientID when initiate client.
 		SetClientID(clientID string)
-
-		// SetClientTimeout sets the base timeout for rpc calls.
-		SetClientTimeout(timeout time.Duration)
 
 		// SetBlockValidation sets the blockValidation which by default is disabled.
 		SetBlockValidation(blockValidation bool)
@@ -118,10 +114,6 @@ type (
 		blockValidation bool
 		retry           retry.Retry
 		validate        *validator.Validate
-
-		shortTimeout  time.Duration // Used by APIs such as a simple lookup to the meta storage. Defaults to 2s.
-		mediumTimeout time.Duration // Used by APIs such as downloading one object from the blob storage. Defaults to 5s.
-		longTimeout   time.Duration // Used by APIs such as downloading multiple objects from the blob storage. Defaults to 11s.
 	}
 
 	clientParams struct {
@@ -132,15 +124,6 @@ type (
 		Client          gateway.Client
 		Parser          parser.Parser
 	}
-)
-
-const (
-	// The default timeout is loose to account for various retries. For example:
-	// - On the client side, certain gRPC error codes are automatically retried by the gateway package.
-	// - On the server side, certain storage errors are automatically retried by the storage package.
-	//
-	// If your use case is very time sensitive, you may override Config.ClientTimeout.
-	defaultClientTimeout = 2 * time.Second
 )
 
 func newClient(params clientParams) (Client, error) {
@@ -155,8 +138,8 @@ func newClient(params clientParams) (Client, error) {
 		retry:           retry.New(),
 		validate:        validator.New(),
 	}
-	client.SetClientTimeout(defaultClientTimeout)
-	client = WithClientRetryInterceptor(client, logger)
+
+	client = WithTimeoutableClientInterceptor(client, logger)
 	return client, nil
 }
 
@@ -176,16 +159,6 @@ func (c *clientImpl) SetClientID(clientID string) {
 	c.clientID = clientID
 }
 
-func (c *clientImpl) SetClientTimeout(timeout time.Duration) {
-	if timeout == 0 {
-		timeout = defaultClientTimeout
-	}
-
-	c.shortTimeout = timeout
-	c.mediumTimeout = timeout*2 + time.Second
-	c.longTimeout = timeout*4 + time.Second*3
-}
-
 func (c *clientImpl) SetBlockValidation(blockValidation bool) {
 	c.blockValidation = blockValidation
 }
@@ -199,9 +172,6 @@ func (c *clientImpl) GetLatestBlock(ctx context.Context) (uint64, error) {
 }
 
 func (c *clientImpl) GetLatestBlockWithTag(ctx context.Context, tag uint32) (uint64, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.shortTimeout)
-	defer cancel()
-
 	resp, err := c.client.GetLatestBlock(ctx, &api.GetLatestBlockRequest{
 		Tag: tag,
 	})
@@ -216,9 +186,6 @@ func (c *clientImpl) GetBlock(ctx context.Context, height uint64, hash string) (
 }
 
 func (c *clientImpl) GetBlockWithTag(ctx context.Context, tag uint32, height uint64, hash string) (*api.Block, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.mediumTimeout)
-	defer cancel()
-
 	return c.downloadBlock(ctx, tag, height, hash)
 }
 
@@ -226,14 +193,6 @@ func (c *clientImpl) GetBlocksByRangeWithTag(ctx context.Context, tag uint32, st
 	if endHeight == 0 {
 		endHeight = startHeight + 1
 	}
-
-	timeout := c.mediumTimeout
-	if endHeight-startHeight > 2 {
-		timeout = c.longTimeout
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
 	resp, err := c.client.GetBlockFilesByRange(ctx, &api.GetBlockFilesByRangeRequest{
 		Tag:         tag,
@@ -469,14 +428,6 @@ func (c *clientImpl) isTransientStreamError(err error) bool {
 }
 
 func (c *clientImpl) GetChainEvents(ctx context.Context, req *api.GetChainEventsRequest) ([]*api.BlockchainEvent, error) {
-	timeout := c.shortTimeout
-	if req.MaxNumEvents > 10 {
-		timeout = c.mediumTimeout
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
 	resp, err := c.client.GetChainEvents(ctx, req)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get chain events (req={%+v}): %w", req, err)
@@ -486,9 +437,6 @@ func (c *clientImpl) GetChainEvents(ctx context.Context, req *api.GetChainEvents
 }
 
 func (c *clientImpl) GetChainMetadata(ctx context.Context, req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.shortTimeout)
-	defer cancel()
-
 	resp, err := c.client.GetChainMetadata(ctx, req)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get chain metadata (req={%+v}): %w", req, err)
@@ -502,9 +450,6 @@ func (c *clientImpl) GetStaticChainMetadata(ctx context.Context, req *api.GetCha
 }
 
 func (c *clientImpl) GetBlockByTransaction(ctx context.Context, tag uint32, transactionHash string) ([]*api.Block, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.mediumTimeout)
-	defer cancel()
-
 	resp, err := c.client.GetBlockByTransaction(ctx, &api.GetBlockByTransactionRequest{
 		Tag:             tag,
 		TransactionHash: transactionHash,

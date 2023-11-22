@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/coinbase/chainstorage/internal/utils/log"
+
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -73,7 +75,39 @@ var (
 	}
 )
 
+func NewWithoutEndpoints(t testing.TB, opts ...fx.Option) TestApp {
+	logger := log.NewDevelopment()
+
+	manager := services.NewMockSystemManager()
+
+	var cfg *config.Config
+	opts = append(
+		opts,
+		aws.Module,
+		cadence.Module,
+		config.Module,
+		fxparams.Module,
+		tracer.Module,
+		fx.NopLogger,
+		fx.Provide(func() testing.TB { return t }),
+		fx.Provide(func() *zap.Logger { return logger }),
+		fx.Provide(func() tally.Scope { return tally.NoopScope }),
+		fx.Provide(func() services.SystemManager { return manager }),
+		fx.Populate(&cfg),
+	)
+
+	app := fxtest.New(t, opts...)
+	app.RequireStart()
+	return &testAppImpl{
+		app:    app,
+		logger: logger,
+		config: cfg,
+	}
+}
+
 func New(t testing.TB, opts ...fx.Option) TestApp {
+	logger := log.NewDevelopment()
+
 	manager := services.NewMockSystemManager()
 
 	var cfg *config.Config
@@ -88,6 +122,7 @@ func New(t testing.TB, opts ...fx.Option) TestApp {
 		fx.NopLogger,
 		fx.Provide(func() testing.TB { return t }),
 		fx.Provide(func() *zap.Logger { return manager.Logger() }),
+		fx.Provide(func() *zap.Logger { return logger }),
 		fx.Provide(func() tally.Scope { return tally.NoopScope }),
 		fx.Provide(func() services.SystemManager { return manager }),
 		fx.Populate(&cfg),
@@ -97,7 +132,7 @@ func New(t testing.TB, opts ...fx.Option) TestApp {
 	app.RequireStart()
 	return &testAppImpl{
 		app:    app,
-		logger: manager.Logger(),
+		logger: logger,
 		config: cfg,
 	}
 }

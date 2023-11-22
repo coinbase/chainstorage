@@ -243,31 +243,7 @@ func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.B
 	}
 
 	if metadata.Tag < 2 {
-		// TODO: remove this branch once v2 is fully rolled out.
-		var block SolanaBlock
-		if err := json.Unmarshal(blobdata.Header, &block); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal header (metadata={%+v}: %w", metadata, err)
-		}
-
-		nativeBlock, err := p.parseBlock(metadata.Height, &block)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to parse block (metadata={%+v}: %w", metadata, err)
-		}
-
-		return &api.NativeBlock{
-			Blockchain:      rawBlock.Blockchain,
-			Network:         rawBlock.Network,
-			Tag:             metadata.Tag,
-			Hash:            metadata.Hash,
-			ParentHash:      metadata.ParentHash,
-			Height:          metadata.Height,
-			ParentHeight:    metadata.ParentHeight,
-			Timestamp:       p.parseTimestamp(block.BlockTime),
-			NumTransactions: uint64(len(block.Transactions)),
-			Block: &api.NativeBlock_Solana{
-				Solana: nativeBlock,
-			},
-		}, nil
+		return nil, internal.ErrNotImplemented
 	}
 
 	var block SolanaBlockV2
@@ -347,29 +323,6 @@ func (p *solanaNativeParserImpl) parseTimestamp(ts int64) *timestamp.Timestamp {
 	return &timestamp.Timestamp{
 		Seconds: ts,
 	}
-}
-
-func (p *solanaNativeParserImpl) parseBlock(slot uint64, block *SolanaBlock) (*api.SolanaBlock, error) {
-	header, err := p.parseHeader(slot, block)
-	if err != nil {
-		return nil, xerrors.Errorf("failed to parse header: %w", err)
-	}
-
-	transactions, err := p.parseTransactions(block.Transactions)
-	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transactions: %w", err)
-	}
-
-	rewards, err := p.parseRewards(block.Rewards)
-	if err != nil {
-		return nil, xerrors.Errorf("failed to parse rewards: %w", err)
-	}
-
-	return &api.SolanaBlock{
-		Header:       header,
-		Transactions: transactions,
-		Rewards:      rewards,
-	}, nil
 }
 
 func (p *solanaNativeParserImpl) parseBlockV2(slot uint64, block *SolanaBlockV2) (*api.SolanaBlockV2, error) {

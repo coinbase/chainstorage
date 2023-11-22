@@ -92,14 +92,7 @@ var (
 		"maxSupportedTransactionVersion": maxSupportedTransactionVersion,
 	}
 
-	// This configuration defines the maxSupportedTransactionVersion for getBlock requests. Specifying this
-	// Allows getting blocks with mix transaction versions, if this is not provided, and there are mix transaction
-	// versions in the block, -32015 error will be returned
 	solanaGetBlockConfiguration = map[string]any{
-		"maxSupportedTransactionVersion": maxSupportedTransactionVersion,
-	}
-
-	solanaGetBlockConfigurationV2 = map[string]any{
 		"encoding":                       "jsonParsed",
 		"transactionDetails":             "full",
 		"rewards":                        true,
@@ -307,11 +300,11 @@ func (c *solanaClientImpl) getBlobdata(header json.RawMessage) *api.Block_Solana
 }
 
 func (c *solanaClientImpl) getBlock(ctx context.Context, tag uint32, height uint64) (*getBlockResponse, error) {
-	cfg := solanaGetBlockConfigurationV2
+	cfg := solanaGetBlockConfiguration
 	if tag < 2 {
-		// TODO: remove this branch once v2 is fully rolled out.
-		cfg = solanaGetBlockConfiguration
+		return nil, internal.ErrNotImplemented
 	}
+
 	params := jsonrpc.Params{
 		height,
 		cfg,

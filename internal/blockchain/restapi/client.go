@@ -121,8 +121,7 @@ func newClient(params ClientParams, endpointProvider endpoints.EndpointProvider)
 	clientRetry := newRetry(params, logger)
 
 	return &clientImpl{
-		logger: logger,
-		// TODO: we will also need to create the dashboard for REST API, similar as Json RPC.
+		logger:           logger,
 		metrics:          params.Metrics.SubScope("restapi"),
 		httpClient:       params.HTTPClient,
 		retry:            clientRetry,

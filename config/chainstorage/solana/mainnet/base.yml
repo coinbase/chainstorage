@@ -137,7 +137,7 @@ workflows:
     activity_schedule_to_start_timeout: 5m
     activity_start_to_close_timeout: 10m
     backoff_interval: 0s
-    batch_size: 25
+    batch_size: 300
     block_gap_limit: 8000
     checkpoint_size: 500
     event_gap_limit: 300
@@ -157,7 +157,7 @@ workflows:
     fast_sync: true
     liveness_check_enabled: true
     liveness_check_interval: 1m
-    liveness_check_violation_limit: 15
+    liveness_check_violation_limit: 10
     max_blocks_to_sync_per_cycle: 300
     parallelism: 24
     session_creation_timeout: 2m

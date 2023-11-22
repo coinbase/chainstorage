@@ -82,10 +82,6 @@ func New(manager services.SystemManager, cfg *Config) (Session, error) {
 		session.Client().SetClientID(cfg.ClientID)
 	}
 
-	if cfg.ClientTimeout > 0 {
-		session.Client().SetClientTimeout(cfg.ClientTimeout)
-	}
-
 	if cfg.BlockValidation != nil {
 		session.Client().SetBlockValidation(pointer.Deref(cfg.BlockValidation))
 	}

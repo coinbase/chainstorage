@@ -87,6 +87,7 @@ var (
 		Use:   "stream",
 		Short: "Stream blocks",
 		RunE: newSDKCommand(func(session sdk.Session) error {
+			lastSequenceNum := sdkFlags.sequence
 			ch, err := session.Client().StreamChainEvents(context.Background(), sdk.StreamingConfiguration{
 				ChainEventsRequest: &api.ChainEventsRequest{
 					SequenceNum: sdkFlags.sequence,
@@ -103,6 +104,12 @@ var (
 				}
 
 				logger.Info("fetched event", zap.Reflect("event", event.BlockchainEvent))
+
+				if event.BlockchainEvent.SequenceNum != lastSequenceNum+1 {
+					return xerrors.Errorf("sequence number should be mono-increasing: expected %v, got %v", lastSequenceNum+1, event.BlockchainEvent.SequenceNum)
+				}
+				lastSequenceNum = event.BlockchainEvent.SequenceNum
+
 				if err := printBlock(session.Parser(), event.Block, true); err != nil {
 					return xerrors.Errorf("failed to output block: %w", err)
 				}

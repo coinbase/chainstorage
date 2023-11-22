@@ -153,7 +153,7 @@ workflows:
     fast_sync: false
     liveness_check_enabled: true
     liveness_check_interval: 1m
-    liveness_check_violation_limit: 15
+    liveness_check_violation_limit: 10
     max_blocks_to_sync_per_cycle: 100
     parallelism: 4
     session_creation_timeout: 2m
