@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
@@ -39,6 +39,7 @@ type (
 		Master     endpoints.EndpointProvider `name:"master"`
 		Slave      endpoints.EndpointProvider `name:"slave"`
 		Validator  endpoints.EndpointProvider `name:"validator"`
+		Consensus  endpoints.EndpointProvider `name:"consensus"`
 		HTTPClient HTTPClient                 `optional:"true"` // Injected by unit test.
 	}
 
@@ -47,13 +48,14 @@ type (
 		Master    Client `name:"master"`
 		Slave     Client `name:"slave"`
 		Validator Client `name:"validator"`
+		Consensus Client `name:"consensus"`
 	}
 
 	Request struct {
-		JSONRPC string      `json:"jsonrpc"`
-		Method  string      `json:"method"`
-		Params  interface{} `json:"params,omitempty"`
-		ID      uint        `json:"id"`
+		JSONRPC string `json:"jsonrpc"`
+		Method  string `json:"method"`
+		Params  any    `json:"params,omitempty"`
+		ID      uint   `json:"id"`
 	}
 
 	Response struct {
@@ -79,7 +81,7 @@ type (
 		Timeout time.Duration
 	}
 
-	Params []interface{}
+	Params []any
 
 	Option func(opts *options)
 
@@ -120,10 +122,16 @@ func New(params ClientParams) (ClientResult, error) {
 		return ClientResult{}, xerrors.Errorf("failed to create validator client: %w", err)
 	}
 
+	consensus, err := newClient(params, params.Consensus)
+	if err != nil {
+		return ClientResult{}, xerrors.Errorf("failed to create consensus client: %w", err)
+	}
+
 	return ClientResult{
 		Master:    master,
 		Slave:     slave,
 		Validator: validator,
+		Consensus: consensus,
 	}, nil
 }
 
@@ -170,6 +178,8 @@ func (c *clientImpl) Call(ctx context.Context, method *RequestMethod, params Par
 		return nil, xerrors.Errorf("failed to get endpoint for request: %w", err)
 	}
 
+	endpoint.IncRequestsCounter(1)
+
 	request := &Request{
 		JSONRPC: jsonrpcVersion,
 		Method:  method.Name,
@@ -178,7 +188,7 @@ func (c *clientImpl) Call(ctx context.Context, method *RequestMethod, params Par
 	}
 
 	var response *Response
-	if err := c.instrument(ctx, method.Name, endpoint.Name, []Params{params}, func(ctx context.Context) error {
+	if err := c.wrap(ctx, method.Name, endpoint.Name, []Params{params}, func(ctx context.Context) error {
 		response = new(Response)
 		if err := c.makeHTTPRequest(ctx, method.Timeout, endpoint, request, response); err != nil {
 			return xerrors.Errorf("failed to make http request (method=%v, params=%v, endpoint=%v): %w", method, params, endpoint.Name, err)
@@ -207,6 +217,8 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 		return nil, xerrors.Errorf("failed to get endpoint for request: %w", err)
 	}
 
+	endpoint.IncRequestsCounter(int64(len(batchParams)))
+
 	batchRequests := make([]*Request, len(batchParams))
 	for i, params := range batchParams {
 		batchRequests[i] = &Request{
@@ -218,7 +230,7 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 	}
 
 	finalBatchResponses := make([]*Response, len(batchParams))
-	if err := c.instrument(ctx, method.Name, endpoint.Name, batchParams, func(ctx context.Context) error {
+	if err := c.wrap(ctx, method.Name, endpoint.Name, batchParams, func(ctx context.Context) error {
 		var batchResponses []Response
 		if err := c.makeHTTPRequest(ctx, method.Timeout, endpoint, batchRequests, &batchResponses); err != nil {
 			return xerrors.Errorf(
@@ -287,7 +299,7 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 	return finalBatchResponses, nil
 }
 
-func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration, endpoint *endpoints.Endpoint, data interface{}, out interface{}) error {
+func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration, endpoint *endpoints.Endpoint, data any, out any) error {
 	url := endpoint.Config.Url
 	user := endpoint.Config.User
 	password := endpoint.Config.Password
@@ -340,10 +352,11 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration,
 		// - https://github.com/coinbase/chainstorage/blob/55da0742878e5ffbc788b43b0d3fdef417574542/internal/blockchain/jsonrpc/client_test.go#L210
 		_ = json.Unmarshal(responseBody, out)
 
-		if response.StatusCode >= 500 || response.StatusCode == 429 {
-			if retryAfter := response.Header.Get("Retry-After"); retryAfter != "" {
-				c.logger.Warn("received retry-after header", zap.Reflect("retryAfter", retryAfter))
-			}
+		if response.StatusCode == 429 {
+			return retry.RateLimit(errHTTP)
+		}
+
+		if response.StatusCode >= 500 {
 			return retry.Retryable(errHTTP)
 		}
 		return errHTTP
@@ -367,7 +380,8 @@ func (c *clientImpl) getHTTPClient(endpoint *endpoints.Endpoint) HTTPClient {
 	return endpoint.Client
 }
 
-func (c *clientImpl) instrument(ctx context.Context, method string, endpoint string, params []Params, fn instrument.OperationFn) error {
+// wrap wraps the operation with metrics, logging, and retry.
+func (c *clientImpl) wrap(ctx context.Context, method string, endpoint string, params []Params, operation instrument.OperationFn) error {
 	tags := map[string]string{
 		"method":   method,
 		"endpoint": endpoint,
@@ -379,14 +393,13 @@ func (c *clientImpl) instrument(ctx context.Context, method string, endpoint str
 		zap.Int("numParams", len(params)),
 		zap.Reflect("params", c.shortenParams(params)),
 	)
-	call := instrument.NewCall(
+	instrument := instrument.New(
 		scope,
 		"request",
-		instrument.WithRetry(c.retry),
 		instrument.WithTracer(instrumentName, tags),
 		instrument.WithLogger(logger, instrumentName),
-	)
-	return call.Instrument(ctx, fn)
+	).WithRetry(c.retry)
+	return instrument.Instrument(ctx, operation)
 }
 
 func (c *clientImpl) shortenParams(params []Params) []Params {
@@ -407,7 +420,7 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("HTTPError %v: %v", e.Code, e.Response)
 }
 
-func (r *Response) Unmarshal(out interface{}) error {
+func (r *Response) Unmarshal(out any) error {
 	return json.Unmarshal(r.Result, out)
 }
 

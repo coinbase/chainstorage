@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
@@ -16,6 +16,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -30,6 +31,7 @@ type (
 		Config          *config.Config
 		Clients         client.ClientParams
 		BlockStorage    storage.BlockStorage
+		EventStorage    storage.EventStorage
 		FailoverManager endpoints.FailoverManager
 	}
 
@@ -39,43 +41,66 @@ type (
 		master                 client.Client
 		slave                  client.Client
 		validator              client.Client
+		consensus              client.Client
 		blockStorage           storage.BlockStorage
+		eventStorage           storage.EventStorage
 		failoverManager        endpoints.FailoverManager
 		masterHeightAverage    ewma.MovingAverage
 		slaveHeightAverage     ewma.MovingAverage
 		validatorHeightAverage ewma.MovingAverage
+		consensusHeightAverage ewma.MovingAverage
 		metrics                *nodeCanaryMetrics
 	}
 
 	nodeCanaryMetrics struct {
-		masterHeight                 tally.Gauge
-		slaveHeight                  tally.Gauge
-		validatorHeight              tally.Gauge
-		masterSlaveDistance          tally.Gauge
-		masterSlaveDistanceWithinSLA tally.Counter
-		masterSlaveDistanceOutOfSLA  tally.Counter
-		masterDistance               tally.Gauge
-		masterDistanceWithinSLA      tally.Counter
-		masterDistanceOutOfSLA       tally.Counter
-		slaveDistance                tally.Gauge
-		slaveDistanceWithinSLA       tally.Counter
-		slaveDistanceOutOfSLA        tally.Counter
-		validatorDistance            tally.Gauge
-		timeSinceLastBlock           tally.Gauge
-		timeSinceLastBlockWithinSLA  tally.Counter
-		timeSinceLastBlockOutOfSLA   tally.Counter
-		blockTimeDelta               tally.Gauge
-		blockTimeDeltaWithinSLA      tally.Counter
-		blockTimeDeltaOutOfSLA       tally.Counter
-		blockHeightDelta             tally.Gauge
-		blockHeightDeltaWithinSLA    tally.Counter
-		blockHeightDeltaOutOfSLA     tally.Counter
-		masterPrimaryHealthCheck     instrument.Call
-		masterSecondaryHealthCheck   instrument.Call
-		slavePrimaryHealthCheck      instrument.Call
-		slaveSecondaryHealthCheck    instrument.Call
-		validatorPrimaryHealthCheck  instrument.Call
+		masterHeight                  tally.Gauge
+		slaveHeight                   tally.Gauge
+		validatorHeight               tally.Gauge
+		consensusHeight               tally.Gauge
+		masterSlaveDistance           tally.Gauge
+		masterSlaveDistanceWithinSLA  tally.Counter
+		masterSlaveDistanceOutOfSLA   tally.Counter
+		masterDistance                tally.Gauge
+		masterDistanceWithinSLA       tally.Counter
+		masterDistanceOutOfSLA        tally.Counter
+		slaveDistance                 tally.Gauge
+		slaveDistanceWithinSLA        tally.Counter
+		slaveDistanceOutOfSLA         tally.Counter
+		validatorDistance             tally.Gauge
+		validatorDistanceWithinSLA    tally.Counter
+		validatorDistanceOutOfSLA     tally.Counter
+		consensusDistance             tally.Gauge
+		consensusDistanceWithinSLA    tally.Counter
+		consensusDistanceOutOfSLA     tally.Counter
+		timeSinceLastBlock            tally.Gauge
+		timeSinceLastBlockWithinSLA   tally.Counter
+		timeSinceLastBlockOutOfSLA    tally.Counter
+		blockTimeDelta                tally.Gauge
+		blockTimeDeltaWithinSLA       tally.Counter
+		blockTimeDeltaOutOfSLA        tally.Counter
+		blockHeightDelta              tally.Gauge
+		blockHeightDeltaWithinSLA     tally.Counter
+		blockHeightDeltaOutOfSLA      tally.Counter
+		timeSinceLastEvent            tally.Gauge
+		timeSinceLastEventWithinSLA   tally.Counter
+		timeSinceLastEventOutOfSLA    tally.Counter
+		eventTimeDelta                tally.Gauge
+		eventTimeDeltaWithinSLA       tally.Counter
+		eventTimeDeltaOutOfSLA        tally.Counter
+		eventHeightDelta              tally.Gauge
+		eventHeightDeltaWithinSLA     tally.Counter
+		eventHeightDeltaOutOfSLA      tally.Counter
+		masterPrimaryHealthCheck      instrumentedHealthCheck
+		masterSecondaryHealthCheck    instrumentedHealthCheck
+		slavePrimaryHealthCheck       instrumentedHealthCheck
+		slaveSecondaryHealthCheck     instrumentedHealthCheck
+		validatorPrimaryHealthCheck   instrumentedHealthCheck
+		validatorSecondaryHealthCheck instrumentedHealthCheck
+		consensusPrimaryHealthCheck   instrumentedHealthCheck
+		consensusSecondaryHealthCheck instrumentedHealthCheck
 	}
+
+	instrumentedHealthCheck = instrument.InstrumentWithResult[uint64]
 )
 
 const (
@@ -99,22 +124,30 @@ const (
 	healthCheckMsg  = "node.health_check"
 	healthCheckType = "health_check_type"
 
-	slaTypeTag                        = "sla_type"
-	masterHeightMetric                = "master_height"
-	slaveHeightMetric                 = "slave_height"
-	validatorHeightMetric             = "validator_height"
-	masterSlaveDistanceMetric         = "master_slave_distance"
-	masterDistanceMetric              = "master_distance"
-	slaveDistanceMetric               = "slave_distance"
-	validatorDistanceMetric           = "validator_distance"
-	timeSinceLastBlockMetric          = "time_since_last_block"
-	blockTimeDeltaMetric              = "block_time_delta"
-	blockHeightDeltaMetric            = "block_height_delta"
-	masterPrimaryHealthCheckMetric    = "master_primary_health_check"
-	masterSecondaryHealthCheckMetric  = "master_secondary_health_check"
-	slavePrimaryHealthCheckMetric     = "slave_primary_health_check"
-	slaveSecondaryHealthCheckMetric   = "slave_secondary_health_check"
-	validatorPrimaryHealthCheckMetric = "validator_primary_health_check"
+	slaTypeTag                          = "sla_type"
+	masterHeightMetric                  = "master_height"
+	slaveHeightMetric                   = "slave_height"
+	validatorHeightMetric               = "validator_height"
+	consensusHeightMetric               = "consensus_height"
+	masterSlaveDistanceMetric           = "master_slave_distance"
+	masterDistanceMetric                = "master_distance"
+	slaveDistanceMetric                 = "slave_distance"
+	validatorDistanceMetric             = "validator_distance"
+	consensusDistanceMetric             = "consensus_distance"
+	timeSinceLastBlockMetric            = "time_since_last_block"
+	blockTimeDeltaMetric                = "block_time_delta"
+	blockHeightDeltaMetric              = "block_height_delta"
+	timeSinceLastEventMetric            = "time_since_last_event"
+	eventTimeDeltaMetric                = "event_time_delta"
+	eventHeightDeltaMetric              = "event_height_delta"
+	masterPrimaryHealthCheckMetric      = "master_primary_health_check"
+	masterSecondaryHealthCheckMetric    = "master_secondary_health_check"
+	slavePrimaryHealthCheckMetric       = "slave_primary_health_check"
+	slaveSecondaryHealthCheckMetric     = "slave_secondary_health_check"
+	validatorPrimaryHealthCheckMetric   = "validator_primary_health_check"
+	validatorSecondaryHealthCheckMetric = "validator_secondary_health_check"
+	consensusPrimaryHealthCheckMetric   = "consensus_primary_health_check"
+	consensusSecondaryHealthCheckMetric = "consensus_secondary_health_check"
 )
 
 func NewNodeCanary(params NodeCanaryTaskParams) (Task, error) {
@@ -125,11 +158,14 @@ func NewNodeCanary(params NodeCanaryTaskParams) (Task, error) {
 		master:                 params.Clients.Master,
 		slave:                  params.Clients.Slave,
 		validator:              params.Clients.Validator,
+		consensus:              params.Clients.Consensus,
 		blockStorage:           params.BlockStorage,
+		eventStorage:           params.EventStorage,
 		failoverManager:        params.FailoverManager,
 		masterHeightAverage:    ewma.NewMovingAverage(movingAverageAge),
 		slaveHeightAverage:     ewma.NewMovingAverage(movingAverageAge),
 		validatorHeightAverage: ewma.NewMovingAverage(movingAverageAge),
+		consensusHeightAverage: ewma.NewMovingAverage(movingAverageAge),
 		metrics:                newNodeCanaryMetrics(params.Metrics, logger),
 	}, nil
 }
@@ -147,8 +183,8 @@ func newNodeCanaryMetrics(rootScope tally.Scope, logger *zap.Logger) *nodeCanary
 		}).Counter(slaMetric)
 	}
 
-	newHealthCheckCall := func(metricName string) instrument.Call {
-		return instrument.NewCall(
+	newHealthCheckCall := func(metricName string) instrumentedHealthCheck {
+		return instrument.NewWithResult[uint64](
 			scope,
 			metricName,
 			instrument.WithLogger(logger.With(zap.String(healthCheckType, metricName)), healthCheckMsg),
@@ -161,33 +197,51 @@ func newNodeCanaryMetrics(rootScope tally.Scope, logger *zap.Logger) *nodeCanary
 	}
 
 	return &nodeCanaryMetrics{
-		masterHeight:                 scope.Gauge(masterHeightMetric),
-		slaveHeight:                  scope.Gauge(slaveHeightMetric),
-		validatorHeight:              scope.Gauge(validatorHeightMetric),
-		masterSlaveDistance:          scope.Gauge(masterSlaveDistanceMetric),
-		masterSlaveDistanceWithinSLA: newSLACounter(masterSlaveDistanceMetric, sev3, resultTypeSuccess),
-		masterSlaveDistanceOutOfSLA:  newSLACounter(masterSlaveDistanceMetric, sev3, resultTypeError),
-		masterDistance:               scope.Gauge(masterDistanceMetric),
-		masterDistanceWithinSLA:      newSLACounter(masterDistanceMetric, sev3, resultTypeSuccess),
-		masterDistanceOutOfSLA:       newSLACounter(masterDistanceMetric, sev3, resultTypeError),
-		slaveDistance:                scope.Gauge(slaveDistanceMetric),
-		slaveDistanceWithinSLA:       newSLACounter(slaveDistanceMetric, sev3, resultTypeSuccess),
-		slaveDistanceOutOfSLA:        newSLACounter(slaveDistanceMetric, sev3, resultTypeError),
-		validatorDistance:            scope.Gauge(validatorDistanceMetric),
-		timeSinceLastBlock:           scope.Gauge(timeSinceLastBlockMetric),
-		timeSinceLastBlockWithinSLA:  newSLACounter(timeSinceLastBlockMetric, sev2, resultTypeSuccess),
-		timeSinceLastBlockOutOfSLA:   newSLACounter(timeSinceLastBlockMetric, sev2, resultTypeError),
-		blockTimeDelta:               scope.Gauge(blockTimeDeltaMetric),
-		blockTimeDeltaWithinSLA:      newSLACounter(blockTimeDeltaMetric, sev1, resultTypeSuccess),
-		blockTimeDeltaOutOfSLA:       newSLACounter(blockTimeDeltaMetric, sev1, resultTypeError),
-		blockHeightDelta:             scope.Gauge(blockHeightDeltaMetric),
-		blockHeightDeltaWithinSLA:    newSLACounter(blockHeightDeltaMetric, sev1, resultTypeSuccess),
-		blockHeightDeltaOutOfSLA:     newSLACounter(blockHeightDeltaMetric, sev1, resultTypeError),
-		masterPrimaryHealthCheck:     newHealthCheckCall(masterPrimaryHealthCheckMetric),
-		masterSecondaryHealthCheck:   newHealthCheckCall(masterSecondaryHealthCheckMetric),
-		slavePrimaryHealthCheck:      newHealthCheckCall(slavePrimaryHealthCheckMetric),
-		slaveSecondaryHealthCheck:    newHealthCheckCall(slaveSecondaryHealthCheckMetric),
-		validatorPrimaryHealthCheck:  newHealthCheckCall(validatorPrimaryHealthCheckMetric),
+		masterHeight:                  scope.Gauge(masterHeightMetric),
+		slaveHeight:                   scope.Gauge(slaveHeightMetric),
+		validatorHeight:               scope.Gauge(validatorHeightMetric),
+		consensusHeight:               scope.Gauge(consensusHeightMetric),
+		masterSlaveDistance:           scope.Gauge(masterSlaveDistanceMetric),
+		masterSlaveDistanceWithinSLA:  newSLACounter(masterSlaveDistanceMetric, sev3, resultTypeSuccess),
+		masterSlaveDistanceOutOfSLA:   newSLACounter(masterSlaveDistanceMetric, sev3, resultTypeError),
+		masterDistance:                scope.Gauge(masterDistanceMetric),
+		masterDistanceWithinSLA:       newSLACounter(masterDistanceMetric, sev3, resultTypeSuccess),
+		masterDistanceOutOfSLA:        newSLACounter(masterDistanceMetric, sev3, resultTypeError),
+		slaveDistance:                 scope.Gauge(slaveDistanceMetric),
+		slaveDistanceWithinSLA:        newSLACounter(slaveDistanceMetric, sev3, resultTypeSuccess),
+		slaveDistanceOutOfSLA:         newSLACounter(slaveDistanceMetric, sev3, resultTypeError),
+		validatorDistance:             scope.Gauge(validatorDistanceMetric),
+		validatorDistanceWithinSLA:    newSLACounter(validatorDistanceMetric, sev3, resultTypeSuccess),
+		validatorDistanceOutOfSLA:     newSLACounter(validatorDistanceMetric, sev3, resultTypeError),
+		consensusDistance:             scope.Gauge(consensusDistanceMetric),
+		consensusDistanceWithinSLA:    newSLACounter(consensusDistanceMetric, sev3, resultTypeSuccess),
+		consensusDistanceOutOfSLA:     newSLACounter(consensusDistanceMetric, sev3, resultTypeError),
+		timeSinceLastBlock:            scope.Gauge(timeSinceLastBlockMetric),
+		timeSinceLastBlockWithinSLA:   newSLACounter(timeSinceLastBlockMetric, sev1, resultTypeSuccess),
+		timeSinceLastBlockOutOfSLA:    newSLACounter(timeSinceLastBlockMetric, sev1, resultTypeError),
+		blockTimeDelta:                scope.Gauge(blockTimeDeltaMetric),
+		blockTimeDeltaWithinSLA:       newSLACounter(blockTimeDeltaMetric, sev1, resultTypeSuccess),
+		blockTimeDeltaOutOfSLA:        newSLACounter(blockTimeDeltaMetric, sev1, resultTypeError),
+		blockHeightDelta:              scope.Gauge(blockHeightDeltaMetric),
+		blockHeightDeltaWithinSLA:     newSLACounter(blockHeightDeltaMetric, sev1, resultTypeSuccess),
+		blockHeightDeltaOutOfSLA:      newSLACounter(blockHeightDeltaMetric, sev1, resultTypeError),
+		eventTimeDelta:                scope.Gauge(eventTimeDeltaMetric),
+		eventTimeDeltaWithinSLA:       newSLACounter(eventTimeDeltaMetric, sev3, resultTypeSuccess),
+		eventTimeDeltaOutOfSLA:        newSLACounter(eventTimeDeltaMetric, sev3, resultTypeError),
+		eventHeightDelta:              scope.Gauge(eventHeightDeltaMetric),
+		eventHeightDeltaWithinSLA:     newSLACounter(eventHeightDeltaMetric, sev3, resultTypeSuccess),
+		eventHeightDeltaOutOfSLA:      newSLACounter(eventHeightDeltaMetric, sev3, resultTypeError),
+		timeSinceLastEvent:            scope.Gauge(timeSinceLastEventMetric),
+		timeSinceLastEventWithinSLA:   newSLACounter(timeSinceLastEventMetric, sev3, resultTypeSuccess),
+		timeSinceLastEventOutOfSLA:    newSLACounter(timeSinceLastEventMetric, sev3, resultTypeError),
+		masterPrimaryHealthCheck:      newHealthCheckCall(masterPrimaryHealthCheckMetric),
+		masterSecondaryHealthCheck:    newHealthCheckCall(masterSecondaryHealthCheckMetric),
+		slavePrimaryHealthCheck:       newHealthCheckCall(slavePrimaryHealthCheckMetric),
+		slaveSecondaryHealthCheck:     newHealthCheckCall(slaveSecondaryHealthCheckMetric),
+		validatorPrimaryHealthCheck:   newHealthCheckCall(validatorPrimaryHealthCheckMetric),
+		validatorSecondaryHealthCheck: newHealthCheckCall(validatorSecondaryHealthCheckMetric),
+		consensusPrimaryHealthCheck:   newHealthCheckCall(consensusPrimaryHealthCheckMetric),
+		consensusSecondaryHealthCheck: newHealthCheckCall(consensusSecondaryHealthCheckMetric),
 	}
 }
 
@@ -212,36 +266,50 @@ func (t *nodeCanaryTask) DelayStartDuration() time.Duration {
 }
 
 func (t *nodeCanaryTask) Run(ctx context.Context) error {
-	tag := t.config.GetStableBlockTag()
+	blockTag := t.config.GetStableBlockTag()
+	eventTag := t.config.GetStableEventTag()
 	now := time.Now()
 	sla := t.config.SLA
 	group, ctx := syncgroup.New(ctx)
 
-	// Note that failoverCtx is set to nil if failover is unavailable.
-	failoverCtx, err := t.failoverManager.WithFailoverContext(ctx)
-	if err != nil {
-		if !xerrors.Is(err, endpoints.ErrFailoverUnavailable) {
-			return xerrors.Errorf("failed to create failover context: %w", err)
+	// Note that lastEvent is nil when no eventId or event is available.
+	var lastEvent *model.BlockEvent
+	group.Go(func() error {
+		eventId, err := t.eventStorage.GetMaxEventId(ctx, eventTag)
+		if err != nil {
+			if xerrors.Is(err, storage.ErrNoMaxEventIdFound) {
+				return nil
+			}
+
+			return xerrors.Errorf("failed to get max event id from storage: %w", err)
 		}
-	}
+		event, err := t.eventStorage.GetEventByEventId(ctx, eventTag, eventId)
+		if err != nil {
+			return xerrors.Errorf("failed to get event by id from storage: %w", err)
+		}
+		lastEvent = model.NewBlockEventFromEventEntry(event.EventType, event)
+		return nil
+	})
 
 	var masterHeight uint64
 	var masterDistance uint64
 	var masterBlock *api.BlockMetadata
 	group.Go(func() error {
-		if err := t.metrics.masterPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) error {
+		height, err := t.metrics.masterPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
 			height, err := t.master.GetLatestHeight(ctx)
 			if err != nil {
-				return xerrors.Errorf("failed to ping master: %w", err)
+				return 0, xerrors.Errorf("failed to ping master: %w", err)
 			}
 
-			masterHeight = height
-			return nil
-		}); err != nil {
+			return height, nil
+		})
+		if err != nil {
+			// Ignore the error and skip the task.
 			return nil
 		}
 
-		blocks, err := t.master.BatchGetBlockMetadata(ctx, tag, masterHeight, masterHeight+1)
+		masterHeight = height
+		blocks, err := t.master.BatchGetBlockMetadata(ctx, blockTag, masterHeight, masterHeight+1)
 		if err != nil {
 			t.logger.Info("skipping node canary task due to chain reorg", zap.Error(err))
 			return ErrSkipped
@@ -263,7 +331,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 				t.metrics.masterDistanceWithinSLA.Inc(1)
 			} else {
 				t.metrics.masterDistanceOutOfSLA.Inc(1)
-				t.logger.Error(
+				t.logger.Warn(
 					outOfSLAMsg,
 					zap.Uint64("height", masterHeight),
 					zap.String(slaTypeTag, masterDistanceMetric),
@@ -284,18 +352,20 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	var slaveHeight uint64
 	var slaveDistance uint64
 	group.Go(func() error {
-		if err := t.metrics.slavePrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) error {
+		height, err := t.metrics.slavePrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
 			height, err := t.slave.GetLatestHeight(ctx)
 			if err != nil {
-				return xerrors.Errorf("failed to ping slave: %w", err)
+				return 0, xerrors.Errorf("failed to ping slave: %w", err)
 			}
 
-			slaveHeight = height
-			return nil
-		}); err != nil {
+			return height, nil
+		})
+		if err != nil {
+			// Ignore the error and skip the task.
 			return nil
 		}
 
+		slaveHeight = height
 		t.metrics.slaveHeight.Update(float64(slaveHeight))
 		// Distance between current height of slave and its moving average.
 		if t.slaveHeightAverage.Value() != 0 {
@@ -306,7 +376,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 				t.metrics.slaveDistanceWithinSLA.Inc(1)
 			} else {
 				t.metrics.slaveDistanceOutOfSLA.Inc(1)
-				t.logger.Error(
+				t.logger.Warn(
 					outOfSLAMsg,
 					zap.Uint64("height", slaveHeight),
 					zap.String(slaTypeTag, slaveDistanceMetric),
@@ -326,23 +396,43 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	if !t.config.Chain.Client.Validator.EndpointGroup.Empty() {
 		// Do not fail the task if the health check on validator nodes returns an error.
 		group.Go(func() error {
-			if err := t.metrics.validatorPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) error {
+			height, err := t.metrics.validatorPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
 				height, err := t.validator.GetLatestHeight(ctx)
 				if err != nil {
-					return xerrors.Errorf("failed to ping validator: %w", err)
+					return 0, xerrors.Errorf("failed to ping validator: %w", err)
 				}
 
-				validatorHeight = height
-				return nil
-			}); err != nil {
+				return height, nil
+			})
+			if err != nil {
+				// Ignore the error and skip the task.
 				return nil
 			}
 
+			validatorHeight = height
 			t.metrics.validatorHeight.Update(float64(validatorHeight))
 			// Distance between current height of validator and its moving average.
 			if t.validatorHeightAverage.Value() != 0 {
 				validatorDistance = uint64(math.Abs(float64(validatorHeight) - t.validatorHeightAverage.Value()))
 				t.metrics.validatorDistance.Update(float64(validatorDistance))
+
+				distanceThreshold := sla.OutOfSyncValidatorNodeDistance
+				if distanceThreshold == 0 {
+					distanceThreshold = sla.OutOfSyncNodeDistance
+				}
+
+				if validatorDistance < distanceThreshold {
+					t.metrics.validatorDistanceWithinSLA.Inc(1)
+				} else {
+					t.metrics.validatorDistanceOutOfSLA.Inc(1)
+					t.logger.Warn(
+						outOfSLAMsg,
+						zap.Uint64("height", validatorHeight),
+						zap.String(slaTypeTag, validatorDistanceMetric),
+						zap.Uint64(expectedTag, distanceThreshold),
+						zap.Uint64(actualTag, validatorDistance),
+					)
+				}
 			}
 			t.validatorHeightAverage.Add(float64(validatorHeight))
 
@@ -350,27 +440,127 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 		})
 	}
 
-	if failoverCtx != nil {
+	var consensusHeight uint64
+	var consensusDistance uint64
+	// Do not fail the task if the health check on consensus nodes returns an error.
+	group.Go(func() error {
+		height, err := t.metrics.consensusPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
+			height, err := t.consensus.GetLatestHeight(ctx)
+			if err != nil {
+				return 0, xerrors.Errorf("failed to ping consensus: %w", err)
+			}
+
+			return height, nil
+		})
+		if err != nil {
+			// Ignore the error and skip the task.
+			return nil
+		}
+
+		consensusHeight = height
+		t.metrics.consensusHeight.Update(float64(consensusHeight))
+		// Distance between current height of consensus and its moving average.
+		if t.consensusHeightAverage.Value() != 0 {
+			consensusDistance = uint64(math.Abs(float64(consensusHeight) - t.consensusHeightAverage.Value()))
+			t.metrics.consensusDistance.Update(float64(consensusDistance))
+
+			if consensusDistance < sla.OutOfSyncNodeDistance {
+				t.metrics.consensusDistanceWithinSLA.Inc(1)
+			} else {
+				t.metrics.consensusDistanceOutOfSLA.Inc(1)
+				t.logger.Warn(
+					outOfSLAMsg,
+					zap.Uint64("height", consensusHeight),
+					zap.String(slaTypeTag, consensusDistanceMetric),
+					zap.Uint64(expectedTag, sla.OutOfSyncNodeDistance),
+					zap.Uint64(actualTag, consensusDistance),
+				)
+			}
+		}
+		t.consensusHeightAverage.Add(float64(consensusHeight))
+
+		return nil
+	})
+
+	// Note that masterSlaveFailoverCtx is set to nil if failover is unavailable.
+	masterSlaveFailoverCtx, err := t.failoverManager.WithFailoverContext(ctx, endpoints.MasterSlaveClusters)
+	if err != nil {
+		if !xerrors.Is(err, endpoints.ErrFailoverUnavailable) {
+			return xerrors.Errorf("failed to create failover context for MasterSlaveClusters: %w", err)
+		}
+	}
+
+	if masterSlaveFailoverCtx != nil {
 		// Do not fail the task if the health check on secondary nodes returns an error.
 		group.Go(func() error {
-			_ = t.metrics.masterSecondaryHealthCheck.Instrument(failoverCtx, func(ctx context.Context) error {
-				if _, err = t.master.GetLatestHeight(ctx); err != nil {
-					return xerrors.Errorf("failed to ping master with failover context: %w", err)
+			_, _ = t.metrics.masterSecondaryHealthCheck.Instrument(masterSlaveFailoverCtx, func(ctx context.Context) (uint64, error) {
+				height, err := t.master.GetLatestHeight(ctx)
+				if err != nil {
+					return 0, xerrors.Errorf("failed to ping master with failover context: %w", err)
 				}
 
-				return nil
+				return height, nil
 			})
 
 			return nil
 		})
 
 		group.Go(func() error {
-			_ = t.metrics.slaveSecondaryHealthCheck.Instrument(failoverCtx, func(ctx context.Context) error {
-				if _, err = t.slave.GetLatestHeight(ctx); err != nil {
-					return xerrors.Errorf("failed to ping slave with failover context: %w", err)
+			_, _ = t.metrics.slaveSecondaryHealthCheck.Instrument(masterSlaveFailoverCtx, func(ctx context.Context) (uint64, error) {
+				height, err := t.slave.GetLatestHeight(ctx)
+				if err != nil {
+					return 0, xerrors.Errorf("failed to ping slave with failover context: %w", err)
 				}
 
-				return nil
+				return height, nil
+			})
+
+			return nil
+		})
+	}
+
+	// Note that validatorFailoverCtx is set to nil if failover is unavailable.
+	validatorFailoverCtx, err := t.failoverManager.WithFailoverContext(ctx, endpoints.ValidatorCluster)
+	if err != nil {
+		if !xerrors.Is(err, endpoints.ErrFailoverUnavailable) {
+			return xerrors.Errorf("failed to create failover context for ValidatorCluster: %w", err)
+		}
+	}
+
+	if validatorFailoverCtx != nil {
+		// Do not fail the task if the health check on secondary nodes returns an error.
+		group.Go(func() error {
+			_, _ = t.metrics.validatorSecondaryHealthCheck.Instrument(validatorFailoverCtx, func(ctx context.Context) (uint64, error) {
+				height, err := t.validator.GetLatestHeight(ctx)
+				if err != nil {
+					return 0, xerrors.Errorf("failed to ping validator with failover context: %w", err)
+				}
+
+				return height, nil
+			})
+
+			return nil
+		})
+	}
+
+	// Note that consensusFailoverCtx is set to nil if failover is unavailable.
+	consensusFailoverCtx, err := t.failoverManager.WithFailoverContext(ctx, endpoints.ConsensusCluster)
+	if err != nil {
+		if !xerrors.Is(err, endpoints.ErrFailoverUnavailable) {
+			return xerrors.Errorf("failed to create failover context for ConsensusCluster: %w", err)
+		}
+	}
+
+	if consensusFailoverCtx != nil {
+		// Do not fail the task if the health check on secondary nodes returns an error.
+		group.Go(func() error {
+			_, _ = t.metrics.consensusSecondaryHealthCheck.Instrument(consensusFailoverCtx, func(ctx context.Context) (uint64, error) {
+				height, err := t.consensus.GetLatestHeight(ctx)
+				if err != nil {
+					return 0, xerrors.Errorf("failed to ping consensus with failover context: %w", err)
+				}
+
+				return height, nil
 			})
 
 			return nil
@@ -379,13 +569,12 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 
 	var persistedBlock *api.BlockMetadata
 	group.Go(func() error {
-		block, err := t.blockStorage.GetLatestBlock(ctx, tag)
+		block, err := t.blockStorage.GetLatestBlock(ctx, blockTag)
 		if err != nil {
 			if xerrors.Is(err, storage.ErrItemNotFound) {
 				// Note that persistedBlock is nil when no block is available.
 				return nil
 			}
-
 			return xerrors.Errorf("failed to get latest block from storage: %w", err)
 		}
 
@@ -402,22 +591,25 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	}
 
 	// Distance between master and slave.
-	var masterSlaveDistance uint64
+	// Actual distance(master height - slave height) is used for distance metrics.
+	// Absolute value is used for SLA metrics.
+	var masterSlaveDistance int64
 	if masterHeight > 0 && slaveHeight > 0 {
-		masterSlaveDistance = uint64(math.Abs(float64(masterHeight) - float64(slaveHeight)))
+		masterSlaveDistance = int64(masterHeight - slaveHeight)
 		t.metrics.masterSlaveDistance.Update(float64(masterSlaveDistance))
 
+		absMasterSlaveDistance := uint64(math.Abs(float64(masterSlaveDistance)))
 		// Complain if the nodes are out of sync.
-		if masterSlaveDistance < sla.OutOfSyncNodeDistance {
+		if absMasterSlaveDistance < sla.OutOfSyncNodeDistance {
 			t.metrics.masterSlaveDistanceWithinSLA.Inc(1)
 		} else {
 			t.metrics.masterSlaveDistanceOutOfSLA.Inc(1)
-			t.logger.Error(
+			t.logger.Warn(
 				outOfSLAMsg,
 				zap.Uint64("height", masterHeight),
 				zap.String(slaTypeTag, masterSlaveDistanceMetric),
 				zap.Uint64(expectedTag, sla.OutOfSyncNodeDistance),
-				zap.Uint64(actualTag, masterSlaveDistance),
+				zap.Int64(actualTag, masterSlaveDistance),
 			)
 		}
 	}
@@ -428,15 +620,14 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	var timeSinceLastBlock time.Duration
 	var blockHeightDelta uint64
 	var blockTimeDelta time.Duration
-	if persistedBlock != nil && persistedBlock.GetTimestamp() != nil && masterBlock != nil && t.isPollerPresent() {
+	if persistedBlock != nil && persistedBlock.GetTimestamp() != nil && t.isPollerPresent() {
 		timeSinceLastBlock = now.Sub(persistedBlock.Timestamp.AsTime())
 		t.metrics.timeSinceLastBlock.Update(timeSinceLastBlock.Seconds())
-
 		if timeSinceLastBlock < sla.TimeSinceLastBlock {
 			t.metrics.timeSinceLastBlockWithinSLA.Inc(1)
 		} else {
 			t.metrics.timeSinceLastBlockOutOfSLA.Inc(1)
-			t.logger.Error(
+			t.logger.Warn(
 				outOfSLAMsg,
 				zap.Uint64("height", masterHeight),
 				zap.String(slaTypeTag, timeSinceLastBlockMetric),
@@ -445,46 +636,106 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 			)
 		}
 
-		blockHeightDelta = uint64(math.Max(0, float64(masterBlock.Height)-float64(persistedBlock.Height)))
-		t.metrics.blockHeightDelta.Update(float64(blockHeightDelta))
-		if blockHeightDelta < sla.BlockHeightDelta {
-			t.metrics.blockHeightDeltaWithinSLA.Inc(1)
+		if masterBlock != nil {
+			blockHeightDelta = uint64(math.Max(0, float64(masterBlock.Height)-float64(persistedBlock.Height)))
+			t.metrics.blockHeightDelta.Update(float64(blockHeightDelta))
+			if blockHeightDelta < sla.BlockHeightDelta {
+				t.metrics.blockHeightDeltaWithinSLA.Inc(1)
+			} else {
+				t.metrics.blockHeightDeltaOutOfSLA.Inc(1)
+				t.logger.Warn(
+					outOfSLAMsg,
+					zap.Uint64("height", masterHeight),
+					zap.String(slaTypeTag, blockHeightDeltaMetric),
+					zap.Uint64(expectedTag, sla.BlockHeightDelta),
+					zap.Uint64(actualTag, blockHeightDelta),
+				)
+			}
+
+			if masterBlock.Timestamp != nil {
+				blockTimeDelta = masterBlock.Timestamp.AsTime().Sub(persistedBlock.Timestamp.AsTime())
+				if blockTimeDelta < 0 {
+					blockTimeDelta = 0
+				}
+				t.metrics.blockTimeDelta.Update(blockTimeDelta.Seconds())
+
+				if blockTimeDelta < sla.BlockTimeDelta {
+					t.metrics.blockTimeDeltaWithinSLA.Inc(1)
+				} else {
+					t.metrics.blockTimeDeltaOutOfSLA.Inc(1)
+					t.logger.Warn(
+						outOfSLAMsg,
+						zap.Uint64("height", masterHeight),
+						zap.String(slaTypeTag, blockTimeDeltaMetric),
+						zap.String(expectedTag, sla.BlockTimeDelta.String()),
+						zap.String(actualTag, blockTimeDelta.String()),
+					)
+				}
+			}
+		}
+	}
+
+	var timeSinceLastEvent time.Duration
+	var eventHeightDelta uint64
+	var eventTimeDelta time.Duration
+	if lastEvent != nil && lastEvent.GetBlockTimestamp() != 0 && t.isPollerPresent() {
+		timeSinceLastEvent = now.Sub(time.Unix(lastEvent.GetBlockTimestamp(), 0))
+		t.metrics.timeSinceLastEvent.Update(timeSinceLastEvent.Seconds())
+		if timeSinceLastEvent < sla.TimeSinceLastEvent {
+			t.metrics.timeSinceLastEventWithinSLA.Inc(1)
 		} else {
-			t.metrics.blockHeightDeltaOutOfSLA.Inc(1)
-			t.logger.Error(
+			t.metrics.timeSinceLastEventOutOfSLA.Inc(1)
+			t.logger.Warn(
 				outOfSLAMsg,
 				zap.Uint64("height", masterHeight),
-				zap.String(slaTypeTag, blockHeightDeltaMetric),
-				zap.Uint64(expectedTag, sla.BlockHeightDelta),
-				zap.Uint64(actualTag, blockHeightDelta),
+				zap.String(slaTypeTag, timeSinceLastEventMetric),
+				zap.String(expectedTag, sla.TimeSinceLastEvent.String()),
+				zap.String(actualTag, timeSinceLastEvent.String()),
 			)
 		}
 
-		if masterBlock.Timestamp != nil {
-			blockTimeDelta = masterBlock.Timestamp.AsTime().Sub(persistedBlock.Timestamp.AsTime())
-			if blockTimeDelta < 0 {
-				blockTimeDelta = 0
-			}
-			t.metrics.blockTimeDelta.Update(blockTimeDelta.Seconds())
-
-			if blockTimeDelta < sla.BlockTimeDelta {
-				t.metrics.blockTimeDeltaWithinSLA.Inc(1)
+		if masterBlock != nil {
+			eventHeightDelta = uint64(math.Max(0, float64(masterBlock.Height)-float64(lastEvent.GetBlockHeight())))
+			t.metrics.eventHeightDelta.Update(float64(eventHeightDelta))
+			if blockHeightDelta < sla.BlockHeightDelta {
+				t.metrics.eventHeightDeltaWithinSLA.Inc(1)
 			} else {
-				t.metrics.blockTimeDeltaOutOfSLA.Inc(1)
-				t.logger.Error(
+				t.metrics.eventHeightDeltaOutOfSLA.Inc(1)
+				t.logger.Warn(
 					outOfSLAMsg,
 					zap.Uint64("height", masterHeight),
-					zap.String(slaTypeTag, blockTimeDeltaMetric),
-					zap.String(expectedTag, sla.BlockTimeDelta.String()),
-					zap.String(actualTag, blockTimeDelta.String()),
+					zap.String(slaTypeTag, eventHeightDeltaMetric),
+					zap.Uint64(expectedTag, sla.EventHeightDelta),
+					zap.Uint64(actualTag, eventHeightDelta),
 				)
+			}
+
+			if masterBlock.Timestamp != nil {
+				eventTimeDelta = masterBlock.Timestamp.AsTime().Sub(time.Unix(lastEvent.GetBlockTimestamp(), 0))
+				if eventTimeDelta < 0 {
+					eventTimeDelta = 0
+				}
+
+				t.metrics.eventTimeDelta.Update(eventTimeDelta.Seconds())
+				if eventTimeDelta < sla.EventTimeDelta {
+					t.metrics.eventTimeDeltaWithinSLA.Inc(1)
+				} else {
+					t.metrics.eventTimeDeltaOutOfSLA.Inc(1)
+					t.logger.Warn(
+						outOfSLAMsg,
+						zap.Uint64("height", masterHeight),
+						zap.String(slaTypeTag, eventTimeDeltaMetric),
+						zap.String(expectedTag, sla.EventTimeDelta.String()),
+						zap.String(actualTag, eventTimeDelta.String()),
+					)
+				}
 			}
 		}
 	}
 
 	t.logger.Info(
 		"finished node canary task",
-		zap.Uint64("masterSlaveDistance", masterSlaveDistance),
+		zap.Int64("masterSlaveDistance", masterSlaveDistance),
 		zap.Uint64("masterDistance", masterDistance),
 		zap.Uint64("masterHeight", masterHeight),
 		zap.Uint64("masterHeightAverage", uint64(t.masterHeightAverage.Value())),
@@ -494,9 +745,15 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 		zap.Uint64("validatorDistance", validatorDistance),
 		zap.Uint64("validatorHeight", validatorHeight),
 		zap.Uint64("validatorHeightAverage", uint64(t.validatorHeightAverage.Value())),
+		zap.Uint64("consensusDistance", consensusDistance),
+		zap.Uint64("consensusHeight", consensusHeight),
+		zap.Uint64("consensusHeightAverage", uint64(t.consensusHeightAverage.Value())),
 		zap.String("timeSinceLastBlock", timeSinceLastBlock.String()),
 		zap.Uint64("blockHeightDelta", blockHeightDelta),
 		zap.String("blockTimeDelta", blockTimeDelta.String()),
+		zap.String("eventTimeDelta", eventTimeDelta.String()),
+		zap.Uint64("eventHeightDelta", eventHeightDelta),
+		zap.String("timeSinceLastEvent", timeSinceLastEvent.String()),
 	)
 
 	return nil

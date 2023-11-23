@@ -3,24 +3,25 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/aws"
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
+	"github.com/coinbase/chainstorage/internal/blockchain/restapi"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/storage"
-	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage"
+	"github.com/coinbase/chainstorage/sdk"
 )
 
 var (
@@ -35,19 +36,20 @@ var (
 
 	validateCmd = &cobra.Command{
 		Use:   "validate",
-		Short: "Validate a block",
+		Short: "Validate a block with native format",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var deps struct {
 				fx.In
-				Config      *config.Config
-				Client      client.Client `name:"validator"`
-				BlobStorage blobstorage.BlobStorage
-				MetaStorage metastorage.MetaStorage
+				Config          *config.Config
+				ValidatorClient client.Client `name:"validator"`
+				StorageClient   sdk.Client
+				Parser          parser.Parser
 			}
 
 			app := startApp(
 				client.Module,
 				jsonrpc.Module,
+				restapi.Module,
 				endpoints.Module,
 				aws.Module,
 				s3.Module,
@@ -61,30 +63,35 @@ var (
 			tag := deps.Config.GetEffectiveBlockTag(crossValidatorFlags.tag)
 			height := crossValidatorFlags.height
 
-			persistedBlockMetaData, err := deps.MetaStorage.GetBlockByHeight(ctx, tag, height)
+			persistedRawBlock, err := deps.StorageClient.GetBlockWithTag(ctx, tag, height, "")
 			if err != nil {
-				return xerrors.Errorf("failed to get block meta data from meta storage (height=%d): %w", height, err)
-			}
-			persistedRawBlock, err := deps.BlobStorage.Download(ctx, persistedBlockMetaData)
-			if err != nil {
-				return xerrors.Errorf("failed to get block from blobStorage (key=%s): %w", persistedBlockMetaData.ObjectKeyMain, err)
+				return xerrors.Errorf("failed to get block from storage: %w", err)
 			}
 
-			hash := persistedBlockMetaData.Hash
-			expectedRawBlock, err := deps.Client.GetBlockByHash(ctx, tag, height, hash)
+			hash := persistedRawBlock.Metadata.Hash
+			expectedRawBlock, err := deps.ValidatorClient.GetBlockByHash(ctx, tag, height, hash)
 			if err != nil {
 				return xerrors.Errorf("failed to get block from validator client (tag=%v, height=%v, hash=%v): %w", tag, height, hash, err)
 			}
 
-			// Skip check of ObjectKeyMain
-			persistedRawBlock.Metadata.ObjectKeyMain = expectedRawBlock.Metadata.ObjectKeyMain
-			// Skip check for timestamp in metadata
-			if persistedRawBlock.Metadata.GetTimestamp() == nil {
-				persistedRawBlock.Metadata.Timestamp = expectedRawBlock.Metadata.Timestamp
+			persistedNativeBlock, err := deps.Parser.ParseNativeBlock(ctx, persistedRawBlock)
+			if err != nil {
+				return xerrors.Errorf("failed to parse actual raw block using native parser for block {%+v}: %w", persistedRawBlock.Metadata, err)
 			}
 
-			if !proto.Equal(expectedRawBlock, persistedRawBlock) {
+			expectedNativeBlock, err := deps.Parser.ParseNativeBlock(ctx, expectedRawBlock)
+			if err != nil {
+				return xerrors.Errorf("failed to parse expected raw block using native parser for block {%+v}: %w", expectedRawBlock.Metadata, err)
+			}
+
+			if err := deps.Parser.CompareNativeBlocks(ctx, height, expectedNativeBlock, persistedNativeBlock); err != nil {
+				var checkerErr *parser.ParityCheckFailedError
+				if xerrors.As(err, &checkerErr) {
+					fmt.Printf("cross validation diff report: %v", checkerErr.Diff)
+				}
+
 				logger.Error("cross validation failed",
+					zap.Error(err),
 					zap.String("hash", hash),
 					zap.Uint64("height", height),
 					zap.Reflect("expected_metadata", expectedRawBlock.Metadata),
@@ -96,14 +103,15 @@ var (
 
 			out := commonFlags.out
 			if out != "" {
-				outExpected := fmt.Sprintf("%v_%v", out, "expected")
-				if err := logBlock(expectedRawBlock.Metadata, expectedRawBlock, outExpected); err != nil {
-					return xerrors.Errorf("failed to log expected block: %w", err)
+				ext := filepath.Ext(out)
+				outExpected := fmt.Sprintf("%v_%v%v", strings.TrimSuffix(out, ext), "expected", ext)
+				if err := logBlock(expectedRawBlock.Metadata, expectedNativeBlock, outExpected); err != nil {
+					return xerrors.Errorf("failed to log expected native block: %w", err)
 				}
 
-				outActual := fmt.Sprintf("%v_%v", out, "actual")
-				if err := logBlock(persistedRawBlock.Metadata, persistedRawBlock, outActual); err != nil {
-					return xerrors.Errorf("failed to log actual block: %w", err)
+				outActual := fmt.Sprintf("%v_%v%v", strings.TrimSuffix(out, ext), "actual", ext)
+				if err := logBlock(persistedRawBlock.Metadata, persistedNativeBlock, outActual); err != nil {
+					return xerrors.Errorf("failed to log actual native block: %w", err)
 				}
 
 				logger.Info("log blocks in files",
@@ -137,6 +145,7 @@ var (
 				client.Module,
 				downloader.Module,
 				jsonrpc.Module,
+				restapi.Module,
 				parser.Module,
 				endpoints.Module,
 				fx.Populate(&deps),

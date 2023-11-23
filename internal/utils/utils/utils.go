@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -46,6 +48,13 @@ func SinceTimestamp(timestamp *timestamppb.Timestamp) time.Duration {
 	return res
 }
 
+// GenerateSha256HashString A hash function to obfuscate the input string.
+// This is to prevent the input from being leaked to the public.
+func GenerateSha256HashString(input string) string {
+	hash := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(hash[:])
+}
+
 // ParseBlockchain converts a blockchain name, e.g. `ethereum`, to the proto definition,
 // e.g. `common.Blockchain_BLOCKCHAIN_ETHEREUM`.
 func ParseBlockchain(blockchainName string) (common.Blockchain, error) {
@@ -76,4 +85,20 @@ func ParseNetwork(networkName string) (common.Network, error) {
 	}
 
 	return common.Network(parsedNetwork), nil
+}
+
+// ParseSidechain converts a sidechain name, e.g. `ethereum-mainnet-beacon`, to the proto definition,
+// e.g. `api.SideChain_SIDECHAIN_ETHEREUM_MAINNET_BEACON`
+func ParseSidechain(sidechainName string) (api.SideChain, error) {
+	formattedSidechainName := fmt.Sprintf(
+		"SIDECHAIN_%s",
+		strings.Replace(strings.ToUpper(sidechainName), "-", "_", 2),
+	)
+	parsedSidechain, ok := api.SideChain_value[formattedSidechainName]
+	if !ok {
+		return api.SideChain_SIDECHAIN_NONE,
+			fmt.Errorf("error sidechain name: `%s` did not parse correctly to an enum", sidechainName)
+	}
+
+	return api.SideChain(parsedSidechain), nil
 }

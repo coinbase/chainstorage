@@ -1,0 +1,29 @@
+chain:
+  block_time: 400ms
+  irreversible_distance: 1
+sla:
+  block_height_delta: 400
+  block_time_delta: 3m
+  out_of_sync_node_distance: 500
+  tier: 2
+  time_since_last_block: 6m
+  event_height_delta: 400
+  event_time_delta: 3m
+  time_since_last_event: 6m
+  expected_workflows:
+    - poller
+    - streamer
+    - monitor
+workflows:
+  backfiller:
+    num_concurrent_extractors: 24
+    mini_batch_size: 62
+  monitor:
+    backoff_interval: 0s
+    parallelism: 15
+  poller:
+    backoff_interval: 0s
+    fast_sync: true
+    max_blocks_to_sync_per_cycle: 300
+  streamer:
+    backoff_interval: 0s

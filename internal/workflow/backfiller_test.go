@@ -146,7 +146,7 @@ func (s *backfillerTestSuite) TestBackfiller() {
 		})
 	s.blockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(int(endHeight - startHeight)).
-		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64, opts ...jsonrpc.Option) (*api.Block, error) {
+		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64, opts ...client.ClientOption) (*api.Block, error) {
 			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
 			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
 			require.Equal(tag, tag_)
@@ -182,6 +182,75 @@ func (s *backfillerTestSuite) TestBackfiller() {
 		StartHeight:             startHeight,
 		EndHeight:               endHeight,
 		NumConcurrentExtractors: numConcurrentExtractors,
+	})
+	require.NoError(err)
+
+	for i := startHeight; i < endHeight; i++ {
+		v, ok := seen.blockchainClient.Load(i)
+		require.True(ok)
+		require.True(v.(bool))
+		v, ok = seen.blobStorage.Load(i)
+		require.True(ok)
+		require.True(v.(bool))
+		v, ok = seen.metadataAccessor.Load(i)
+		require.True(ok)
+		require.True(v.(bool))
+	}
+}
+
+func (s *backfillerTestSuite) TestBackfiller_MiniBatch() {
+	require := testutil.Require(s.T())
+
+	seen := struct {
+		blockchainClient sync.Map
+		blobStorage      sync.Map
+		metadataAccessor sync.Map
+	}{}
+	s.metadataAccessor.EXPECT().GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any()).
+		Times(1).
+		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64) (*api.BlockMetadata, error) {
+			require.Equal(tag, tag_)
+			return s.getMockMetadata(height), nil
+		})
+	s.blockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any()).
+		Times(int(endHeight - startHeight)).
+		DoAndReturn(func(ctx context.Context, tag_ uint32, height uint64, opts ...client.ClientOption) (*api.Block, error) {
+			require.False(s.masterEndpointProvider.HasFailoverContext(ctx))
+			require.False(s.slaveEndpointProvider.HasFailoverContext(ctx))
+			require.Equal(tag, tag_)
+			_, ok := seen.blockchainClient.LoadOrStore(height, true)
+			require.False(ok)
+			return &api.Block{
+				Metadata: s.getMockMetadata(height),
+			}, nil
+		})
+
+	s.blobStorage.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any()).
+		Times(int(endHeight - startHeight)).
+		DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
+			require.Equal(api.Compression_GZIP, compression)
+			_, ok := seen.blobStorage.LoadOrStore(block.Metadata.Height, true)
+			require.False(ok)
+			return strconv.Itoa(int(block.Metadata.Height)), nil
+		})
+
+	s.metadataAccessor.EXPECT().PersistBlockMetas(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, updateWatermark bool, blocks []*api.BlockMetadata, lastBlock *api.BlockMetadata) error {
+			require.Equal(lastBlock.Hash, blocks[0].ParentHash)
+			for _, block := range blocks {
+				require.False(updateWatermark)
+				_, ok := seen.metadataAccessor.LoadOrStore(block.Height, true)
+				require.False(ok)
+			}
+			return nil
+		}).AnyTimes()
+
+	_, err := s.backfiller.Execute(context.Background(), &BackfillerRequest{
+		Tag:                     tag,
+		StartHeight:             startHeight,
+		EndHeight:               endHeight,
+		NumConcurrentExtractors: numConcurrentExtractors,
+		MiniBatchSize:           3,
 	})
 	require.NoError(err)
 
@@ -277,7 +346,9 @@ func (s *backfillerTestSuite) TestBackfiller_Checkpoint() {
 	s.env.OnActivity(activity.ActivityExtractor, mock.Anything, mock.Anything).
 		Return(func(ctx context.Context, request *activity.ExtractorRequest) (*activity.ExtractorResponse, error) {
 			response := &activity.ExtractorResponse{
-				Metadata: s.getMockMetadata(request.Height),
+				Metadatas: []*api.BlockMetadata{
+					s.getMockMetadata(request.Heights[0]),
+				},
 			}
 			return response, nil
 
@@ -308,10 +379,12 @@ func (s *backfillerTestSuite) TestBackfiller_NonContinuousChainWithinBatch() {
 	s.env.OnActivity(activity.ActivityExtractor, mock.Anything, mock.Anything).
 		Return(func(ctx context.Context, request *activity.ExtractorRequest) (*activity.ExtractorResponse, error) {
 			response := &activity.ExtractorResponse{
-				Metadata: s.getMockMetadata(request.Height),
+				Metadatas: []*api.BlockMetadata{
+					s.getMockMetadata(request.Heights[0]),
+				},
 			}
-			if request.Height == invalidHeight {
-				response.Metadata.ParentHash = "unexpected_hash"
+			if request.Heights[0] == invalidHeight {
+				response.Metadatas[0].ParentHash = "unexpected_hash"
 			}
 			return response, nil
 
@@ -339,10 +412,12 @@ func (s *backfillerTestSuite) TestBackfiller_NonContinuousChainAcrossBatch() {
 	s.env.OnActivity(activity.ActivityExtractor, mock.Anything, mock.Anything).
 		Return(func(ctx context.Context, request *activity.ExtractorRequest) (*activity.ExtractorResponse, error) {
 			response := &activity.ExtractorResponse{
-				Metadata: s.getMockMetadata(request.Height),
+				Metadatas: []*api.BlockMetadata{
+					s.getMockMetadata(request.Heights[0]),
+				},
 			}
-			if request.Height == startHeight+2*s.app.Config().Workflows.Backfiller.BatchSize {
-				response.Metadata.ParentHash = "unexpected_hash"
+			if request.Heights[0] == startHeight+2*s.app.Config().Workflows.Backfiller.BatchSize {
+				response.Metadatas[0].ParentHash = "unexpected_hash"
 			}
 			return response, nil
 
@@ -376,7 +451,9 @@ func (s *backfillerTestSuite) TestBackfiller_NonContinuousChainAcrossCheckpoint(
 	s.env.OnActivity(activity.ActivityExtractor, mock.Anything, mock.Anything).
 		Return(func(ctx context.Context, request *activity.ExtractorRequest) (*activity.ExtractorResponse, error) {
 			response := &activity.ExtractorResponse{
-				Metadata: s.getMockMetadata(request.Height),
+				Metadatas: []*api.BlockMetadata{
+					s.getMockMetadata(request.Heights[0]),
+				},
 			}
 			return response, nil
 
@@ -404,10 +481,12 @@ func (s *backfillerTestSuite) TestBackfiller_Reprocess() {
 	s.env.OnActivity(activity.ActivityExtractor, mock.Anything, mock.Anything).
 		Return(func(ctx context.Context, request *activity.ExtractorRequest) (*activity.ExtractorResponse, error) {
 			response := &activity.ExtractorResponse{
-				Metadata: s.getMockMetadata(request.Height),
+				Metadatas: []*api.BlockMetadata{
+					s.getMockMetadata(request.Heights[0]),
+				},
 			}
 
-			if request.Height == blockNumber {
+			if request.Heights[0] == blockNumber {
 				numCallsForReprocessedBlock += 1
 				if numCallsForReprocessedBlock <= maximumAttempts+1 {
 					return nil, xerrors.New("transient error")
@@ -439,7 +518,9 @@ func (s *backfillerTestSuite) TestBackfiller_UpdateWatermarkIfSet() {
 	s.env.OnActivity(activity.ActivityExtractor, mock.Anything, mock.Anything).
 		Return(func(ctx context.Context, request *activity.ExtractorRequest) (*activity.ExtractorResponse, error) {
 			response := &activity.ExtractorResponse{
-				Metadata: s.getMockMetadata(request.Height),
+				Metadatas: []*api.BlockMetadata{
+					s.getMockMetadata(request.Heights[0]),
+				},
 			}
 			return response, nil
 

@@ -14,6 +14,7 @@ type (
 	metaStorageImpl struct {
 		internal.BlockStorage
 		internal.EventStorage
+		internal.TransactionStorage
 	}
 
 	Params struct {
@@ -38,9 +39,15 @@ func NewMetaStorage(params Params) (internal.Result, error) {
 		return internal.Result{}, xerrors.Errorf("failed create new EventStorage: %w", err)
 	}
 
+	transactionStorage, err := newTransactionStorage(params)
+	if err != nil {
+		return internal.Result{}, xerrors.Errorf("failed create new TransactionStorage: %w", err)
+	}
+
 	metaStorage := &metaStorageImpl{
-		BlockStorage: blockStorage,
-		EventStorage: eventStorage,
+		BlockStorage:       blockStorage,
+		EventStorage:       eventStorage,
+		TransactionStorage: transactionStorage,
 	}
 
 	return internal.Result{

@@ -1,0 +1,3 @@
+workflows:
+  cross_validator:
+    validation_percentage: 20

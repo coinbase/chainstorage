@@ -3,5 +3,8 @@ aws:
   aws_account: production
 cadence:
   address: temporal.example.com:7233
+sdk:
+#  TODO: check this address
+  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/{{blockchain}}/{{network}}/v1
 server:
   bind_address: "0.0.0.0:9090"

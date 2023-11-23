@@ -24,7 +24,7 @@ type (
 		Retries       int
 		SentTimestamp time.Time
 		ReceiptHandle string
-		Data          interface{}
+		Data          any
 	}
 
 	DLQFactory interface {

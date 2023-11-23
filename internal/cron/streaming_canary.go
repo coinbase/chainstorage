@@ -10,26 +10,26 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/coinbase/chainstorage/internal/config"
-
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/log"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+	"github.com/coinbase/chainstorage/sdk"
 )
 
 type (
 	StreamingCanaryTaskParams struct {
 		fx.In
 		fxparams.Params
-		Client       gateway.Client
+		Client       sdk.Client
 		EventStorage storage.EventStorage
 		Config       *config.Config
 	}
 
 	streamingCanaryTask struct {
 		enabled      bool
-		client       gateway.Client
+		client       sdk.Client
 		logger       *zap.Logger
 		eventStorage storage.EventStorage
 		eventTag     uint32
@@ -37,8 +37,8 @@ type (
 )
 
 const (
-	streamingPadding   = 7
-	streamingNumEvents = 10
+	streamingPadding   = 2
+	streamingNumEvents = 4
 )
 
 func NewStreamingCanary(params StreamingCanaryTaskParams) (Task, error) {
@@ -100,10 +100,13 @@ func (t *streamingCanaryTask) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	stream, err := t.client.StreamChainEvents(ctx, &api.ChainEventsRequest{
-		SequenceNum: sequenceNum,
-		EventTag:    eventTag,
+	stream, err := t.client.StreamChainEvents(ctx, sdk.StreamingConfiguration{
+		NumberOfEvents: streamingNumEvents,
+		ChainEventsRequest: &api.ChainEventsRequest{
+			SequenceNum: sequenceNum,
+		},
 	})
+
 	if err != nil {
 		if t.isAbortedError(err) {
 			return nil
@@ -113,29 +116,24 @@ func (t *streamingCanaryTask) Run(ctx context.Context) error {
 	}
 
 	for i := 0; i < streamingNumEvents; i++ {
-		resp, err := stream.Recv()
-		if err != nil {
-			if t.isAbortedError(err) {
-				return nil
-			}
-
-			return xerrors.Errorf("failed to receive from event stream (sequenceNum=%v, i=%v): %w", sequenceNum, i, err)
+		resp, ok := <-stream
+		if !ok {
+			return xerrors.Errorf("unable to read event from closed stream (sequenceNum=%v, i=%v): %w", sequenceNum, i, err)
 		}
 
-		event := resp.GetEvent()
+		if resp.Error != nil {
+			if t.isAbortedError(resp.Error) {
+				return nil
+			}
+			return xerrors.Errorf("received error from event stream (sequenceNum=%v, i=%v): %w", sequenceNum, i, resp.Error)
+		}
+
+		event := resp.BlockchainEvent
 		if event == nil {
 			return xerrors.Errorf("received null event (sequenceNum=%v, i=%v)", sequenceNum, i)
 		}
 
 		t.logger.Debug("received event", zap.Int("i", i), zap.Reflect("event", event))
-		// The block file should exist regardless of the event type.
-		if _, err := t.client.GetBlockFile(ctx, &api.GetBlockFileRequest{
-			Tag:    event.Block.Tag,
-			Height: event.Block.Height,
-			Hash:   event.Block.Hash,
-		}); err != nil {
-			return xerrors.Errorf("failed to get block file (sequenceNum=%v, i=%v, event={%+v}): %w", sequenceNum, i, event, err)
-		}
 	}
 
 	return nil

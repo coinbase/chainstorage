@@ -3,9 +3,23 @@ package main
 import (
 	"testing"
 
+	"go.temporal.io/sdk/testsuite"
+
+	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 )
+
+type (
+	CronTestSuite struct {
+		testsuite.WorkflowTestSuite
+		t *testing.T
+	}
+)
+
+func (s CronTestSuite) T() *testing.T {
+	return s.t
+}
 
 func TestIntegrationCron(t *testing.T) {
 	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
@@ -19,8 +33,11 @@ func TestIntegrationCron(t *testing.T) {
 			return
 		}
 
+		ts := &CronTestSuite{t: t}
+		env := cadence.NewTestEnv(ts)
 		manager := startManager(
 			config.WithCustomConfig(cfg),
+			cadence.WithTestEnv(env),
 		)
 
 		manager.Shutdown()

@@ -1,2 +1,7 @@
 chain:
   block_start_height: 15000000
+sla:
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer

@@ -1,0 +1,242 @@
+syntax = "proto3";
+
+package coinbase.chainstorage;
+
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/chainstorage";
+
+import "google/protobuf/timestamp.proto";
+
+message EthereumBlobdata {
+  bytes header = 1;
+  repeated bytes transaction_receipts = 2;
+  repeated bytes transaction_traces = 3;
+  repeated bytes uncles = 4;
+  oneof extra_data {
+    PolygonExtraData polygon = 100;
+  }
+}
+
+message PolygonExtraData {
+  bytes author = 1;
+}
+
+message EthereumBlock {
+  EthereumHeader header = 1;
+  repeated EthereumTransaction transactions = 2;
+  repeated EthereumHeader uncles = 3;
+}
+
+message EthereumWithdrawal {
+  uint64 index = 1;
+  uint64 validator_index = 2;
+  string address = 3;
+  uint64 amount = 4;
+}
+
+message EthereumHeader {
+  string hash = 1;
+  string parent_hash = 2;
+  uint64 number = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  repeated string transactions = 5;
+  string nonce = 6;
+  string sha3_uncles = 7;
+  string logs_bloom = 8;
+  string transactions_root = 9;
+  string state_root = 10;
+  string receipts_root = 11;
+  string miner = 12;
+  uint64 difficulty = 13;
+  string total_difficulty = 14;
+  string extra_data = 15;
+  uint64 size = 16;
+  uint64 gas_limit = 17;
+  uint64 gas_used = 18;
+  repeated string uncles = 19;
+  oneof optional_base_fee_per_gas {
+    uint64 base_fee_per_gas = 20;
+  }
+  string mix_hash = 21;
+  repeated EthereumWithdrawal withdrawals = 22;
+  string withdrawals_root = 23;
+  oneof optional_polygon_author {
+    string author = 24;
+  }
+}
+
+message EthereumTransactionAccess {
+  string address = 1;
+  repeated string storage_keys = 2;
+}
+
+message EthereumTransactionAccessList {
+  repeated EthereumTransactionAccess access_list = 1;
+}
+
+message EthereumTransaction {
+  string block_hash = 1;
+  uint64 block_number = 2;
+  string from = 3;
+  uint64 gas = 4;
+  uint64 gas_price = 5;
+  string hash = 6;
+  string input = 7;
+  uint64 nonce = 8;
+  string to = 9;
+  uint64 index = 10;
+  string value = 11;
+  EthereumTransactionReceipt receipt = 12;
+  //  EthereumTransactionTrace trace = 13;
+  repeated EthereumTokenTransfer token_transfers = 14;
+  uint64 type = 15;
+  oneof optional_max_fee_per_gas {
+    uint64 max_fee_per_gas = 16;
+  }
+  oneof optional_max_priority_fee_per_gas {
+    uint64 max_priority_fee_per_gas = 17;
+  }
+  oneof optional_transaction_access_list {
+    EthereumTransactionAccessList transaction_access_list = 18;
+  }
+  repeated EthereumTransactionFlattenedTrace flattened_traces = 19;
+  google.protobuf.Timestamp block_timestamp = 20;
+  oneof optional_priority_fee_per_gas {
+    uint64 priority_fee_per_gas = 21;
+  }
+  oneof optional_mint {
+    string mint = 22;
+  }
+  string v = 23;
+  string r = 24;
+  string s = 25;
+  oneof optional_chain_id {
+    uint64 chain_id = 26;
+  }
+  string source_hash = 27;
+  bool is_system_tx = 28;
+}
+
+message EthereumTransactionReceipt {
+  message L1FeeInfo {
+    uint64 l1_gas_used = 1;
+    uint64 l1_gas_price = 2;
+    uint64 l1_fee = 3;
+    string l1_fee_scalar = 4;
+  }
+  string transaction_hash = 1;
+  uint64 transaction_index = 2;
+  string block_hash = 3;
+  uint64 block_number = 4;
+  string from = 5;
+  string to = 6;
+  uint64 cumulative_gas_used = 7;
+  uint64 gas_used = 8;
+  string contract_address = 9;
+  repeated EthereumEventLog logs = 10;
+  string logs_bloom = 11;
+  string root = 12;
+  reserved 13;
+  oneof optional_status {
+    uint64 status = 14;
+  }
+  uint64 type = 15;
+  uint64 effective_gas_price = 16;
+  oneof optional_l1_fee_info {
+    L1FeeInfo l1_fee_info = 17;
+  }
+  oneof optional_deposit_nonce {
+    uint64 deposit_nonce = 18;
+  }
+  oneof optional_deposit_receipt_version {
+    uint64 deposit_receipt_version = 19;
+  }
+}
+
+message EthereumEventLog {
+  bool removed = 1;
+  uint64 log_index = 2;
+  string transaction_hash = 3;
+  uint64 transaction_index = 4;
+  string block_hash = 5;
+  uint64 block_number = 6;
+  string address = 7;
+  string data = 8;
+  repeated string topics = 9;
+}
+
+message EthereumTransactionTrace {
+  string error = 1;
+  string type = 2;
+  string from = 3;
+  string to = 4;
+  string value = 5;
+  uint64 gas = 6;
+  uint64 gas_used = 7;
+  string input = 8;
+  string output = 9;
+  repeated EthereumTransactionTrace calls = 10;
+}
+
+message EthereumTransactionFlattenedTrace {
+  string error = 1;
+  string type = 2;
+  string from = 3;
+  string to = 4;
+  string value = 5;
+  uint64 gas = 6;
+  uint64 gas_used = 7;
+  string input = 8;
+  string output = 9;
+  uint64 subtraces = 10;
+  repeated uint64 trace_address = 11;
+  string trace_type = 12;
+  string call_type = 13;
+  string trace_id = 14;
+  uint64 status = 15;
+  string block_hash = 16;
+  uint64 block_number = 17;
+  string transaction_hash = 18;
+  uint64 transaction_index = 19;
+}
+
+message EthereumTokenTransfer {
+  string token_address = 1;
+  string from_address = 2;
+  string to_address = 3;
+  string value = 4;
+  uint64 transaction_index = 5;
+  string transaction_hash = 6;
+  uint64 log_index = 7;
+  string block_hash = 8;
+  uint64 block_number = 9;
+  oneof token_transfer {
+    ERC20TokenTransfer erc20 = 100;
+    ERC721TokenTransfer erc721 = 101;
+  }
+}
+
+message ERC20TokenTransfer {
+  string from_address = 1;
+  string to_address = 2;
+  string value = 3;
+}
+
+message ERC721TokenTransfer {
+  string from_address = 1;
+  string to_address = 2;
+  string token_id = 3;
+}
+
+message EthereumAccountStateProof {
+  bytes account_proof = 1;
+}
+
+message EthereumExtraInput {
+  string erc20_contract = 1;
+}
+
+message EthereumAccountStateResponse {
+  uint64 nonce = 1;
+  string storage_hash = 2;
+  string code_hash = 3;
+}

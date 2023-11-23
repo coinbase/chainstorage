@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
@@ -14,7 +15,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/log"
 	"github.com/coinbase/chainstorage/internal/utils/picker"
-	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
+	"github.com/coinbase/chainstorage/internal/utils/utils"
 )
 
 type (
@@ -36,12 +37,15 @@ type (
 		Name   string
 		Config *config.Endpoint
 		Client *http.Client
+
+		requestsCounter tally.Counter
 	}
 
 	EndpointProviderParams struct {
 		fx.In
 		Config *config.Config
 		Logger *zap.Logger
+		Scope  tally.Scope
 	}
 
 	EndpointProviderResult struct {
@@ -49,6 +53,7 @@ type (
 		Master    EndpointProvider `name:"master"`
 		Slave     EndpointProvider `name:"slave"`
 		Validator EndpointProvider `name:"validator"`
+		Consensus EndpointProvider `name:"consensus"`
 	}
 )
 
@@ -57,6 +62,7 @@ type (
 		name               string
 		endpointGroup      *config.EndpointGroup
 		logger             *zap.Logger
+		scope              tally.Scope
 		primaryPicker      picker.Picker
 		primaryEndpoints   []*Endpoint
 		secondaryPicker    picker.Picker
@@ -70,6 +76,7 @@ const (
 	masterEndpointGroupName    = "master"
 	slaveEndpointGroupName     = "slave"
 	validatorEndpointGroupName = "validator"
+	consensusEndpointGroupName = "consensus"
 	contextKeyFailover         = "failover:"
 )
 
@@ -79,35 +86,52 @@ var (
 
 func NewEndpointProvider(params EndpointProviderParams) (EndpointProviderResult, error) {
 	logger := log.WithPackage(params.Logger)
+	scope := params.Scope.SubScope("endpoints")
 
-	master, err := newEndpointProvider(logger, params.Config, &params.Config.Chain.Client.Master.EndpointGroup, masterEndpointGroupName)
+	master, err := newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Master.EndpointGroup, masterEndpointGroupName)
 	if err != nil {
 		return EndpointProviderResult{}, xerrors.Errorf("failed to create master endpoint provider: %w", err)
 	}
 
-	slave, err := newEndpointProvider(logger, params.Config, &params.Config.Chain.Client.Slave.EndpointGroup, slaveEndpointGroupName)
+	slave, err := newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Slave.EndpointGroup, slaveEndpointGroupName)
 	if err != nil {
 		return EndpointProviderResult{}, xerrors.Errorf("failed to create slave endpoint provider: %w", err)
 	}
 
-	validator, err := newEndpointProvider(logger, params.Config, &params.Config.Chain.Client.Validator.EndpointGroup, validatorEndpointGroupName)
+	validator, err := newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Validator.EndpointGroup, validatorEndpointGroupName)
 	if err != nil {
 		return EndpointProviderResult{}, xerrors.Errorf("failed to create validator endpoint provider: %w", err)
+	}
+
+	// Consensus client is set as Slave by default
+	var consensus *endpointProvider
+	if !params.Config.Chain.Client.Consensus.EndpointGroup.Empty() {
+		consensus, err = newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Consensus.EndpointGroup, consensusEndpointGroupName)
+		if err != nil {
+			return EndpointProviderResult{}, xerrors.Errorf("failed to create consensus endpoint provider: %w", err)
+		}
+	} else {
+		consensus, err = newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Slave.EndpointGroup, consensusEndpointGroupName)
+		if err != nil {
+			return EndpointProviderResult{}, xerrors.Errorf("failed to create consensus endpoint provider with slave endpoints: %w", err)
+		}
 	}
 
 	return EndpointProviderResult{
 		Master:    master,
 		Slave:     slave,
 		Validator: validator,
+		Consensus: consensus,
 	}, nil
 }
 
-func newEndpointProvider(logger *zap.Logger, cfg *config.Config, endpointGroup *config.EndpointGroup, name string) (*endpointProvider, error) {
+func newEndpointProvider(logger *zap.Logger, cfg *config.Config, scope tally.Scope, endpointGroup *config.EndpointGroup, name string) (*endpointProvider, error) {
 	primaryEndpoints, primaryPicker, err := newEndpoints(
 		logger,
 		cfg,
+		scope,
 		endpointGroup.Endpoints,
-		&endpointGroup.StickySession,
+		&endpointGroup.EndpointConfig,
 	)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create primary endpoints: %w", err)
@@ -116,8 +140,9 @@ func newEndpointProvider(logger *zap.Logger, cfg *config.Config, endpointGroup *
 	secondaryEndpoints, secondaryPicker, err := newEndpoints(
 		logger,
 		cfg,
+		scope,
 		endpointGroup.EndpointsFailover,
-		&endpointGroup.StickySessionFailover,
+		&endpointGroup.EndpointConfigFailover,
 	)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create secondary endpoints: %w", err)
@@ -133,6 +158,7 @@ func newEndpointProvider(logger *zap.Logger, cfg *config.Config, endpointGroup *
 		name:               name,
 		endpointGroup:      endpointGroup,
 		logger:             logger,
+		scope:              scope,
 		primaryPicker:      primaryPicker,
 		primaryEndpoints:   primaryEndpoints,
 		secondaryPicker:    secondaryPicker,
@@ -143,12 +169,13 @@ func newEndpointProvider(logger *zap.Logger, cfg *config.Config, endpointGroup *
 func newEndpoints(
 	logger *zap.Logger,
 	cfg *config.Config,
+	scope tally.Scope,
 	endpoints []config.Endpoint,
-	stickySession *config.StickySessionConfig,
+	endpointConfig *config.EndpointConfig,
 ) ([]*Endpoint, picker.Picker, error) {
 	res := make([]*Endpoint, len(endpoints))
 	for i := range endpoints {
-		endpoint, err := newEndpoint(cfg, logger, &endpoints[i], stickySession)
+		endpoint, err := newEndpoint(cfg, logger, scope, &endpoints[i], endpointConfig)
 		if err != nil {
 			return nil, nil, xerrors.Errorf("failed to create endpoint: %w", err)
 		}
@@ -176,10 +203,19 @@ func newEndpoints(
 func newEndpoint(
 	cfg *config.Config,
 	logger *zap.Logger,
+	scope tally.Scope,
 	endpoint *config.Endpoint,
-	stickySession *config.StickySessionConfig,
+	endpointConfig *config.EndpointConfig,
 ) (*Endpoint, error) {
 	var opts []ClientOption
+
+	//TODO: check if this is still needed
+	//if cfg.Env() == config.EnvLocal {
+	//	// Skip TLS verify due to go1.18 issue in MacOS https://github.com/golang/go/issues/51991
+	//	opts = append(opts, withRootCAs(fix.Roots()))
+	//}
+
+	stickySession := endpointConfig.StickySession
 	if stickySession.Enabled() {
 		if stickySession.CookiePassive {
 			opts = append(opts, withStickySessionCookiePassive())
@@ -215,8 +251,12 @@ func newEndpoint(
 		}
 	}
 
-	if cfg.Chain.Blockchain == common.Blockchain_BLOCKCHAIN_OPTIMISM {
-		opts = append(opts, withOverrideRequestTimeout(600))
+	if len(endpointConfig.Headers) > 0 {
+		opts = append(opts, withHeaders(endpointConfig.Headers))
+	}
+
+	if cfg.Chain.Client.HttpTimeout > 0 {
+		opts = append(opts, withOverrideRequestTimeout(cfg.Chain.Client.HttpTimeout))
 	}
 
 	client, err := newHTTPClient(opts...)
@@ -224,15 +264,27 @@ func newEndpoint(
 		return nil, xerrors.Errorf("failed to create http client for %v: %w", endpoint.Name, err)
 	}
 
+	providerID := "unknown"
+	if endpoint.ProviderID != "" {
+		providerID = endpoint.ProviderID
+	}
+
 	return &Endpoint{
 		Name:   endpoint.Name,
 		Config: endpoint,
 		Client: client,
+		requestsCounter: scope.
+			Tagged(map[string]string{
+				"endpoint_name": endpoint.Name,
+				"provider_id":   providerID,
+			}).
+			Counter("requests"),
 	}, nil
 }
 
 func getStickySessionValue(cfg *config.Config) string {
-	return fmt.Sprintf("%v-%v-%v", consts.ServiceName, cfg.Chain.Network.GetName(), cfg.Env())
+	headerValue := fmt.Sprintf("%v-%v-%v", consts.ServiceName, cfg.Chain.Network.GetName(), cfg.Env())
+	return utils.GenerateSha256HashString(headerValue)
 }
 
 func (e *endpointProvider) GetEndpoint(ctx context.Context) (*Endpoint, error) {
@@ -280,4 +332,8 @@ func (e *endpointProvider) HasFailoverContext(ctx context.Context) bool {
 func (e *endpointProvider) getFailoverContextKey() contextKey {
 	// Use different key for master and slave.
 	return contextKey(contextKeyFailover + e.name)
+}
+
+func (e *Endpoint) IncRequestsCounter(n int64) {
+	e.requestsCounter.Inc(n)
 }

@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"golang.org/x/xerrors"
@@ -29,6 +31,8 @@ const (
 	versionedIdFormat       = "%d-%v"
 	pkeyValueForWatermark   = int64(-1)
 	blockHeightForWatermark = uint64(0)
+	EventIdStartValue       = int64(1)
+	EventIdDeleted          = int64(0)
 	addEventsSafePadding    = int64(20)
 	defaultEventTag         = uint32(0)
 )
@@ -40,22 +44,27 @@ type (
 		heightIndexName                        string
 		versionedEventBlockIndexName           string
 		latestEventTag                         uint32
-		instrumentAddEvents                    instrument.Call
-		instrumentGetEventByEventId            instrument.Call
-		instrumentGetEventsAfterEventId        instrument.Call
-		instrumentGetEventsByEventIdRange      instrument.Call
-		instrumentGetMaxEventId                instrument.Call
-		instrumentSetMaxEventId                instrument.Call
-		instrumentGetFirstEventIdByBlockHeight instrument.Call
-		instrumentGetEventsByBlockHeight       instrument.Call
+		instrumentAddEvents                    instrument.Instrument
+		instrumentGetEventByEventId            instrument.InstrumentWithResult[*model.EventEntry]
+		instrumentGetEventsAfterEventId        instrument.InstrumentWithResult[[]*model.EventEntry]
+		instrumentGetEventsByEventIdRange      instrument.InstrumentWithResult[[]*model.EventEntry]
+		instrumentGetMaxEventId                instrument.InstrumentWithResult[int64]
+		instrumentSetMaxEventId                instrument.Instrument
+		instrumentGetFirstEventIdByBlockHeight instrument.InstrumentWithResult[int64]
+		instrumentGetEventsByBlockHeight       instrument.InstrumentWithResult[[]*model.EventEntry]
 	}
 )
 
 func newEventStorage(params Params) (internal.EventStorage, error) {
+	var eventTable ddbTable
+	var err error
+
 	heightIndexName := params.Config.AWS.DynamoDB.EventTableHeightIndex
-	eventTable, err := createEventTable(params)
-	if err != nil {
-		return nil, xerrors.Errorf("failed to create event table: %w", err)
+	if params.Config.AWS.DynamoDB.EventTable != "" {
+		eventTable, err = createEventTable(params)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to create event table: %w", err)
+		}
 	}
 
 	versionedEventBlockIndexName := params.Config.AWS.DynamoDB.VersionedEventTableBlockIndex
@@ -71,14 +80,14 @@ func newEventStorage(params Params) (internal.EventStorage, error) {
 		versionedEventTable:                    versionedEventTable,
 		versionedEventBlockIndexName:           versionedEventBlockIndexName,
 		latestEventTag:                         params.Config.GetLatestEventTag(),
-		instrumentAddEvents:                    instrument.NewCall(metrics, "add_events"),
-		instrumentGetEventByEventId:            instrument.NewCall(metrics, "get_event_by_event_id"),
-		instrumentGetEventsAfterEventId:        instrument.NewCall(metrics, "get_events_after_event_id"),
-		instrumentGetEventsByEventIdRange:      instrument.NewCall(metrics, "get_events_by_event_id_range"),
-		instrumentGetMaxEventId:                instrument.NewCall(metrics, "get_max_event_id"),
-		instrumentSetMaxEventId:                instrument.NewCall(metrics, "set_max_event_id"),
-		instrumentGetFirstEventIdByBlockHeight: instrument.NewCall(metrics, "get_first_event_id_by_block_height"),
-		instrumentGetEventsByBlockHeight:       instrument.NewCall(metrics, "get_events_by_block_height"),
+		instrumentAddEvents:                    instrument.New(metrics, "add_events"),
+		instrumentGetEventByEventId:            instrument.NewWithResult[*model.EventEntry](metrics, "get_event_by_event_id"),
+		instrumentGetEventsAfterEventId:        instrument.NewWithResult[[]*model.EventEntry](metrics, "get_events_after_event_id"),
+		instrumentGetEventsByEventIdRange:      instrument.NewWithResult[[]*model.EventEntry](metrics, "get_events_by_event_id_range"),
+		instrumentGetMaxEventId:                instrument.NewWithResult[int64](metrics, "get_max_event_id"),
+		instrumentSetMaxEventId:                instrument.New(metrics, "set_max_event_id"),
+		instrumentGetFirstEventIdByBlockHeight: instrument.NewWithResult[int64](metrics, "get_first_event_id_by_block_height"),
+		instrumentGetEventsByBlockHeight:       instrument.NewWithResult[[]*model.EventEntry](metrics, "get_events_by_block_height"),
 	}
 	return &storage, nil
 }
@@ -270,8 +279,8 @@ func convertBlockEventsToEventEntries(blockEvents []*model.BlockEvent, eventTag 
 }
 
 func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error {
-	if eventTag > e.latestEventTag {
-		return xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return err
 	}
 
 	maxEventId, err := e.GetMaxEventId(ctx, eventTag)
@@ -287,12 +296,12 @@ func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, event
 
 	eventsToAdd := convertBlockEventsToEventEntries(events, eventTag, startEventId)
 
-	return e.addEventsWithDDBEntries(ctx, eventTag, eventsToAdd)
+	return e.AddEventEntries(ctx, eventTag, eventsToAdd)
 }
 
-func (e *eventStorageImpl) addEventsWithDDBEntries(ctx context.Context, eventTag uint32, eventEntries []*model.EventEntry) error {
-	if eventTag > e.latestEventTag {
-		return xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+func (e *eventStorageImpl) AddEventEntries(ctx context.Context, eventTag uint32, eventEntries []*model.EventEntry) error {
+	if err := e.validateEventTag(eventTag); err != nil {
+		return err
 	}
 	startEventId := eventEntries[0].EventId
 
@@ -320,7 +329,7 @@ func (e *eventStorageImpl) addEventsWithDDBEntries(ctx context.Context, eventTag
 		}
 
 		if eventTag == defaultEventTag {
-			itemsToWrite := make([]interface{}, len(eventEntries))
+			itemsToWrite := make([]any, len(eventEntries))
 			for i, event := range eventEntries {
 				itemsToWrite[i] = (*ddbmodel.EventDDBEntry)(event)
 			}
@@ -334,7 +343,7 @@ func (e *eventStorageImpl) addEventsWithDDBEntries(ctx context.Context, eventTag
 			}
 			return nil
 		} else {
-			itemsToWrite := make([]interface{}, len(eventEntries))
+			itemsToWrite := make([]any, len(eventEntries))
 			for i, event := range eventEntries {
 				itemsToWrite[i] = castEventEntryToVersionedDDBEntry(event)
 			}
@@ -353,36 +362,32 @@ func (e *eventStorageImpl) addEventsWithDDBEntries(ctx context.Context, eventTag
 }
 
 func (e *eventStorageImpl) GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventEntry, error) {
-	if eventTag > e.latestEventTag {
-		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return nil, err
 	}
 
-	var event *model.EventEntry
-	if err := e.instrumentGetEventByEventId.Instrument(ctx, func(ctx context.Context) error {
+	return e.instrumentGetEventByEventId.Instrument(ctx, func(ctx context.Context) (*model.EventEntry, error) {
 		maxEventId, err := e.GetMaxEventId(ctx, eventTag)
 		if err != nil {
 			if xerrors.Is(err, errors.ErrNoEventHistory) {
-				return errors.ErrNoMaxEventIdFound
+				return nil, errors.ErrNoMaxEventIdFound
 			}
-			return xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
+			return nil, xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
 		}
 		if eventId > maxEventId {
-			return xerrors.Errorf("invalid eventId %d (event ends at %d) for eventTag=%d: %w", eventId, maxEventId, eventTag, errors.ErrInvalidEventId)
+			return nil, xerrors.Errorf("invalid eventId %d (event ends at %d) for eventTag=%d: %w", eventId, maxEventId, eventTag, errors.ErrInvalidEventId)
 		}
 		events, err := e.GetEventsByEventIdRange(ctx, eventTag, eventId, eventId+1)
 		if err != nil {
-			return xerrors.Errorf("failed to get events for eventTag=%d, eventId=%d: %w", eventTag, eventId, err)
+			return nil, xerrors.Errorf("failed to get events for eventTag=%d, eventId=%d: %w", eventTag, eventId, err)
 		}
 		if len(events) != 1 {
-			return xerrors.Errorf("got %d events for eventTag=%d, eventId=%d", len(events), eventTag, eventId)
+			return nil, xerrors.Errorf("got %d events for eventTag=%d, eventId=%d", len(events), eventTag, eventId)
 		}
 
-		event = events[0]
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return event, nil
+		event := events[0]
+		return event, nil
+	})
 }
 
 func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventEntry, error) {
@@ -390,13 +395,12 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 		return nil, xerrors.Errorf("invalid minEventId %d (event starts at %d): %w", minEventId, model.EventIdStartValue, errors.ErrInvalidEventId)
 	}
 
-	if eventTag > e.latestEventTag {
-		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return nil, err
 	}
 
-	var events []*model.EventEntry
 	inputKeys := make([]StringMap, 0, maxEventId-minEventId)
-	if err := e.instrumentGetEventsByEventIdRange.Instrument(ctx, func(ctx context.Context) error {
+	return e.instrumentGetEventsByEventIdRange.Instrument(ctx, func(ctx context.Context) ([]*model.EventEntry, error) {
 		if eventTag == defaultEventTag {
 			for i := minEventId; i < maxEventId; i++ {
 				eventKeyMap := getEventStorageKeyMap(i)
@@ -405,19 +409,19 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 			outputItems, err := e.eventTable.GetItems(ctx, inputKeys)
 			if err != nil {
 				if xerrors.Is(err, errors.ErrItemNotFound) {
-					return xerrors.Errorf("miss events for range [%d, %d): %w", minEventId, maxEventId, err)
+					return nil, xerrors.Errorf("miss events for range [%d, %d): %w", minEventId, maxEventId, err)
 				}
-				return xerrors.Errorf("failed to get events: %w", err)
+				return nil, xerrors.Errorf("failed to get events: %w", err)
 			}
-			events = make([]*model.EventEntry, 0, len(outputItems))
+			events := make([]*model.EventEntry, 0, len(outputItems))
 			for _, outputItem := range outputItems {
 				event, ok := castItemToEventEntry(outputItem)
 				if !ok {
-					return xerrors.Errorf("failed to cast to EventDDBEntry: %v", outputItem)
+					return nil, xerrors.Errorf("failed to cast to EventDDBEntry: %v", outputItem)
 				}
 				events = append(events, event)
 			}
-			return nil
+			return events, nil
 		} else {
 			for i := minEventId; i < maxEventId; i++ {
 				eventId := getEventIdForEventSequence(eventTag, i)
@@ -427,56 +431,52 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 			outputItems, err := e.versionedEventTable.GetItems(ctx, inputKeys)
 			if err != nil {
 				if xerrors.Is(err, errors.ErrItemNotFound) {
-					return xerrors.Errorf("miss versioned events (eventTag=%d) for range [%d, %d): %w", eventTag, minEventId, maxEventId, err)
+					return nil, xerrors.Errorf("miss versioned events (eventTag=%d) for range [%d, %d): %w", eventTag, minEventId, maxEventId, err)
 				}
-				return xerrors.Errorf("failed to get versioned events: %w", err)
+				return nil, xerrors.Errorf("failed to get versioned events: %w", err)
 			}
-			events = make([]*model.EventEntry, 0, len(outputItems))
+			events := make([]*model.EventEntry, 0, len(outputItems))
 			for _, outputItem := range outputItems {
 				event, ok := castVersionedItemToEventEntry(outputItem)
 				if !ok {
-					return xerrors.Errorf("failed to cast versioned item to EventDDBEntry: %v", outputItem)
+					return nil, xerrors.Errorf("failed to cast versioned item to EventDDBEntry: %v", outputItem)
 				}
 				events = append(events, event)
 			}
-			return nil
+			return events, nil
 		}
-	}); err != nil {
-		return nil, err
-	}
-	return events, nil
+	})
 }
 
 func (e *eventStorageImpl) GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error) {
-	if eventTag > e.latestEventTag {
-		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return nil, err
 	}
 
-	var events []*model.EventEntry
-	if err := e.instrumentGetEventsAfterEventId.Instrument(ctx, func(ctx context.Context) error {
+	events, err := e.instrumentGetEventsAfterEventId.Instrument(ctx, func(ctx context.Context) ([]*model.EventEntry, error) {
 		maxEventId, err := e.GetMaxEventId(ctx, eventTag)
 		if err != nil {
 			if xerrors.Is(err, errors.ErrNoEventHistory) {
-				return errors.ErrNoMaxEventIdFound
+				return nil, errors.ErrNoMaxEventIdFound
 			}
-			return xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
+			return nil, xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
 		}
 		if maxEventId == eventId {
-			return nil
+			return nil, nil
 		}
 		if eventId > maxEventId {
-			return xerrors.Errorf("invalid eventId %d (event ends at %d) for eventTag=%d: %w", eventId, maxEventId, eventTag, errors.ErrInvalidEventId)
+			return nil, xerrors.Errorf("invalid eventId %d (event ends at %d) for eventTag=%d: %w", eventId, maxEventId, eventTag, errors.ErrInvalidEventId)
 		}
 		if eventId+int64(maxEvents) < maxEventId {
 			maxEventId = eventId + int64(maxEvents)
 		}
-		events, err = e.GetEventsByEventIdRange(ctx, eventTag, eventId+1, maxEventId+1)
-		return err
-	}); err != nil {
+		return e.GetEventsByEventIdRange(ctx, eventTag, eventId+1, maxEventId+1)
+	})
+	if err != nil {
 		return nil, err
 	}
-	err := e.validateEvents(events)
-	if err != nil {
+
+	if err := e.validateEvents(events); err != nil {
 		return nil, xerrors.Errorf("events failed validation for eventTag=%d: %w", eventTag, err)
 	}
 	return events, nil
@@ -497,56 +497,52 @@ func (e *eventStorageImpl) validateEvents(events []*model.EventEntry) error {
 }
 
 func (e *eventStorageImpl) GetMaxEventId(ctx context.Context, eventTag uint32) (int64, error) {
-	var maxEventId int64
-
-	if eventTag > e.latestEventTag {
-		return maxEventId, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return 0, err
 	}
-	err := e.instrumentGetMaxEventId.Instrument(ctx, func(ctx context.Context) error {
+	return e.instrumentGetMaxEventId.Instrument(ctx, func(ctx context.Context) (int64, error) {
 		if eventTag == defaultEventTag {
 			ddbEntry, err := e.getEventByKey(ctx, pkeyValueForWatermark)
 			if err != nil {
 				if xerrors.Is(err, errors.ErrItemNotFound) {
-					return errors.ErrNoEventHistory
+					return 0, errors.ErrNoEventHistory
 				}
-				return err
+				return 0, err
 			}
 			// this scenario happens when we soft delete max event id to repopulate events table
 			if ddbEntry.MaxEventId == model.EventIdDeleted {
-				return errors.ErrNoEventHistory
+				return 0, errors.ErrNoEventHistory
 			}
-			maxEventId = ddbEntry.MaxEventId
-			return nil
+			maxEventId := ddbEntry.MaxEventId
+			return maxEventId, nil
 		} else {
 			watermarkEventId := getEventIdForWatermark(eventTag)
 			ddbEntry, err := e.getVersionedEventByKey(ctx, watermarkEventId)
 			if err != nil {
 				if xerrors.Is(err, errors.ErrItemNotFound) {
-					return errors.ErrNoEventHistory
+					return 0, errors.ErrNoEventHistory
 				}
-				return err
+				return 0, err
 			}
 			// this scenario happens when we soft delete max event id to repopulate events table
 			if ddbEntry.MaxEventId == model.EventIdDeleted {
-				return errors.ErrNoEventHistory
+				return 0, errors.ErrNoEventHistory
 			}
-			maxEventId = ddbEntry.MaxEventId
-			return nil
+			maxEventId := ddbEntry.MaxEventId
+			return maxEventId, nil
 		}
 	})
-
-	return maxEventId, err
 }
 
 func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, maxEventId int64) error {
-	if eventTag > e.latestEventTag {
-		return xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return err
 	}
 
 	if maxEventId < model.EventIdStartValue && maxEventId != model.EventIdDeleted {
 		return xerrors.Errorf("invalid max event id: %d", maxEventId)
 	}
-	err := e.instrumentSetMaxEventId.Instrument(ctx, func(ctx context.Context) error {
+	return e.instrumentSetMaxEventId.Instrument(ctx, func(ctx context.Context) error {
 		currentMaxEventId, err := e.GetMaxEventId(ctx, eventTag)
 		if err != nil {
 			return xerrors.Errorf("failed to get current max event id for eventTag=%d: %w", eventTag, err)
@@ -571,22 +567,27 @@ func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, m
 			return nil
 		}
 	})
-	return err
 }
 
 func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventEntry, error) {
-	if eventTag > e.latestEventTag {
-		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return nil, err
 	}
 	var events []*model.EventEntry
 	if eventTag == defaultEventTag {
-		outputItems, err := e.eventTable.QueryItems(ctx, e.heightIndexName, fmt.Sprintf("%s = %s", heightKeyName, heightValueName),
-			map[string]*dynamodb.AttributeValue{
-				heightValueName: {
-					N: aws.String(fmt.Sprintf("%d", blockHeight)),
-				},
-			})
+		keyCondition := expression.Key(heightKeyName).Equal(expression.Value(blockHeight))
+		builder := expression.NewBuilder().WithKeyCondition(keyCondition)
+		expr, err := builder.Build()
+		if err != nil {
+			return nil, xerrors.Errorf("failed to build expression for querying events: %w", err)
+		}
 
+		outputItems, err := e.eventTable.QueryItems(ctx, &QueryItemsRequest{
+			IndexName:                 e.heightIndexName,
+			KeyConditionExpression:    expr.KeyCondition(),
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
+		})
 		if err != nil {
 			return nil, xerrors.Errorf("failed to query events by height (%v): %w", blockHeight, err)
 		}
@@ -605,12 +606,19 @@ func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag 
 			events = append(events, eventEntry)
 		}
 	} else {
-		outputItems, err := e.versionedEventTable.QueryItems(ctx, e.versionedEventBlockIndexName, fmt.Sprintf("%s = %s", blockIdKeyName, blockIdValueName),
-			map[string]*dynamodb.AttributeValue{
-				blockIdValueName: {
-					S: aws.String(fmt.Sprintf("%d-%d", eventTag, blockHeight)),
-				},
-			})
+		keyCondition := expression.Key(blockIdKeyName).Equal(expression.Value(fmt.Sprintf("%d-%d", eventTag, blockHeight)))
+		builder := expression.NewBuilder().WithKeyCondition(keyCondition)
+		expr, err := builder.Build()
+		if err != nil {
+			return nil, xerrors.Errorf("failed to build expression for querying events: %w", err)
+		}
+
+		outputItems, err := e.versionedEventTable.QueryItems(ctx, &QueryItemsRequest{
+			IndexName:                 e.versionedEventBlockIndexName,
+			KeyConditionExpression:    expr.KeyCondition(),
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
+		})
 		if err != nil {
 			return nil, xerrors.Errorf("failed to query events for (eventTag=%v, height=%v): %w", eventTag, blockHeight, err)
 		}
@@ -633,41 +641,47 @@ func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag 
 }
 
 func (e *eventStorageImpl) GetFirstEventIdByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) (int64, error) {
-	eventId := int64(math.MaxInt64)
-	if eventTag > e.latestEventTag {
-		return eventId, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	if err := e.validateEventTag(eventTag); err != nil {
+		return 0, err
 	}
-	err := e.instrumentGetFirstEventIdByBlockHeight.Instrument(ctx, func(ctx context.Context) error {
+	return e.instrumentGetFirstEventIdByBlockHeight.Instrument(ctx, func(ctx context.Context) (int64, error) {
+		eventId := int64(math.MaxInt64)
 		events, err := e.getEventsByBlockHeight(ctx, eventTag, blockHeight)
 		if err != nil {
-			return xerrors.Errorf("failed to get events for eventTag=%v, blockHeight=%v: %w", eventTag, blockHeight, err)
+			return eventId, xerrors.Errorf("failed to get events for eventTag=%v, blockHeight=%v: %w", eventTag, blockHeight, err)
 		}
 		for _, event := range events {
 			if event.EventId < eventId {
 				eventId = event.EventId
 			}
 		}
-		return nil
+		return eventId, nil
 	})
-	return eventId, err
 }
 
 func (e *eventStorageImpl) GetEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventEntry, error) {
-	if eventTag > e.latestEventTag {
-		return nil, xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
-	}
-	var events []*model.EventEntry
-	if err := e.instrumentGetEventsByBlockHeight.Instrument(ctx, func(ctx context.Context) error {
-		var err error
-		events, err = e.getEventsByBlockHeight(ctx, eventTag, blockHeight)
-		if err != nil {
-			return xerrors.Errorf("failed to get events for eventTag=%v, blockHeight=%v: %w", eventTag, blockHeight, err)
-		}
-		return nil
-	}); err != nil {
+	if err := e.validateEventTag(eventTag); err != nil {
 		return nil, err
 	}
-	return events, nil
+
+	return e.instrumentGetEventsByBlockHeight.Instrument(ctx, func(ctx context.Context) ([]*model.EventEntry, error) {
+		events, err := e.getEventsByBlockHeight(ctx, eventTag, blockHeight)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to get events for eventTag=%v, blockHeight=%v: %w", eventTag, blockHeight, err)
+		}
+		return events, nil
+	})
+}
+
+func (e *eventStorageImpl) validateEventTag(eventTag uint32) error {
+	if eventTag > e.latestEventTag {
+		return xerrors.Errorf("do not support eventTag=%d, latestEventTag=%d", eventTag, e.latestEventTag)
+	}
+	if eventTag == 0 && e.eventTable == nil {
+		return errors.ErrNoEventHistory
+	}
+
+	return nil
 }
 
 func getEventIdForWatermark(eventTag uint32) string {
@@ -709,7 +723,7 @@ func castEventEntryToVersionedDDBEntry(eventEntry *model.EventEntry) *ddbmodel.V
 	}
 }
 
-func castItemToEventEntry(outputItem interface{}) (*model.EventEntry, bool) {
+func castItemToEventEntry(outputItem any) (*model.EventEntry, bool) {
 	eventDDBEntry, ok := outputItem.(*ddbmodel.EventDDBEntry)
 	if !ok {
 		return nil, ok
@@ -721,7 +735,7 @@ func castItemToEventEntry(outputItem interface{}) (*model.EventEntry, bool) {
 	return (*model.EventEntry)(eventDDBEntry), true
 }
 
-func castVersionedItemToEventEntry(outputItem interface{}) (*model.EventEntry, bool) {
+func castVersionedItemToEventEntry(outputItem any) (*model.EventEntry, bool) {
 	versionedEventDDBEntry, ok := outputItem.(*ddbmodel.VersionedEventDDBEntry)
 	if !ok {
 		return nil, ok

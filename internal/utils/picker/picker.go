@@ -8,16 +8,16 @@ import (
 
 type (
 	Choice struct {
-		Item   interface{}
+		Item   any
 		Weight int
 	}
 
 	Picker interface {
-		Next() interface{}
+		Next() any
 	}
 
 	simplePicker struct {
-		Item interface{}
+		Item any
 	}
 
 	weightedPicker struct {
@@ -45,11 +45,11 @@ func New(choices []*Choice) Picker {
 	}
 }
 
-func (p *simplePicker) Next() interface{} {
+func (p *simplePicker) Next() any {
 	return p.Item
 }
 
-func (p *weightedPicker) Next() interface{} {
+func (p *weightedPicker) Next() any {
 	p.mu.Lock()
 	choice := p.picker.Next()
 	p.mu.Unlock()

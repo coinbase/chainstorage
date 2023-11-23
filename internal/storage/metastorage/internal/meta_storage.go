@@ -19,10 +19,14 @@ type (
 		GetBlockByHash(ctx context.Context, tag uint32, height uint64, blockHash string) (*api.BlockMetadata, error)
 		GetBlockByHeight(ctx context.Context, tag uint32, height uint64) (*api.BlockMetadata, error)
 		GetBlocksByHeightRange(ctx context.Context, tag uint32, startHeight, endHeight uint64) ([]*api.BlockMetadata, error)
+		// GetBlocksByHeights gets blocks by heights. Results is an ordered array that matches the order in `heights` array
+		// i.e. if the heights is [100,2,3], it will return the metadata in order: [block 100, block 2, block 3]
+		GetBlocksByHeights(ctx context.Context, tag uint32, heights []uint64) ([]*api.BlockMetadata, error)
 	}
 
 	EventStorage interface {
 		AddEvents(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error
+		AddEventEntries(ctx context.Context, eventTag uint32, eventDDBEntries []*model.EventEntry) error
 		GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventEntry, error)
 		GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error)
 		GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventEntry, error)
@@ -32,16 +36,31 @@ type (
 		GetEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventEntry, error)
 	}
 
+	TransactionStorage interface {
+		// AddTransactions adds or updates a transaction to block number and hash mapping to the storage.
+		AddTransactions(ctx context.Context, transaction []*model.Transaction, parallelism int) error
+
+		// GetTransaction returns a slice of model.Transaction objects, representing the blocks'
+		// information for the specific transaction.
+		//
+		// There are two reasons that a transaction could map to multiple blocks:
+		// 1. blockchain reorgs
+		// 2. protocol by design, e.g. NEAR
+		GetTransaction(ctx context.Context, tag uint32, transactionHash string) ([]*model.Transaction, error)
+	}
+
 	MetaStorage interface {
 		BlockStorage
 		EventStorage
+		TransactionStorage
 	}
 
 	Result struct {
 		fx.Out
-		BlockStorage BlockStorage
-		EventStorage EventStorage
-		MetaStorage  MetaStorage
+		BlockStorage       BlockStorage
+		EventStorage       EventStorage
+		MetaStorage        MetaStorage
+		TransactionStorage TransactionStorage
 	}
 
 	MetaStorageFactory interface {

@@ -50,7 +50,7 @@ func WriteFile(relPath string, data []byte) error {
 	return finalizer.Close()
 }
 
-func UnmarshalJSON(pathToFile string, out interface{}) error {
+func UnmarshalJSON(pathToFile string, out any) error {
 	data, err := ReadFile(pathToFile)
 	if err != nil {
 		return xerrors.Errorf("failed to read file %v: %w", pathToFile, err)
@@ -63,13 +63,13 @@ func UnmarshalJSON(pathToFile string, out interface{}) error {
 	return nil
 }
 
-func MustUnmarshalJSON(pathToFile string, out interface{}) {
+func MustUnmarshalJSON(pathToFile string, out any) {
 	if err := UnmarshalJSON(pathToFile, out); err != nil {
 		panic(err)
 	}
 }
 
-func MarshalJSON(pathToFile string, in interface{}) error {
+func MarshalJSON(pathToFile string, in any) error {
 	data, err := json.MarshalIndent(in, "", "  ")
 	if err != nil {
 		return xerrors.Errorf("failed to marshal input: %w", err)
@@ -82,7 +82,7 @@ func MarshalJSON(pathToFile string, in interface{}) error {
 	return nil
 }
 
-func MustMarshalJSON(pathToFile string, in interface{}) {
+func MustMarshalJSON(pathToFile string, in any) {
 	if err := MarshalJSON(pathToFile, in); err != nil {
 		panic(err)
 	}

@@ -6,5 +6,13 @@ cadence:
   address: temporal-dev.example.com:7233
 chain:
   block_start_height: 4200000
+sdk:
+  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/goerli/v1
 server:
   bind_address: 0.0.0.0:9090
+workflows:
+  poller:
+    activity_retry_maximum_attempts: 6
+    activity_schedule_to_start_timeout: 5m
+  streamer:
+    activity_schedule_to_start_timeout: 5m

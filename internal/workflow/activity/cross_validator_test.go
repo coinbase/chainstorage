@@ -11,15 +11,17 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
+	"github.com/coinbase/chainstorage/internal/blockchain/parser"
+	parsermocks "github.com/coinbase/chainstorage/internal/blockchain/parser/mocks"
+	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
-	"github.com/coinbase/chainstorage/internal/storage/metastorage"
-	"github.com/coinbase/chainstorage/internal/utils/testutil"
-
-	"github.com/coinbase/chainstorage/internal/cadence"
 	blobstoragemocks "github.com/coinbase/chainstorage/internal/storage/blobstorage/mocks"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage"
 	metastoragemocks "github.com/coinbase/chainstorage/internal/storage/metastorage/mocks"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
+	"github.com/coinbase/chainstorage/internal/utils/testutil"
+	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
 type crossValidatorTestSuite struct {
@@ -30,6 +32,7 @@ type crossValidatorTestSuite struct {
 	blobStorage     *blobstoragemocks.MockBlobStorage
 	validatorClient *clientmocks.MockClient
 	crossValidator  *CrossValidator
+	parser          *parsermocks.MockParser
 	cfg             *config.Config
 	app             testapp.TestApp
 	env             *cadence.TestEnv
@@ -46,6 +49,7 @@ func (s *crossValidatorTestSuite) SetupTest() {
 	s.blobStorage = blobstoragemocks.NewMockBlobStorage(s.ctrl)
 	s.metaStorage = metastoragemocks.NewMockMetaStorage(s.ctrl)
 	s.validatorClient = clientmocks.NewMockClient(s.ctrl)
+	s.parser = parsermocks.NewMockParser(s.ctrl)
 	cfg, err := config.New()
 	require.NoError(err)
 	cfg.Workflows.CrossValidator.ValidationPercentage = 100
@@ -58,6 +62,7 @@ func (s *crossValidatorTestSuite) SetupTest() {
 		testapp.WithConfig(cfg),
 		fx.Provide(func() blobstorage.BlobStorage { return s.blobStorage }),
 		fx.Provide(func() metastorage.MetaStorage { return s.metaStorage }),
+		fx.Provide(func() parser.Parser { return s.parser }),
 		fx.Provide(fx.Annotated{
 			Name: "validator",
 			Target: func() client.Client {
@@ -82,7 +87,6 @@ func (s *crossValidatorTestSuite) TestValidator() {
 		theirHeight         = uint64(15_001_005)
 		heightPadding       = uint64(1000)
 		maxBlocksToValidate = uint64(50)
-		maxReorgDistance    = uint64(35)
 		parallelism         = 1
 	)
 
@@ -110,6 +114,12 @@ func (s *crossValidatorTestSuite) TestValidator() {
 		s.validatorClient.EXPECT().
 			GetBlockByHash(gomock.Any(), blockTag, i, gomock.Any()).
 			Return(block, nil)
+		s.parser.EXPECT().
+			ParseNativeBlock(gomock.Any(), block).
+			Return(&api.NativeBlock{}, nil).Times(2)
+		s.parser.EXPECT().
+			CompareNativeBlocks(gomock.Any(), i, gomock.Any(), gomock.Any()).
+			Return(nil)
 	}
 
 	response, err := s.crossValidator.Execute(s.env.BackgroundContext(), &CrossValidatorRequest{
@@ -118,11 +128,46 @@ func (s *crossValidatorTestSuite) TestValidator() {
 		ValidationHeightPadding: heightPadding,
 		MaxHeightsToValidate:    maxBlocksToValidate,
 		Parallelism:             parallelism,
-		MaxReorgDistance:        maxReorgDistance,
 	})
 	require.NoError(err)
 	require.Equal(&CrossValidatorResponse{
 		EndHeight: endHeight,
 		BlockGap:  theirHeight - endHeight,
 	}, response)
+}
+
+func (s *crossValidatorTestSuite) TestValidator_Reorg() {
+	const (
+		blockTag            = uint32(1)
+		startHeight         = uint64(15_000_200)
+		ourHeight           = uint64(15_002_000)
+		theirHeight         = uint64(15_001_005)
+		heightPadding       = uint64(1000)
+		maxBlocksToValidate = uint64(50)
+		parallelism         = 1
+	)
+
+	require := testutil.Require(s.T())
+
+	// Get the latest block
+	s.metaStorage.EXPECT().
+		GetLatestBlock(gomock.Any(), blockTag).
+		Return(testutil.MakeBlockMetadata(ourHeight, blockTag), nil)
+	s.validatorClient.EXPECT().
+		GetLatestHeight(gomock.Any()).
+		Return(theirHeight, nil)
+
+	// Validation block range:
+	// endHeight = theirHeight - heightPadding < startHeight
+	// Thus crossValidator will return directly with `response.EndHeight = startHeight`
+	response, err := s.crossValidator.Execute(s.env.BackgroundContext(), &CrossValidatorRequest{
+		Tag:                     blockTag,
+		StartHeight:             startHeight,
+		ValidationHeightPadding: heightPadding,
+		MaxHeightsToValidate:    maxBlocksToValidate,
+		Parallelism:             parallelism,
+	})
+	require.NoError(err)
+	require.Equal(startHeight, response.EndHeight)
+	require.Equal(theirHeight-startHeight, response.BlockGap)
 }

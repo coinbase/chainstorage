@@ -39,6 +39,10 @@ func (e *BlockEvent) GetBlockHeight() uint64 {
 	return e.BlockHeight
 }
 
+func (e *BlockEvent) GetBlockTimestamp() int64 {
+	return e.BlockTimestamp
+}
+
 func (e *BlockEvent) GetBlockSkipped() bool {
 	return e.Skipped
 }
@@ -91,4 +95,16 @@ func NewBlockEventFromEventEntry(eventType api.BlockchainEvent_Type, entry *Even
 		Skipped:        entry.BlockSkipped,
 		BlockTimestamp: entry.BlockTimestamp,
 	}
+}
+
+func CastItemToEventEntry(outputItem any) (*EventEntry, bool) {
+	eventEntry, ok := outputItem.(*EventEntry)
+	if !ok {
+		return nil, ok
+	}
+	// switch to defaultTag is not set
+	if eventEntry.Tag == 0 {
+		eventEntry.Tag = DefaultBlockTag
+	}
+	return eventEntry, true
 }

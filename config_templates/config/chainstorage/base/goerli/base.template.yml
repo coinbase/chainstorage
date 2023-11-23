@@ -1,0 +1,25 @@
+chain:
+  block_time: 2s
+  feature:
+    block_validation_enabled: true
+    block_validation_muted: true
+    rosetta_parser: true
+  irreversible_distance: 200
+sla:
+  block_height_delta: 60
+  block_time_delta: 2m
+  out_of_sync_node_distance: 60
+  tier: 2
+  time_since_last_block: 2m30s
+  event_height_delta: 60
+  event_time_delta: 2m
+  time_since_last_event: 2m30s
+workflows:
+  backfiller:
+    num_concurrent_extractors: 20
+    activity_start_to_close_timeout: 20m
+  poller:
+    backoff_interval: 2s
+    session_enabled: true
+  streamer:
+    backoff_interval: 2s

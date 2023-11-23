@@ -3,6 +3,8 @@ package sdk
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -10,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
@@ -34,8 +37,19 @@ type (
 		// SetClientID sets the clientID when initiate client.
 		SetClientID(clientID string)
 
+		// SetBlockValidation sets the blockValidation which by default is disabled.
+		SetBlockValidation(blockValidation bool)
+
+		// GetBlockValidation returns the blockValidation.
+		GetBlockValidation() bool
+
 		// GetLatestBlock returns the latest block height.
+		// Deprecated: use GetLatestBlockWithTag instead.
 		GetLatestBlock(ctx context.Context) (uint64, error)
+
+		// GetLatestBlockWithTag returns the latest block height, tag is optional.
+		// If tag is not provided, ChainStorage uses the stable tag to look up the latest height.
+		GetLatestBlockWithTag(ctx context.Context, tag uint32) (uint64, error)
 
 		// GetBlock returns the raw block. height is required and hash is optional.
 		// If hash is not provided, ChainStorage returns the block on the canonical chain.
@@ -60,9 +74,14 @@ type (
 		// and thus you may get back FailedPrecondition errors if it goes beyond current tip due to reorg, especially for streaming case.
 		GetBlocksByRangeWithTag(ctx context.Context, tag uint32, startHeight uint64, endHeight uint64) ([]*api.Block, error)
 
+		// GetBlockByTransaction returns the raw block(s) where the transaction resides,
+		// or an empty list if the transaction is not found.
+		// In most networks a transaction belongs to a single block, but there are exceptions.
+		// Note that this API is still experimental and may change at any time.
+		GetBlockByTransaction(ctx context.Context, tag uint32, transactionHash string) ([]*api.Block, error)
+
 		// StreamChainEvents streams raw blocks from ChainStorage.
 		// The caller is responsible for keeping track of the sequence or sequence_num in BlockchainEvent.
-		// This API is currently not supported in the Coinbase public APIs due to limitations in our edge gateway.
 		StreamChainEvents(ctx context.Context, cfg StreamingConfiguration) (<-chan *ChainEventResult, error)
 
 		// GetChainEvents returns at most req.MaxNumEvents available chain events.
@@ -89,8 +108,10 @@ type (
 		config          *config.Config
 		blockDownloader downloader.BlockDownloader
 		client          gateway.Client
+		parser          Parser
 		clientID        string
 		tag             uint32
+		blockValidation bool
 		retry           retry.Retry
 		validate        *validator.Validate
 	}
@@ -101,20 +122,25 @@ type (
 		Config          *config.Config
 		BlockDownloader downloader.BlockDownloader
 		Client          gateway.Client
+		Parser          parser.Parser
 	}
 )
 
 func newClient(params clientParams) (Client, error) {
 	logger := log.WithPackage(params.Logger)
-	return &clientImpl{
+	var client Client = &clientImpl{
 		logger:          logger,
 		config:          params.Config,
 		blockDownloader: params.BlockDownloader,
 		client:          params.Client,
+		parser:          params.Parser,
 		tag:             0, // by default, let the server decide the tag.
 		retry:           retry.New(),
 		validate:        validator.New(),
-	}, nil
+	}
+
+	client = WithTimeoutableClientInterceptor(client, logger)
+	return client, nil
 }
 
 func (c *clientImpl) GetTag() uint32 {
@@ -133,12 +159,24 @@ func (c *clientImpl) SetClientID(clientID string) {
 	c.clientID = clientID
 }
 
+func (c *clientImpl) SetBlockValidation(blockValidation bool) {
+	c.blockValidation = blockValidation
+}
+
+func (c *clientImpl) GetBlockValidation() bool {
+	return c.blockValidation
+}
+
 func (c *clientImpl) GetLatestBlock(ctx context.Context) (uint64, error) {
+	return c.GetLatestBlockWithTag(ctx, c.tag)
+}
+
+func (c *clientImpl) GetLatestBlockWithTag(ctx context.Context, tag uint32) (uint64, error) {
 	resp, err := c.client.GetLatestBlock(ctx, &api.GetLatestBlockRequest{
-		Tag: c.tag,
+		Tag: tag,
 	})
 	if err != nil {
-		return 0, err
+		return 0, xerrors.Errorf("failed to get latest block height (tag=%v): %w", tag, err)
 	}
 	return resp.Height, nil
 }
@@ -185,6 +223,13 @@ func (c *clientImpl) GetBlocksByRangeWithTag(ctx context.Context, tag uint32, st
 			rawBlock, err := c.blockDownloader.Download(ctx, blockFile)
 			if err != nil {
 				return xerrors.Errorf("failed download blockFile from %s: %w", blockFile.GetFileUrl(), err)
+			}
+
+			if c.blockValidation {
+				err := c.validateBlock(ctx, rawBlock)
+				if err != nil {
+					return xerrors.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", blockFile.Height, blockFile.Hash, err)
+				}
 			}
 
 			blocks[i] = rawBlock
@@ -356,6 +401,13 @@ func (c *clientImpl) downloadBlock(ctx context.Context, tag uint32, height uint6
 		return nil, xerrors.Errorf("failed download blockFile (blockFile={%+v}): %w", blockFile.File, err)
 	}
 
+	if c.blockValidation {
+		err = c.validateBlock(ctx, rawBlock)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
+		}
+	}
+
 	return rawBlock, nil
 }
 
@@ -395,4 +447,55 @@ func (c *clientImpl) GetChainMetadata(ctx context.Context, req *api.GetChainMeta
 
 func (c *clientImpl) GetStaticChainMetadata(ctx context.Context, req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error) {
 	return c.config.GetChainMetadataHelper(req)
+}
+
+func (c *clientImpl) GetBlockByTransaction(ctx context.Context, tag uint32, transactionHash string) ([]*api.Block, error) {
+	resp, err := c.client.GetBlockByTransaction(ctx, &api.GetBlockByTransactionRequest{
+		Tag:             tag,
+		TransactionHash: transactionHash,
+	})
+	if err != nil {
+		var grpcErr gateway.GrpcError
+		if xerrors.As(err, &grpcErr) && grpcErr.GRPCStatus().Code() == codes.NotFound {
+			return []*api.Block{}, nil
+		}
+
+		return nil, xerrors.Errorf("failed to find blocks by transaction (%v): %w", transactionHash, err)
+	}
+
+	blockIds := resp.Blocks
+	if len(blockIds) == 0 {
+		return []*api.Block{}, nil
+	}
+
+	// Parallel download is unnecessary
+	// because a transaction belongs to a single block in most cases.
+	blocks := make([]*api.Block, len(blockIds))
+	for i, blockId := range blockIds {
+		block, err := c.downloadBlock(ctx, blockId.Tag, blockId.Height, blockId.Hash)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to download block data: %w", err)
+		}
+
+		blocks[i] = block
+	}
+
+	return blocks, nil
+}
+
+func (c *clientImpl) validateBlock(ctx context.Context, rawBlock *api.Block) error {
+	hash := rawBlock.GetMetadata().GetHash()
+	height := rawBlock.GetMetadata().GetHeight()
+
+	nativeBlock, err := c.parser.ParseNativeBlock(ctx, rawBlock)
+	if err != nil {
+		return xerrors.Errorf("failed to parse native format for block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
+	}
+
+	err = c.parser.ValidateBlock(ctx, nativeBlock)
+	if err != nil {
+		return xerrors.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
+	}
+
+	return nil
 }

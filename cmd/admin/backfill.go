@@ -15,6 +15,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
+	"github.com/coinbase/chainstorage/internal/blockchain/restapi"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/storage"
@@ -47,6 +48,7 @@ var (
 			app := startApp(
 				client.Module,
 				jsonrpc.Module,
+				restapi.Module,
 				endpoints.Module,
 				aws.Module,
 				s3.Module,
@@ -70,9 +72,14 @@ var (
 				return xerrors.Errorf("invalid block range: [%v, %v)", startHeight, endHeight)
 			}
 
+			chainInfo := fmt.Sprintf("%v-%v", commonFlags.blockchain, commonFlags.network)
+			if commonFlags.sidechain != "" {
+				chainInfo = fmt.Sprintf("%v-%v", chainInfo, commonFlags.sidechain)
+			}
+
 			prompt := color.CyanString(fmt.Sprintf(
-				"Are you sure you want backfill [%v, %v) in %v::%v-%v? (y/N) ",
-				startHeight, endHeight, env, commonFlags.blockchain, commonFlags.network,
+				"Are you sure you want backfill [%v, %v) in %v::%v? (y/N) ",
+				startHeight, endHeight, env, chainInfo,
 			))
 			if !confirm(prompt) {
 				return nil

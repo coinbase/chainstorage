@@ -1,30 +1,39 @@
 aws:
   aws_account: development
-  storage:
-    data_compression: GZIP
+  bucket: example-chainstorage-ethereum-mainnet-dev
+  dlq:
+    name: example_chainstorage_blocks_ethereum_mainnet_dlq
+  dynamodb:
+    block_table: example_chainstorage_blocks_ethereum_mainnet
+    event_table: example_chainstorage_block_events_ethereum_mainnet
+    event_table_height_index: example_chainstorage_block_events_by_height_eth_main
 chain:
   block_tag:
     latest: 2
     stable: 2
-  block_time: 13s
+  block_time: 12s
   event_tag:
-    latest: 1
-    stable: 0
-  irreversible_distance: 14
+    latest: 3
+    stable: 3
+  irreversible_distance: 12
   feature:
     rosetta_parser: true
+    default_stable_event: true
+    block_validation_enabled: true
+    block_validation_muted: true
 sla:
   block_height_delta: 10
   block_time_delta: 2m
   out_of_sync_node_distance: 10
   tier: 1
-  time_since_last_block: 3m
+  time_since_last_block: 2m
+  event_height_delta: 10
+  event_time_delta: 2m
+  time_since_last_event: 2m
   expected_workflows:
     - monitor
     - poller
     - streamer
-    - streamer/event_tag=1
-    - datalake/block_tag=2
     - cross_validator
 workflows:
   backfiller:
@@ -32,11 +41,16 @@ workflows:
     num_concurrent_extractors: 24
   cross_validator:
     batch_size: 1000
-    backoff_interval: 500ms
     validation_start_height: 15500000
     validation_percentage: 1
   poller:
     parallelism: 10
     failover_enabled: true
+    session_enabled: true
+    backoff_interval: 1s
+    consensus_validation: true
+    consensus_validation_muted: true
   monitor:
     failover_enabled: true
+  streamer:
+    backoff_interval: 1s

@@ -82,6 +82,7 @@ func (s *benchmarkerTestSuite) TestBenchmarker() {
 		stepSize                = 1000000
 		samplesToTest           = 10
 		numConcurrentExtractors = 4
+		miniBatchSize           = 2
 	)
 
 	require := testutil.Require(s.T())
@@ -117,6 +118,7 @@ func (s *benchmarkerTestSuite) TestBenchmarker() {
 		StepSize:                stepSize,
 		SamplesToTest:           samplesToTest,
 		NumConcurrentExtractors: numConcurrentExtractors,
+		MiniBatchSize:           miniBatchSize,
 	})
 	require.NoError(err)
 
@@ -134,6 +136,7 @@ func (s *benchmarkerTestSuite) TestBenchmarker_ValidateRequest() {
 		StepSize:                1,
 		SamplesToTest:           1,
 		NumConcurrentExtractors: numConcurrentExtractors,
+		MiniBatchSize:           1,
 	})
 	require.Error(err)
 	require.Contains(err.Error(), "invalid workflow request")
@@ -160,6 +163,7 @@ func (s *benchmarkerTestSuite) TestBenchmarker_ValidateRequest() {
 		StepSize:                1,
 		SamplesToTest:           0,
 		NumConcurrentExtractors: numConcurrentExtractors,
+		MiniBatchSize:           1,
 	})
 	require.Error(err)
 	require.Contains(err.Error(), "invalid workflow request")
@@ -173,6 +177,7 @@ func (s *benchmarkerTestSuite) TestBenchmarker_ValidateRequest() {
 		StepSize:                1,
 		SamplesToTest:           1,
 		NumConcurrentExtractors: 0,
+		MiniBatchSize:           1,
 	})
 	require.Error(err)
 	require.Contains(err.Error(), "invalid workflow request")

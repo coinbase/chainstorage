@@ -1,7 +1,9 @@
 aws:
   aws_account: development
 chain:
-  block_tag:
-    stable: 2
   event_tag:
-    latest: 2
+    latest: 3
+    stable: 3
+workflows:
+  cross_validator:
+    validation_percentage: 20

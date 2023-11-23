@@ -1,3 +1,28 @@
 chain:
   event_tag:
     latest: 2
+    stable: 0
+  feature:
+    default_stable_event: false
+aws:
+  aws_account: development
+sla:
+  block_height_delta: 12
+  block_time_delta: 3m
+  out_of_sync_node_distance: 12
+  time_since_last_block: 3m
+  event_height_delta: 12
+  event_time_delta: 3m
+  time_since_last_event: 3m
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer
+    - streamer/event_tag=1
+    - streamer/event_tag=2
+    - cross_validator
+workflows:
+  poller:
+    failover_enabled: false
+  monitor:
+    failover_enabled: false

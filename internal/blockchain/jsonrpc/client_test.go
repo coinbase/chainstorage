@@ -62,7 +62,7 @@ func TestCall(t *testing.T) {
 	require.NotNil(client)
 	response, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -104,7 +104,7 @@ func TestCall_HTTPError(t *testing.T) {
 	require.NotNil(client)
 	_, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -149,7 +149,7 @@ func TestCall_RPCError(t *testing.T) {
 	require.NotNil(client)
 	_, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -194,7 +194,7 @@ func TestCall_AllowsRPCError(t *testing.T) {
 	require.NotNil(client)
 	response, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		},
@@ -238,7 +238,7 @@ func TestCall_RPCError_StatusNotOK(t *testing.T) {
 	require.NotNil(client)
 	result, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -282,7 +282,7 @@ func TestCall_RPCError_TooManyRequests(t *testing.T) {
 	require.NotNil(client)
 	result, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -331,7 +331,7 @@ func TestCall_RPCError_429_SucceededAfterRetries(t *testing.T) {
 	require.NotNil(client)
 	result, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -371,7 +371,7 @@ func TestCall_RPCError_StatusNotOK_WithCustomizedAttempts(t *testing.T) {
 	require.NotNil(client)
 	result, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -414,7 +414,7 @@ func TestCall_URLError(t *testing.T) {
 	require.NotNil(client)
 	result, err := client.Call(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
-		[]interface{}{
+		jsonrpc.Params{
 			"0x1234",
 			true,
 		})
@@ -462,9 +462,9 @@ func TestBatchCall(t *testing.T) {
 	client := params.Master
 	require.NotNil(client)
 	batchParams := []jsonrpc.Params{
-		jsonrpc.Params([]interface{}{"0x1234"}),
-		jsonrpc.Params([]interface{}{"0x1235"}),
-		jsonrpc.Params([]interface{}{"0x1236"}),
+		{"0x1234"},
+		{"0x1235"},
+		{"0x1236"},
 	}
 	batchResponse, err := client.BatchCall(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
@@ -515,9 +515,9 @@ func TestBatchCall_RPCError(t *testing.T) {
 	client := params.Master
 	require.NotNil(client)
 	batchParams := []jsonrpc.Params{
-		jsonrpc.Params([]interface{}{"0x1234"}),
-		jsonrpc.Params([]interface{}{"0x1235"}),
-		jsonrpc.Params([]interface{}{"0x1236"}),
+		{"0x1234"},
+		{"0x1235"},
+		{"0x1236"},
 	}
 	_, err := client.BatchCall(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
@@ -564,9 +564,9 @@ func TestBatchCall_AllowsRPCError(t *testing.T) {
 	client := params.Master
 	require.NotNil(client)
 	batchParams := []jsonrpc.Params{
-		jsonrpc.Params([]interface{}{"0x1234"}),
-		jsonrpc.Params([]interface{}{"0x1235"}),
-		jsonrpc.Params([]interface{}{"0x1236"}),
+		{"0x1234"},
+		{"0x1235"},
+		{"0x1236"},
 	}
 	responses, err := client.BatchCall(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
@@ -618,9 +618,9 @@ func TestBatchCall_WrongNumberOfResponses(t *testing.T) {
 	client := params.Master
 	require.NotNil(client)
 	batchParams := []jsonrpc.Params{
-		jsonrpc.Params([]interface{}{"0x1234"}),
-		jsonrpc.Params([]interface{}{"0x1235"}),
-		jsonrpc.Params([]interface{}{"0x1236"}),
+		{"0x1234"},
+		{"0x1235"},
+		{"0x1236"},
 	}
 	_, err := client.BatchCall(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
@@ -664,9 +664,9 @@ func TestBatchCall_DuplicateID(t *testing.T) {
 	client := params.Master
 	require.NotNil(client)
 	batchParams := []jsonrpc.Params{
-		jsonrpc.Params([]interface{}{"0x1234"}),
-		jsonrpc.Params([]interface{}{"0x1235"}),
-		jsonrpc.Params([]interface{}{"0x1236"}),
+		{"0x1234"},
+		{"0x1235"},
+		{"0x1236"},
 	}
 	_, err := client.BatchCall(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
@@ -724,9 +724,9 @@ func TestBatchCall_RetryNullResponse(t *testing.T) {
 	client := params.Master
 	require.NotNil(client)
 	batchParams := []jsonrpc.Params{
-		jsonrpc.Params([]interface{}{"0x1234"}),
-		jsonrpc.Params([]interface{}{"0x1235"}),
-		jsonrpc.Params([]interface{}{"0x1236"}),
+		{"0x1234"},
+		{"0x1235"},
+		{"0x1236"},
 	}
 	batchResponse, err := client.BatchCall(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},
@@ -772,9 +772,9 @@ func TestBatchCall_URLError(t *testing.T) {
 	client := params.Master
 	require.NotNil(client)
 	batchParams := []jsonrpc.Params{
-		jsonrpc.Params([]interface{}{"0x1234"}),
-		jsonrpc.Params([]interface{}{"0x1235"}),
-		jsonrpc.Params([]interface{}{"0x1236"}),
+		{"0x1234"},
+		{"0x1235"},
+		{"0x1236"},
 	}
 	_, err := client.BatchCall(context.Background(),
 		&jsonrpc.RequestMethod{Name: "hello", Timeout: time.Duration(5)},

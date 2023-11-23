@@ -1,0 +1,33 @@
+chain:
+  block_time: 2s
+  feature:
+    rosetta_parser: true
+    default_stable_event: true
+    block_validation_enabled: true
+    block_validation_muted: true
+  irreversible_distance: 400
+sla:
+  block_height_delta: 100 # https://mumbai.polygonscan.com/blocks_forked
+  block_time_delta: 5m
+  out_of_sync_node_distance: 100
+  tier: 2
+  time_since_last_block: 10m
+  event_height_delta: 100
+  event_time_delta: 5m
+  time_since_last_event: 10m
+workflows:
+  backfiller:
+    num_concurrent_extractors: 48
+  poller:
+    backoff_interval: 2s
+    checkpoint_size: 250
+    parallelism: 24
+    consensus_validation: true
+    consensus_validation_muted: true
+  streamer:
+    backoff_interval: 2s
+  cross_validator:
+    backoff_interval: 2s
+    checkpoint_size: 500
+    validation_start_height: 37000000
+    validation_percentage: 20

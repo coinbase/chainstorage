@@ -114,3 +114,18 @@ func LoadRawBlock(file string) (*api.Block, error) {
 
 	return &rawBlock, nil
 }
+
+func LoadNativeBlock(file string) (*api.EthereumBlock, error) {
+	data, err := fixtures.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var block api.EthereumBlock
+
+	if err := protojson.Unmarshal(data, &block); err != nil {
+		return nil, err
+	}
+
+	return &block, nil
+}

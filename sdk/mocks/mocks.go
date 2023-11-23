@@ -55,6 +55,35 @@ func (mr *MockClientMockRecorder) GetBlock(arg0, arg1, arg2 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockClient)(nil).GetBlock), arg0, arg1, arg2)
 }
 
+// GetBlockByTransaction mocks base method.
+func (m *MockClient) GetBlockByTransaction(arg0 context.Context, arg1 uint32, arg2 string) ([]*chainstorage.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockByTransaction", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]*chainstorage.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockByTransaction indicates an expected call of GetBlockByTransaction.
+func (mr *MockClientMockRecorder) GetBlockByTransaction(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByTransaction", reflect.TypeOf((*MockClient)(nil).GetBlockByTransaction), arg0, arg1, arg2)
+}
+
+// GetBlockValidation mocks base method.
+func (m *MockClient) GetBlockValidation() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockValidation")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// GetBlockValidation indicates an expected call of GetBlockValidation.
+func (mr *MockClientMockRecorder) GetBlockValidation() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockValidation", reflect.TypeOf((*MockClient)(nil).GetBlockValidation))
+}
+
 // GetBlockWithTag mocks base method.
 func (m *MockClient) GetBlockWithTag(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 string) (*chainstorage.Block, error) {
 	m.ctrl.T.Helper()
@@ -159,6 +188,21 @@ func (mr *MockClientMockRecorder) GetLatestBlock(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestBlock", reflect.TypeOf((*MockClient)(nil).GetLatestBlock), arg0)
 }
 
+// GetLatestBlockWithTag mocks base method.
+func (m *MockClient) GetLatestBlockWithTag(arg0 context.Context, arg1 uint32) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLatestBlockWithTag", arg0, arg1)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLatestBlockWithTag indicates an expected call of GetLatestBlockWithTag.
+func (mr *MockClientMockRecorder) GetLatestBlockWithTag(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestBlockWithTag", reflect.TypeOf((*MockClient)(nil).GetLatestBlockWithTag), arg0, arg1)
+}
+
 // GetStaticChainMetadata mocks base method.
 func (m *MockClient) GetStaticChainMetadata(arg0 context.Context, arg1 *chainstorage.GetChainMetadataRequest) (*chainstorage.GetChainMetadataResponse, error) {
 	m.ctrl.T.Helper()
@@ -186,6 +230,18 @@ func (m *MockClient) GetTag() uint32 {
 func (mr *MockClientMockRecorder) GetTag() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTag", reflect.TypeOf((*MockClient)(nil).GetTag))
+}
+
+// SetBlockValidation mocks base method.
+func (m *MockClient) SetBlockValidation(arg0 bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetBlockValidation", arg0)
+}
+
+// SetBlockValidation indicates an expected call of SetBlockValidation.
+func (mr *MockClientMockRecorder) SetBlockValidation(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlockValidation", reflect.TypeOf((*MockClient)(nil).SetBlockValidation), arg0)
 }
 
 // SetClientID mocks base method.
@@ -250,6 +306,21 @@ func (m *MockParser) EXPECT() *MockParserMockRecorder {
 	return m.recorder
 }
 
+// GetNativeTransaction mocks base method.
+func (m *MockParser) GetNativeTransaction(arg0 context.Context, arg1 *chainstorage.NativeBlock, arg2 string) (*chainstorage.NativeTransaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNativeTransaction", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*chainstorage.NativeTransaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNativeTransaction indicates an expected call of GetNativeTransaction.
+func (mr *MockParserMockRecorder) GetNativeTransaction(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNativeTransaction", reflect.TypeOf((*MockParser)(nil).GetNativeTransaction), arg0, arg1, arg2)
+}
+
 // ParseNativeBlock mocks base method.
 func (m *MockParser) ParseNativeBlock(arg0 context.Context, arg1 *chainstorage.Block) (*chainstorage.NativeBlock, error) {
 	m.ctrl.T.Helper()
@@ -278,6 +349,20 @@ func (m *MockParser) ParseRosettaBlock(arg0 context.Context, arg1 *chainstorage.
 func (mr *MockParserMockRecorder) ParseRosettaBlock(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseRosettaBlock", reflect.TypeOf((*MockParser)(nil).ParseRosettaBlock), arg0, arg1)
+}
+
+// ValidateBlock mocks base method.
+func (m *MockParser) ValidateBlock(arg0 context.Context, arg1 *chainstorage.NativeBlock) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateBlock", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ValidateBlock indicates an expected call of ValidateBlock.
+func (mr *MockParserMockRecorder) ValidateBlock(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateBlock", reflect.TypeOf((*MockParser)(nil).ValidateBlock), arg0, arg1)
 }
 
 // MockSession is a mock of Session interface.

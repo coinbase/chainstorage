@@ -41,6 +41,26 @@ func (m *MockChainStorageClient) EXPECT() *MockChainStorageClientMockRecorder {
 	return m.recorder
 }
 
+// GetBlockByTransaction mocks base method.
+func (m *MockChainStorageClient) GetBlockByTransaction(arg0 context.Context, arg1 *chainstorage.GetBlockByTransactionRequest, arg2 ...grpc.CallOption) (*chainstorage.GetBlockByTransactionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBlockByTransaction", varargs...)
+	ret0, _ := ret[0].(*chainstorage.GetBlockByTransactionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockByTransaction indicates an expected call of GetBlockByTransaction.
+func (mr *MockChainStorageClientMockRecorder) GetBlockByTransaction(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByTransaction", reflect.TypeOf((*MockChainStorageClient)(nil).GetBlockByTransaction), varargs...)
+}
+
 // GetBlockFile mocks base method.
 func (m *MockChainStorageClient) GetBlockFile(arg0 context.Context, arg1 *chainstorage.GetBlockFileRequest, arg2 ...grpc.CallOption) (*chainstorage.GetBlockFileResponse, error) {
 	m.ctrl.T.Helper()
@@ -181,6 +201,26 @@ func (mr *MockChainStorageClientMockRecorder) GetNativeBlocksByRange(arg0, arg1 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNativeBlocksByRange", reflect.TypeOf((*MockChainStorageClient)(nil).GetNativeBlocksByRange), varargs...)
 }
 
+// GetNativeTransaction mocks base method.
+func (m *MockChainStorageClient) GetNativeTransaction(arg0 context.Context, arg1 *chainstorage.GetNativeTransactionRequest, arg2 ...grpc.CallOption) (*chainstorage.GetNativeTransactionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetNativeTransaction", varargs...)
+	ret0, _ := ret[0].(*chainstorage.GetNativeTransactionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNativeTransaction indicates an expected call of GetNativeTransaction.
+func (mr *MockChainStorageClientMockRecorder) GetNativeTransaction(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNativeTransaction", reflect.TypeOf((*MockChainStorageClient)(nil).GetNativeTransaction), varargs...)
+}
+
 // GetRawBlock mocks base method.
 func (m *MockChainStorageClient) GetRawBlock(arg0 context.Context, arg1 *chainstorage.GetRawBlockRequest, arg2 ...grpc.CallOption) (*chainstorage.GetRawBlockResponse, error) {
 	m.ctrl.T.Helper()
@@ -259,6 +299,26 @@ func (mr *MockChainStorageClientMockRecorder) GetRosettaBlocksByRange(arg0, arg1
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRosettaBlocksByRange", reflect.TypeOf((*MockChainStorageClient)(nil).GetRosettaBlocksByRange), varargs...)
+}
+
+// GetVerifiedAccountState mocks base method.
+func (m *MockChainStorageClient) GetVerifiedAccountState(arg0 context.Context, arg1 *chainstorage.GetVerifiedAccountStateRequest, arg2 ...grpc.CallOption) (*chainstorage.GetVerifiedAccountStateResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetVerifiedAccountState", varargs...)
+	ret0, _ := ret[0].(*chainstorage.GetVerifiedAccountStateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVerifiedAccountState indicates an expected call of GetVerifiedAccountState.
+func (mr *MockChainStorageClientMockRecorder) GetVerifiedAccountState(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVerifiedAccountState", reflect.TypeOf((*MockChainStorageClient)(nil).GetVerifiedAccountState), varargs...)
 }
 
 // GetVersionedChainEvent mocks base method.

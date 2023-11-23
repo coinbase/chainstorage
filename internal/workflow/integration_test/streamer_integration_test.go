@@ -37,11 +37,11 @@ func (s *StreamerIntegrationTestSuite) TestStreamerIntegration() {
 	require := testutil.Require(s.T())
 
 	streamerBatchSize := uint64(50)
-	eventTag := uint32(0)
 	cfg, err := config.New()
 	require.NoError(err)
 
 	tag := cfg.GetStableBlockTag()
+	stableEventTag := cfg.GetStableEventTag()
 	startHeight := cfg.Chain.BlockStartHeight
 	endHeight := cfg.Chain.BlockStartHeight + streamerBatchSize
 	s.backfillData(startHeight, endHeight, tag, common.Blockchain_BLOCKCHAIN_ETHEREUM, common.Network_NETWORK_ETHEREUM_MAINNET)
@@ -64,23 +64,22 @@ func (s *StreamerIntegrationTestSuite) TestStreamerIntegration() {
 	_, err = streamerDeps.Streamer.Execute(context.Background(), &workflow.StreamerRequest{
 		BatchSize:      streamerBatchSize,
 		CheckpointSize: 1,
-		EventTag:       eventTag,
 	})
 
 	require.NotNil(err)
 	require.True(workflow.IsContinueAsNewError(err))
 
-	maxEventId, err := streamerDeps.MetaStorage.GetMaxEventId(context.TODO(), eventTag)
+	maxEventId, err := streamerDeps.MetaStorage.GetMaxEventId(context.TODO(), stableEventTag)
 	require.NoError(err)
 	require.Equal(metastorage.EventIdStartValue+int64(streamerBatchSize)-1, maxEventId)
-	events, err := streamerDeps.MetaStorage.GetEventsByEventIdRange(context.TODO(), eventTag, metastorage.EventIdStartValue, maxEventId)
+	events, err := streamerDeps.MetaStorage.GetEventsByEventIdRange(context.TODO(), stableEventTag, metastorage.EventIdStartValue, maxEventId)
 	require.NoError(err)
 	blocks, err := streamerDeps.MetaStorage.GetBlocksByHeightRange(context.TODO(), tag, startHeight, endHeight)
 	require.NoError(err)
 	for i, event := range events {
 		expectedBlockEvent := model.NewBlockEventWithBlockMeta(api.BlockchainEvent_BLOCK_ADDED, blocks[i])
 		expectedEventId := int64(i) + metastorage.EventIdStartValue
-		expectedEventDDBEntry := model.NewEventEntry(eventTag, expectedEventId, expectedBlockEvent)
+		expectedEventDDBEntry := model.NewEventEntry(stableEventTag, expectedEventId, expectedBlockEvent)
 		require.Equal(expectedEventDDBEntry, event)
 	}
 }

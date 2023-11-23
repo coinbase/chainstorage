@@ -1,0 +1,21 @@
+chain:
+  block_time: 12s
+  irreversible_distance: 36
+sla:
+  block_height_delta: 20
+  block_time_delta: 5m
+  out_of_sync_node_distance: 20
+  tier: 2
+  time_since_last_block: 5m
+  event_height_delta: 20
+  event_time_delta: 5m
+  time_since_last_event: 5m
+  expected_workflows:
+  - monitor
+  - streamer
+  - poller
+workflows:
+  backfiller:
+    num_concurrent_extractors: 24
+  poller:
+    session_enabled: true

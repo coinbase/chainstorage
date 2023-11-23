@@ -1,38 +1,55 @@
 api:
   streaming_interval: 250ms
 aws:
-  aws_account: development
-  storage:
-    data_compression: GZIP
+  dynamodb:
+    event_table: example_chainstorage_block_events_{{blockchain}}_{{network}}
+    event_table_height_index: example_chainstorage_block_events_by_height_{{blockchain}}_{{network}}
+    versioned_event_table: example_chainstorage_versioned_block_events_solana_mainnet
+    versioned_event_table_block_index: example_chainstorage_versioned_block_events_by_block_id_solana_mainnet
 chain:
   block_time: 400ms
+  block_tag:
+    latest: 2
+    stable: 2
   event_tag:
-    latest: 0
-    stable: 0
+    latest: 1
+    stable: 1
+  feature:
+    rosetta_parser: true
+  irreversible_distance: 1
 cron:
   disable_dlq_processor: true
 sla:
-  block_height_delta: 150
-  block_time_delta: 1m30s
-  out_of_sync_node_distance: 150
-  tier: 2
-  time_since_last_block: 3m
+  block_height_delta: 300
+  block_time_delta: 2m
   expected_workflows:
     - monitor
     - poller
     - streamer
+  out_of_sync_node_distance: 300
+  tier: 2
+  time_since_last_block: 3m
+  event_height_delta: 300
+  event_time_delta: 2m
+  time_since_last_event: 3m
 workflows:
   backfiller:
-    num_concurrent_extractors: 64
+    activity_start_to_close_timeout: 2m
+    batch_size: 5000
+    checkpoint_size: 25000
+    mini_batch_size: 10
+    num_concurrent_extractors: 50
   monitor:
-    backoff_interval: 1s
-    batch_size: 25
-    parallelism: 10
+    backoff_interval: 0s
+    batch_size: 300
+    parallelism: 25
+    irreversible_distance: 1500
+    block_gap_limit: 8000
   poller:
-    backoff_interval: 500ms
+    backoff_interval: 0s
     fast_sync: true
     max_blocks_to_sync_per_cycle: 300
     parallelism: 24
     session_enabled: true
   streamer:
-    backoff_interval: 500ms
+    backoff_interval: 0s

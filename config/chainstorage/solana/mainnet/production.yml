@@ -4,5 +4,10 @@ aws:
   bucket: example-chainstorage-solana-mainnet-prod
 cadence:
   address: temporal.example.com:7233
+sdk:
+  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/solana/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
+workflows:
+  backfiller:
+    num_concurrent_extractors: 150

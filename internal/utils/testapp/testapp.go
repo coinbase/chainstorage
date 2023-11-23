@@ -5,7 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/uber-go/tally"
+	"github.com/coinbase/chainstorage/internal/utils/log"
+
+	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/zap"
@@ -18,6 +20,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
+	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/coinbase/chainstorage/sdk/services"
 )
 
@@ -51,22 +54,60 @@ var (
 		{
 			Namespace: "chainstorage",
 			ConfigNames: []string{
+				"aptos-mainnet",
 				"arbitrum-mainnet",
 				"avacchain-mainnet",
+				"base-goerli",
+				"base-mainnet",
 				"bitcoin-mainnet",
 				"bsc-mainnet",
 				"dogecoin-mainnet",
 				"ethereum-goerli",
+				"ethereum-holesky",
 				"ethereum-mainnet",
+				"fantom-mainnet",
 				"optimism-mainnet",
 				"polygon-mainnet",
+				"polygon-testnet",
 				"solana-mainnet",
 			},
 		},
 	}
 )
 
+func NewWithoutEndpoints(t testing.TB, opts ...fx.Option) TestApp {
+	logger := log.NewDevelopment()
+
+	manager := services.NewMockSystemManager()
+
+	var cfg *config.Config
+	opts = append(
+		opts,
+		aws.Module,
+		cadence.Module,
+		config.Module,
+		fxparams.Module,
+		tracer.Module,
+		fx.NopLogger,
+		fx.Provide(func() testing.TB { return t }),
+		fx.Provide(func() *zap.Logger { return logger }),
+		fx.Provide(func() tally.Scope { return tally.NoopScope }),
+		fx.Provide(func() services.SystemManager { return manager }),
+		fx.Populate(&cfg),
+	)
+
+	app := fxtest.New(t, opts...)
+	app.RequireStart()
+	return &testAppImpl{
+		app:    app,
+		logger: logger,
+		config: cfg,
+	}
+}
+
 func New(t testing.TB, opts ...fx.Option) TestApp {
+	logger := log.NewDevelopment()
+
 	manager := services.NewMockSystemManager()
 
 	var cfg *config.Config
@@ -80,7 +121,7 @@ func New(t testing.TB, opts ...fx.Option) TestApp {
 		tracer.Module,
 		fx.NopLogger,
 		fx.Provide(func() testing.TB { return t }),
-		fx.Provide(func() *zap.Logger { return manager.Logger() }),
+		fx.Provide(func() *zap.Logger { return logger }),
 		fx.Provide(func() tally.Scope { return tally.NoopScope }),
 		fx.Provide(func() services.SystemManager { return manager }),
 		fx.Populate(&cfg),
@@ -90,7 +131,7 @@ func New(t testing.TB, opts ...fx.Option) TestApp {
 	app.RequireStart()
 	return &testAppImpl{
 		app:    app,
-		logger: manager.Logger(),
+		logger: logger,
 		config: cfg,
 	}
 }
@@ -150,6 +191,20 @@ func WithBlockchainNetwork(blockchain common.Blockchain, network common.Network)
 	return WithConfig(cfg)
 }
 
+// WithBlockchainNetworkSidechain loads the config according to the specified blockchain, network and sidechain.
+func WithBlockchainNetworkSidechain(blockchain common.Blockchain, network common.Network, sidechain api.SideChain) fx.Option {
+	cfg, err := config.New(
+		config.WithBlockchain(blockchain),
+		config.WithNetwork(network),
+		config.WithSidechain(sidechain),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return WithConfig(cfg)
+}
+
 func (a *testAppImpl) Close() {
 	a.app.RequireStop()
 }
@@ -162,7 +217,7 @@ func (a *testAppImpl) Config() *config.Config {
 	return a.config
 }
 
-var envsToTest = []config.Env{
+var EnvsToTest = []config.Env{
 	config.EnvLocal,
 	config.EnvDevelopment,
 	config.EnvProduction,
@@ -174,16 +229,31 @@ var AWSAccountsToTest = []config.AWSAccount{
 	config.AWSAccountProduction,
 }
 
+func TestAllEnvs(t *testing.T, fn TestFn) {
+	for _, env := range EnvsToTest {
+		t.Run(string(env), func(t *testing.T) {
+			require := testutil.Require(t)
+
+			cfg, err := config.New(config.WithEnvironment(env))
+			require.NoError(err)
+			require.Equal(env, cfg.Env())
+
+			fn(t, cfg)
+		})
+	}
+}
+
 func TestAllConfigs(t *testing.T, fn TestFn) {
 	for _, testConfig := range TestConfigs {
 		namespace := testConfig.Namespace
 		for _, configName := range testConfig.ConfigNames {
 			name := fmt.Sprintf("%v/%v", namespace, configName)
 			t.Run(name, func(t *testing.T) {
-				for _, env := range envsToTest {
+				for _, env := range EnvsToTest {
 					t.Run(string(env), func(t *testing.T) {
 						require := testutil.Require(t)
-						blockchain, network, err := config.ParseConfigName(configName)
+
+						blockchain, network, sidechain, err := config.ParseConfigName(configName)
 						require.NoError(err)
 
 						cfg, err := config.New(
@@ -191,6 +261,7 @@ func TestAllConfigs(t *testing.T, fn TestFn) {
 							config.WithEnvironment(env),
 							config.WithBlockchain(blockchain),
 							config.WithNetwork(network),
+							config.WithSidechain(sidechain),
 						)
 						require.NoError(err)
 						require.Equal(namespace, cfg.Namespace())

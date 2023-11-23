@@ -1,5 +1,2 @@
-sla:
-  expected_workflows:
-    - monitor
-    - poller
-    - streamer
+aws:
+  aws_account: production

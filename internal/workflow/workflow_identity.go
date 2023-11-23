@@ -17,24 +17,27 @@ const (
 	PollerIdentity
 	StreamerIdentity
 	CrossValidatorIdentity
+	EventBackfillerIdentity
 )
 
 var workflowIdentityToString = map[WorkflowIdentity]string{
-	BackfillerIdentity:     "workflow.backfiller",
-	BenchmarkerIdentity:    "workflow.benchmarker",
-	MonitorIdentity:        "workflow.monitor",
-	PollerIdentity:         "workflow.poller",
-	StreamerIdentity:       "workflow.streamer",
-	CrossValidatorIdentity: "workflow.cross_validator",
+	BackfillerIdentity:      "workflow.backfiller",
+	BenchmarkerIdentity:     "workflow.benchmarker",
+	MonitorIdentity:         "workflow.monitor",
+	PollerIdentity:          "workflow.poller",
+	StreamerIdentity:        "workflow.streamer",
+	CrossValidatorIdentity:  "workflow.cross_validator",
+	EventBackfillerIdentity: "workflow.event_backfiller",
 }
 
 var workflowIdentities = map[string]WorkflowIdentity{
-	"backfiller":      BackfillerIdentity,
-	"benchmarker":     BenchmarkerIdentity,
-	"monitor":         MonitorIdentity,
-	"poller":          PollerIdentity,
-	"streamer":        StreamerIdentity,
-	"cross_validator": CrossValidatorIdentity,
+	"backfiller":       BackfillerIdentity,
+	"benchmarker":      BenchmarkerIdentity,
+	"monitor":          MonitorIdentity,
+	"poller":           PollerIdentity,
+	"streamer":         StreamerIdentity,
+	"cross_validator":  CrossValidatorIdentity,
+	"event_backfiller": EventBackfillerIdentity,
 }
 
 func GetWorkflowIdentify(name string) WorkflowIdentity {
@@ -49,7 +52,7 @@ func (w WorkflowIdentity) String() (string, error) {
 	return workflowIdentityString, nil
 }
 
-func (w WorkflowIdentity) UnmarshalJsonStringToRequest(str string) (interface{}, error) {
+func (w WorkflowIdentity) UnmarshalJsonStringToRequest(str string) (any, error) {
 	if str == "" {
 		str = "{}"
 	}
@@ -86,6 +89,11 @@ func (w WorkflowIdentity) UnmarshalJsonStringToRequest(str string) (interface{},
 		}
 	case CrossValidatorIdentity:
 		var req CrossValidatorRequest
+		if err = decoder.Decode(&req); err == nil {
+			return req, nil
+		}
+	case EventBackfillerIdentity:
+		var req EventBackfillerRequest
 		if err = decoder.Decode(&req); err == nil {
 			return req, nil
 		}

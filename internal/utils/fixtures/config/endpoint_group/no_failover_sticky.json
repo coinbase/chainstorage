@@ -8,7 +8,9 @@
       "weight": 4
     }
   ],
-  "sticky_session": {
-    "cookie_hash": "baz"
+  "endpoint_config": {
+    "sticky_session": {
+      "cookie_hash": "baz"
+    }
   }
 }

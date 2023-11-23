@@ -7,23 +7,25 @@ import (
 )
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if rt.stickySessionHeader != nil {
-		req.Header.Set(rt.stickySessionHeader.headerKey, rt.stickySessionHeader.headerValue)
+	if len(rt.headers) > 0 {
+		for key, val := range rt.headers {
+			req.Header.Set(key, val)
+		}
 	}
 
 	res, err := rt.base.RoundTrip(req)
 	return res, err
 }
 
-func WrapHTTPClient(client *http.Client, header *stickySessionHeader) *http.Client {
+func WrapHTTPClient(client *http.Client, headers map[string]string) *http.Client {
 	transport := client.Transport
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
 
 	client.Transport = &roundTripper{
-		base:                transport,
-		stickySessionHeader: header,
+		base:    transport,
+		headers: headers,
 	}
 
 	return client

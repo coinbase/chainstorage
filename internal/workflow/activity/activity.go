@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/uber-go/tally"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/zap"
@@ -16,15 +15,25 @@ import (
 )
 
 const (
-	ActivityExtractor      = "activity.extractor"
-	ActivityLoader         = "activity.loader"
-	ActivitySyncer         = "activity.syncer"
-	ActivityReader         = "activity.reader"
-	ActivityValidator      = "activity.validator"
-	ActivityStreamer       = "activity.streamer"
-	ActivityCrossValidator = "activity.cross_validator"
+	ActivityExtractor       = "activity.extractor"
+	ActivityLoader          = "activity.loader"
+	ActivitySyncer          = "activity.syncer"
+	ActivityLivenessCheck   = "activity.liveness_check"
+	ActivityReader          = "activity.reader"
+	ActivityValidator       = "activity.validator"
+	ActivityStreamer        = "activity.streamer"
+	ActivityCrossValidator  = "activity.cross_validator"
+	ActivityEventReader     = "activity.event_reader"
+	ActivityEventReconciler = "activity.event_reconciler"
+	ActivityEventLoader     = "activity.event_loader"
 
 	loggerMsg = "activity.request"
+
+	resultTypeTag     = "result_type"
+	resultTypeSuccess = "success"
+	resultTypeError   = "error"
+
+	reorgDistanceCheckMetric = "reorg_distance_check"
 )
 
 type baseActivity struct {
@@ -33,6 +42,15 @@ type baseActivity struct {
 	validate   *validator.Validate
 	instrument *instrument.Instrument
 }
+
+var (
+	errTags = map[string]string{
+		resultTypeTag: resultTypeError,
+	}
+	successTags = map[string]string{
+		resultTypeTag: resultTypeSuccess,
+	}
+)
 
 func newBaseActivity(name string, runtime cadence.Runtime) baseActivity {
 	return baseActivity{
@@ -43,13 +61,13 @@ func newBaseActivity(name string, runtime cadence.Runtime) baseActivity {
 	}
 }
 
-func (a *baseActivity) register(activityFn interface{}) {
+func (a *baseActivity) register(activityFn any) {
 	a.runtime.RegisterActivity(activityFn, activity.RegisterOptions{
 		Name: a.name,
 	})
 }
 
-func (a *baseActivity) executeActivity(ctx workflow.Context, request interface{}, response interface{}, opts ...instrument.Option) error {
+func (a *baseActivity) executeActivity(ctx workflow.Context, request any, response any, opts ...instrument.Option) error {
 	opts = append(
 		opts,
 		instrument.WithLoggerField(zap.String("activity", a.name)),
@@ -69,16 +87,12 @@ func (a *baseActivity) executeActivity(ctx workflow.Context, request interface{}
 	}, opts...)
 }
 
-func (a *baseActivity) validateRequest(request interface{}) error {
+func (a *baseActivity) validateRequest(request any) error {
 	if err := a.validate.Struct(request); err != nil {
 		return xerrors.Errorf("invalid activity request (name=%v, request=%+v): %w", a.name, request, err)
 	}
 
 	return nil
-}
-
-func (a *baseActivity) getScope(ctx context.Context) tally.Scope {
-	return a.runtime.GetActivityScope(ctx).SubScope(a.name)
 }
 
 func (a *baseActivity) getLogger(ctx context.Context) *zap.Logger {

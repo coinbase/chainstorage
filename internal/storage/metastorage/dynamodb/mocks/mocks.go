@@ -873,6 +873,56 @@ func (mr *MockDynamoAPIMockRecorder) DescribeGlobalTableWithContext(arg0, arg1 a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeGlobalTableWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).DescribeGlobalTableWithContext), varargs...)
 }
 
+// DescribeImport mocks base method.
+func (m *MockDynamoAPI) DescribeImport(arg0 *dynamodb.DescribeImportInput) (*dynamodb.DescribeImportOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeImport", arg0)
+	ret0, _ := ret[0].(*dynamodb.DescribeImportOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeImport indicates an expected call of DescribeImport.
+func (mr *MockDynamoAPIMockRecorder) DescribeImport(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeImport", reflect.TypeOf((*MockDynamoAPI)(nil).DescribeImport), arg0)
+}
+
+// DescribeImportRequest mocks base method.
+func (m *MockDynamoAPI) DescribeImportRequest(arg0 *dynamodb.DescribeImportInput) (*request.Request, *dynamodb.DescribeImportOutput) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeImportRequest", arg0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*dynamodb.DescribeImportOutput)
+	return ret0, ret1
+}
+
+// DescribeImportRequest indicates an expected call of DescribeImportRequest.
+func (mr *MockDynamoAPIMockRecorder) DescribeImportRequest(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeImportRequest", reflect.TypeOf((*MockDynamoAPI)(nil).DescribeImportRequest), arg0)
+}
+
+// DescribeImportWithContext mocks base method.
+func (m *MockDynamoAPI) DescribeImportWithContext(arg0 context.Context, arg1 *dynamodb.DescribeImportInput, arg2 ...request.Option) (*dynamodb.DescribeImportOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DescribeImportWithContext", varargs...)
+	ret0, _ := ret[0].(*dynamodb.DescribeImportOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeImportWithContext indicates an expected call of DescribeImportWithContext.
+func (mr *MockDynamoAPIMockRecorder) DescribeImportWithContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeImportWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).DescribeImportWithContext), varargs...)
+}
+
 // DescribeKinesisStreamingDestination mocks base method.
 func (m *MockDynamoAPI) DescribeKinesisStreamingDestination(arg0 *dynamodb.DescribeKinesisStreamingDestinationInput) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
 	m.ctrl.T.Helper()
@@ -1423,6 +1473,56 @@ func (mr *MockDynamoAPIMockRecorder) GetItemWithContext(arg0, arg1 any, arg2 ...
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetItemWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).GetItemWithContext), varargs...)
 }
 
+// ImportTable mocks base method.
+func (m *MockDynamoAPI) ImportTable(arg0 *dynamodb.ImportTableInput) (*dynamodb.ImportTableOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ImportTable", arg0)
+	ret0, _ := ret[0].(*dynamodb.ImportTableOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ImportTable indicates an expected call of ImportTable.
+func (mr *MockDynamoAPIMockRecorder) ImportTable(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImportTable", reflect.TypeOf((*MockDynamoAPI)(nil).ImportTable), arg0)
+}
+
+// ImportTableRequest mocks base method.
+func (m *MockDynamoAPI) ImportTableRequest(arg0 *dynamodb.ImportTableInput) (*request.Request, *dynamodb.ImportTableOutput) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ImportTableRequest", arg0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*dynamodb.ImportTableOutput)
+	return ret0, ret1
+}
+
+// ImportTableRequest indicates an expected call of ImportTableRequest.
+func (mr *MockDynamoAPIMockRecorder) ImportTableRequest(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImportTableRequest", reflect.TypeOf((*MockDynamoAPI)(nil).ImportTableRequest), arg0)
+}
+
+// ImportTableWithContext mocks base method.
+func (m *MockDynamoAPI) ImportTableWithContext(arg0 context.Context, arg1 *dynamodb.ImportTableInput, arg2 ...request.Option) (*dynamodb.ImportTableOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ImportTableWithContext", varargs...)
+	ret0, _ := ret[0].(*dynamodb.ImportTableOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ImportTableWithContext indicates an expected call of ImportTableWithContext.
+func (mr *MockDynamoAPIMockRecorder) ImportTableWithContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImportTableWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).ImportTableWithContext), varargs...)
+}
+
 // ListBackups mocks base method.
 func (m *MockDynamoAPI) ListBackups(arg0 *dynamodb.ListBackupsInput) (*dynamodb.ListBackupsOutput, error) {
 	m.ctrl.T.Helper()
@@ -1687,6 +1787,89 @@ func (mr *MockDynamoAPIMockRecorder) ListGlobalTablesWithContext(arg0, arg1 any,
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListGlobalTablesWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).ListGlobalTablesWithContext), varargs...)
+}
+
+// ListImports mocks base method.
+func (m *MockDynamoAPI) ListImports(arg0 *dynamodb.ListImportsInput) (*dynamodb.ListImportsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListImports", arg0)
+	ret0, _ := ret[0].(*dynamodb.ListImportsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListImports indicates an expected call of ListImports.
+func (mr *MockDynamoAPIMockRecorder) ListImports(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImports", reflect.TypeOf((*MockDynamoAPI)(nil).ListImports), arg0)
+}
+
+// ListImportsPages mocks base method.
+func (m *MockDynamoAPI) ListImportsPages(arg0 *dynamodb.ListImportsInput, arg1 func(*dynamodb.ListImportsOutput, bool) bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListImportsPages", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ListImportsPages indicates an expected call of ListImportsPages.
+func (mr *MockDynamoAPIMockRecorder) ListImportsPages(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImportsPages", reflect.TypeOf((*MockDynamoAPI)(nil).ListImportsPages), arg0, arg1)
+}
+
+// ListImportsPagesWithContext mocks base method.
+func (m *MockDynamoAPI) ListImportsPagesWithContext(arg0 context.Context, arg1 *dynamodb.ListImportsInput, arg2 func(*dynamodb.ListImportsOutput, bool) bool, arg3 ...request.Option) error {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1, arg2}
+	for _, a := range arg3 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListImportsPagesWithContext", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ListImportsPagesWithContext indicates an expected call of ListImportsPagesWithContext.
+func (mr *MockDynamoAPIMockRecorder) ListImportsPagesWithContext(arg0, arg1, arg2 any, arg3 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1, arg2}, arg3...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImportsPagesWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).ListImportsPagesWithContext), varargs...)
+}
+
+// ListImportsRequest mocks base method.
+func (m *MockDynamoAPI) ListImportsRequest(arg0 *dynamodb.ListImportsInput) (*request.Request, *dynamodb.ListImportsOutput) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListImportsRequest", arg0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*dynamodb.ListImportsOutput)
+	return ret0, ret1
+}
+
+// ListImportsRequest indicates an expected call of ListImportsRequest.
+func (mr *MockDynamoAPIMockRecorder) ListImportsRequest(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImportsRequest", reflect.TypeOf((*MockDynamoAPI)(nil).ListImportsRequest), arg0)
+}
+
+// ListImportsWithContext mocks base method.
+func (m *MockDynamoAPI) ListImportsWithContext(arg0 context.Context, arg1 *dynamodb.ListImportsInput, arg2 ...request.Option) (*dynamodb.ListImportsOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListImportsWithContext", varargs...)
+	ret0, _ := ret[0].(*dynamodb.ListImportsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListImportsWithContext indicates an expected call of ListImportsWithContext.
+func (mr *MockDynamoAPIMockRecorder) ListImportsWithContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImportsWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).ListImportsWithContext), varargs...)
 }
 
 // ListTables mocks base method.

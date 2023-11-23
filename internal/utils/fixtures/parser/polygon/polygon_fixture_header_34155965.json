@@ -34,22 +34,22 @@
     "v": "0x135",
     "value": "0x0"
   },
-    {
-      "blockHash": "0xff1380994a9aa720150c0ed5b44e3b6c1d61c957c81a463bc1d8768d9aec87d3",
-      "blockNumber": "0x2092dbd",
-      "from": "0x0000000000000000000000000000000000000000",
-      "gas": "0x0",
-      "gasPrice": "0x0",
-      "hash": "0xd9273904d2913833c1740831c41f583cac249ef62de2c3c880dd43ca1f8c33fc",
-      "input": "0x",
-      "nonce": "0x0",
-      "r": "0x0",
-      "s": "0x0",
-      "to": "0x0000000000000000000000000000000000000000",
-      "transactionIndex": "0x1",
-      "type": "0x0",
-      "v": "0x0",
-      "value": "0x0"
-    }],
+  {
+    "blockHash": "0xff1380994a9aa720150c0ed5b44e3b6c1d61c957c81a463bc1d8768d9aec87d3",
+    "blockNumber": "0x2092dbd",
+    "from": "0x0000000000000000000000000000000000000000",
+    "gas": "0x0",
+    "gasPrice": "0x0",
+    "hash": "0xd9273904d2913833c1740831c41f583cac249ef62de2c3c880dd43ca1f8c33fc",
+    "input": "0x",
+    "nonce": "0x0",
+    "r": "0x0",
+    "s": "0x0",
+    "to": "0x0000000000000000000000000000000000000000",
+    "transactionIndex": "0x1",
+    "type": "0x0",
+    "v": "0x0",
+    "value": "0x0"
+  }],
   "transactionsRoot": "0x31ea11c6796e140a3eef51e2ca9e6fcf9ba448786b863c31549dd4325eb8233c"
 }

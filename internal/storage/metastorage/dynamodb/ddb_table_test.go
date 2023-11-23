@@ -9,11 +9,18 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"golang.org/x/xerrors"
+
+	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
+
+	awsrequest "github.com/aws/aws-sdk-go/aws/request"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	dynamodbmocks "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/mocks"
@@ -168,8 +175,50 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetryFailure() {
 	require.Error(err)
 }
 
+func (s *DDBTableTestSuite) TestQueryItem_RequestCanceledFailure() {
+	require := testutil.Require(s.T())
+
+	s.dynamoAPI.EXPECT().QueryWithContext(gomock.Any(), gomock.Any()).
+		Return(nil, awserr.New(awsrequest.CanceledErrorCode,
+			"canceled",
+			nil))
+
+	queryResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
+
+	require.Error(err)
+	require.True(xerrors.Is(err, errors.ErrRequestCanceled))
+	require.Nil(queryResult)
+}
+
+func (s *DDBTableTestSuite) TestQueryItem_QueryFailure() {
+	require := testutil.Require(s.T())
+
+	s.dynamoAPI.EXPECT().QueryWithContext(gomock.Any(), gomock.Any()).
+		Return(nil, awserr.New(awsrequest.ErrCodeRequestError,
+			"Validation error",
+			nil))
+
+	queryResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
+
+	require.Error(err)
+	require.Nil(queryResult)
+}
+
+func (s *DDBTableTestSuite) TestQueryItem_ItemNotFoundErr() {
+	require := testutil.Require(s.T())
+
+	s.dynamoAPI.EXPECT().QueryWithContext(gomock.Any(), gomock.Any()).
+		Return(&dynamodb.QueryOutput{}, nil)
+
+	updateResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
+
+	require.Error(err)
+	require.ErrorIs(err, errors.ErrItemNotFound)
+	require.Nil(updateResult)
+}
+
 func testDDBEntriesToAttributeMaps(
-	entries []interface{},
+	entries []any,
 ) ([]map[string]*dynamodb.AttributeValue, error) {
 	attributes := make([]map[string]*dynamodb.AttributeValue, len(entries))
 	for i := range entries {
@@ -182,8 +231,8 @@ func testDDBEntriesToAttributeMaps(
 	return attributes, nil
 }
 
-func makeTestDDBEntries(numEntries int) []interface{} {
-	entries := make([]interface{}, numEntries)
+func makeTestDDBEntries(numEntries int) []any {
+	entries := make([]any, numEntries)
 	for i := 0; i < numEntries; i++ {
 		pk := fmt.Sprintf("pk-%v", i)
 		sk := fmt.Sprintf("sk-%v", i)
@@ -193,7 +242,7 @@ func makeTestDDBEntries(numEntries int) []interface{} {
 	return entries
 }
 
-func makeTestDDBEntry(pk string, sk string) interface{} {
+func makeTestDDBEntry(pk string, sk string) any {
 	if pk == "" {
 		pk = "pk"
 	}

@@ -3,7 +3,7 @@ package activity
 import (
 	"context"
 
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
@@ -51,16 +51,15 @@ type (
 	}
 
 	ValidatorRequest struct {
-		Tag                       uint32 `validate:"required"`
-		StartHeight               uint64
-		ValidationHeightPadding   uint64 `validate:"required"`
-		MaxHeightsToValidate      uint64 `validate:"required"`
-		StartEventId              int64
-		MaxEventsToValidate       uint64 `validate:"required"`
-		Parallelism               int    `validate:"required,gt=0"`
-		ValidatorMaxReorgDistance uint64
-		EventTag                  uint32
-		Failover                  bool
+		Tag                     uint32 `validate:"required"`
+		StartHeight             uint64
+		ValidationHeightPadding uint64 `validate:"required"`
+		MaxHeightsToValidate    uint64 `validate:"required"`
+		StartEventId            int64
+		MaxEventsToValidate     uint64 `validate:"required"`
+		Parallelism             int    `validate:"required,gt=0"`
+		EventTag                uint32
+		Failover                bool
 	}
 
 	ValidatorResponse struct {
@@ -73,19 +72,21 @@ type (
 	}
 
 	validatorMetrics struct {
-		instrumentValidateHeight    instrument.Call
-		instrumentValidateEvents    instrument.Call
-		instrumentBatchGetBlockMeta instrument.Call
-		s3MetadataMismatchCounter   tally.Counter
-		ddbMetadataMismatchCounter  tally.Counter
-		nativeParsingErrCounter     tally.Counter
-		rosettaParsingErrCounter    tally.Counter
-		dataParityErrCounter        tally.Counter
-		timeSinceLastBlock          tally.Gauge
-		numTransactionsGauge        tally.Gauge
-		rawBlockSizeGauge           tally.Gauge
-		nativeBlockSizeGauge        tally.Gauge
-		rosettaBlockSizeGauge       tally.Gauge
+		instrumentValidateHeight         instrument.Instrument
+		instrumentValidateEvents         instrument.InstrumentWithResult[[]*model.EventEntry]
+		instrumentBatchGetBlockMeta      instrument.InstrumentWithResult[[]*api.BlockMetadata]
+		s3MetadataMismatchCounter        tally.Counter
+		ddbMetadataMismatchCounter       tally.Counter
+		nativeParsingErrCounter          tally.Counter
+		blockValidationErrCounter        tally.Counter
+		rosettaBlockValidationErrCounter tally.Counter
+		rosettaParsingErrCounter         tally.Counter
+		dataParityErrCounter             tally.Counter
+		timeSinceLastBlock               tally.Gauge
+		numTransactionsGauge             tally.Gauge
+		rawBlockSizeGauge                tally.Gauge
+		nativeBlockSizeGauge             tally.Gauge
+		rosettaBlockSizeGauge            tally.Gauge
 	}
 
 	BlockValidation struct {
@@ -118,19 +119,21 @@ func NewValidator(params ValidatorParams) *Validator {
 func newValidatorMetrics(scope tally.Scope) *validatorMetrics {
 	scope = scope.SubScope(ActivityValidator)
 	return &validatorMetrics{
-		instrumentValidateHeight:    instrument.NewCall(scope, "validate_height"),
-		instrumentValidateEvents:    instrument.NewCall(scope, "validate_events"),
-		instrumentBatchGetBlockMeta: instrument.NewCall(scope, "batch_get_block_metadata"),
-		s3MetadataMismatchCounter:   newValidationFailureCounter(scope, "s3_metadata_mismatch"),
-		ddbMetadataMismatchCounter:  newValidationFailureCounter(scope, "ddb_metadata_mismatch"),
-		nativeParsingErrCounter:     newValidationFailureCounter(scope, "native_parsing_error"),
-		rosettaParsingErrCounter:    newValidationFailureCounter(scope, "rosetta_parsing_error"),
-		dataParityErrCounter:        newValidationFailureCounter(scope, "data_parity_error"),
-		timeSinceLastBlock:          scope.Gauge("time_since_last_block"),
-		numTransactionsGauge:        scope.Gauge("num_transactions"),
-		rawBlockSizeGauge:           scope.Gauge("raw_block_size"),
-		nativeBlockSizeGauge:        scope.Gauge("native_block_size"),
-		rosettaBlockSizeGauge:       scope.Gauge("rosetta_block_size"),
+		instrumentValidateHeight:         instrument.New(scope, "validate_height"),
+		instrumentValidateEvents:         instrument.NewWithResult[[]*model.EventEntry](scope, "validate_events"),
+		instrumentBatchGetBlockMeta:      instrument.NewWithResult[[]*api.BlockMetadata](scope, "batch_get_block_metadata"),
+		s3MetadataMismatchCounter:        newValidationFailureCounter(scope, "s3_metadata_mismatch"),
+		ddbMetadataMismatchCounter:       newValidationFailureCounter(scope, "ddb_metadata_mismatch"),
+		nativeParsingErrCounter:          newValidationFailureCounter(scope, "native_parsing_error"),
+		blockValidationErrCounter:        newValidationFailureCounter(scope, "block_validation_error"),
+		rosettaBlockValidationErrCounter: newValidationFailureCounter(scope, "rosetta_block_validation_error"),
+		rosettaParsingErrCounter:         newValidationFailureCounter(scope, "rosetta_parsing_error"),
+		dataParityErrCounter:             newValidationFailureCounter(scope, "data_parity_error"),
+		timeSinceLastBlock:               scope.Gauge("time_since_last_block"),
+		numTransactionsGauge:             scope.Gauge("num_transactions"),
+		rawBlockSizeGauge:                scope.Gauge("raw_block_size"),
+		nativeBlockSizeGauge:             scope.Gauge("native_block_size"),
+		rosettaBlockSizeGauge:            scope.Gauge("rosetta_block_size"),
 	}
 }
 
@@ -156,7 +159,7 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 	logger := v.getLogger(ctx).With(zap.Reflect("request", request))
 
 	if request.Failover {
-		failoverCtx, err := v.failoverManager.WithFailoverContext(ctx)
+		failoverCtx, err := v.failoverManager.WithFailoverContext(ctx, endpoints.MasterSlaveClusters)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to create failover context: %w", err)
 		}
@@ -207,6 +210,10 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 	}
 
 	blockGap := tipOfChain - lastValidatedHeight
+	// If reorg happens, set blockGap to 0.
+	if tipOfChain < lastValidatedHeight {
+		blockGap = 0
+	}
 
 	maxEventId, err := v.metaStorage.GetMaxEventId(ctx, eventTag)
 	if err != nil {
@@ -248,9 +255,21 @@ func (v *Validator) validateLatestBlock(ctx context.Context, logger *zap.Logger,
 		return xerrors.Errorf("failed to parse native block: %w", err)
 	}
 
+	err = v.parser.ValidateBlock(ctx, nativeBlock)
+	if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
+		return xerrors.Errorf("failed to validate native block: %w", err)
+	}
+
 	rosettaBlock, err := v.parser.ParseRosettaBlock(ctx, rawBlock)
 	if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
 		return xerrors.Errorf("failed to parse rosetta block: %w", err)
+	}
+
+	if rosettaBlock != nil {
+		err = v.parser.ValidateRosettaBlock(ctx, &api.ValidateRosettaBlockRequest{NativeBlock: nativeBlock}, rosettaBlock)
+		if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
+			return xerrors.Errorf("failed to validate rosetta block: %w", err)
+		}
 	}
 
 	timeSinceLastBlock := utils.SinceTimestamp(nativeBlock.GetTimestamp())
@@ -288,18 +307,16 @@ func (v *Validator) validateLatestBlock(ctx context.Context, logger *zap.Logger,
 }
 
 func (v *Validator) validateEvents(ctx context.Context, eventTag uint32, startEventId int64, maxEvents uint64) (int64, uint64, error) {
-	var events []*model.EventEntry
-	if err := v.metrics.instrumentValidateEvents.Instrument(ctx, func(ctx context.Context) error {
+	events, err := v.metrics.instrumentValidateEvents.Instrument(ctx, func(ctx context.Context) ([]*model.EventEntry, error) {
 		// fetch some extra events from earlier ids so we can better test continuity
 		startEventId = startEventId - numOfExtraPrevEventsToValidate
 		if startEventId < metastorage.EventIdStartValue {
 			startEventId = metastorage.EventIdStartValue
 		}
 		maxEvents += uint64(numOfExtraPrevEventsToValidate)
-		fetchedEvents, err := v.metaStorage.GetEventsAfterEventId(ctx, eventTag, startEventId, maxEvents)
-		events = fetchedEvents
-		return err
-	}); err != nil {
+		return v.metaStorage.GetEventsAfterEventId(ctx, eventTag, startEventId, maxEvents)
+	})
+	if err != nil {
 		return 0, 0, xerrors.Errorf("failed to call GetEventsAfterEventId (startEventId=%v, maxEvents=%v, eventTag=%v): %w", startEventId, maxEvents, eventTag, err)
 	}
 	if len(events) == 0 {
@@ -317,77 +334,51 @@ func getValidationEndHeight(startHeight uint64, ingestedLatestBlock *api.BlockMe
 	if endHeight > startHeight+request.MaxHeightsToValidate-1 {
 		endHeight = startHeight + request.MaxHeightsToValidate - 1
 	}
-	// TODO: Set default ValidatorMaxReorgDistance for running workflows, safe to delete late
-	validatorMaxReorgDistance := request.ValidatorMaxReorgDistance
-	if validatorMaxReorgDistance == 0 {
-		validatorMaxReorgDistance = 100
-	}
 	if endHeight < startHeight {
 		logger.Info("Invalid startHeight",
 			zap.Uint64("startHeight", startHeight),
 			zap.Uint64("endHeight", endHeight),
 		)
-
-		if startHeight-endHeight < validatorMaxReorgDistance {
-			endHeight = startHeight
-		} else {
-			return 0, xerrors.Errorf("InvalidStartHeight: the gap of calculated endHeight %d and startHeight %d is greater than %d", endHeight, startHeight, validatorMaxReorgDistance)
-		}
+		endHeight = startHeight
 	}
 	return endHeight, nil
 }
 
 func (v *Validator) validateRange(ctx context.Context, logger *zap.Logger, tag uint32,
 	startHeight uint64, endHeight uint64, parallelism int) (uint64, error) {
+	// TODO: Add a check to ensure startHeight is a non-skipped block
 	if startHeight == endHeight {
 		return startHeight, nil
 	}
 
-	var firstNonSkipBlock *api.BlockMetadata
-	var lastBlock *api.BlockMetadata
 	blockMetadataList, err := v.metaStorage.GetBlocksByHeightRange(ctx, tag, startHeight, endHeight+1)
 	if err != nil {
 		return 0, xerrors.Errorf("failed to get blocks [%v, %v]: %w", startHeight, endHeight, err)
 	}
-
-	for _, block := range blockMetadataList {
-		if !block.Skipped {
-			firstNonSkipBlock = block
-			break
-		}
+	blockMetadataList = v.sanitizeBlocks(blockMetadataList)
+	if len(blockMetadataList) == 0 {
+		return startHeight, nil
 	}
 
-	if firstNonSkipBlock != nil && firstNonSkipBlock.Height > 0 {
-		lastBlock, err = v.metaStorage.GetBlockByHeight(ctx, tag, firstNonSkipBlock.ParentHeight)
-		if err != nil {
-			return 0, xerrors.Errorf(
-				"failed to get parentHeight %v of the firstNonSkipBlock %v in [%v, %v]: %w",
-				firstNonSkipBlock.ParentHeight, firstNonSkipBlock.Height, startHeight, endHeight, err)
-		}
-	}
+	endHeight = blockMetadataList[len(blockMetadataList)-1].Height
 
 	// Check if chain is continuous
-	err = parser.ValidateChain(blockMetadataList, lastBlock)
+	// Since startHeight is the last non-skipped block of the previous batch, we do not need to set lastBlock in parser.ValidateChain
+	err = parser.ValidateChain(blockMetadataList, nil)
 	if err != nil {
 		return 0, xerrors.Errorf("block chain is not continuous: %w", err)
 	}
 
-	var expectedMetadataList []*api.BlockMetadata
-	if err := v.metrics.instrumentBatchGetBlockMeta.Instrument(ctx, func(ctx context.Context) error {
+	expectedMetadataList, err := v.metrics.instrumentBatchGetBlockMeta.Instrument(ctx, func(ctx context.Context) ([]*api.BlockMetadata, error) {
 		metadataList, err := v.slaveClient.BatchGetBlockMetadata(ctx, tag, startHeight, endHeight+1)
 		if err != nil {
-			return temporal.NewApplicationError(
+			return nil, temporal.NewApplicationError(
 				xerrors.Errorf("failed to get block metadata from %v to %v: %w", startHeight, endHeight+1, err).Error(), errors.ErrTypeNodeProvider)
 		}
-		expectedMetadataList = metadataList
-		return nil
-	}); err != nil {
+		return metadataList, nil
+	})
+	if err != nil {
 		return 0, err
-	}
-
-	validationSize := int(endHeight - startHeight + 1)
-	if parallelism > validationSize {
-		parallelism = validationSize
 	}
 
 	g, ctx := syncgroup.New(ctx, syncgroup.WithThrottling(parallelism))
@@ -450,7 +441,7 @@ func (v *Validator) validateHeight(ctx context.Context,
 			v.metrics.s3MetadataMismatchCounter.Inc(1)
 			return nil
 		}
-		_, err = v.parser.ParseNativeBlock(ctx, actualRawBlock)
+		nativeBlock, err := v.parser.ParseNativeBlock(ctx, actualRawBlock)
 		if err != nil {
 			logger.Error("failed to parse raw block using native parser",
 				zap.Error(err),
@@ -460,7 +451,18 @@ func (v *Validator) validateHeight(ctx context.Context,
 			return nil
 		}
 
-		_, err = v.parser.ParseRosettaBlock(ctx, actualRawBlock)
+		err = v.parser.ValidateBlock(ctx, nativeBlock)
+		if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
+			logger.Error("failed to validate native block",
+				zap.Error(err),
+				zap.Uint64("blockHeight", nativeBlock.GetHeight()),
+				zap.String("blockHash", nativeBlock.GetHash()),
+			)
+			v.metrics.blockValidationErrCounter.Inc(1)
+			return nil
+		}
+
+		rosettaBlock, err := v.parser.ParseRosettaBlock(ctx, actualRawBlock)
 		// ParseRosettaBlock is not necessarily implemented for all chains, skip if so
 		if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
 			logger.Error("failed to parse raw block using rosetta parser",
@@ -471,7 +473,39 @@ func (v *Validator) validateHeight(ctx context.Context,
 			return nil
 		}
 
+		if rosettaBlock != nil {
+			err = v.parser.ValidateRosettaBlock(ctx, &api.ValidateRosettaBlockRequest{
+				NativeBlock: nativeBlock,
+			}, rosettaBlock)
+			if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
+				logger.Error("failed to validate rosetta block using native block",
+					zap.Error(err),
+					zap.Int64("blockHeight", rosettaBlock.Block.BlockIdentifier.Index),
+					zap.String("blockHash", rosettaBlock.Block.BlockIdentifier.Hash),
+				)
+				v.metrics.rosettaBlockValidationErrCounter.Inc(1)
+				return nil
+			}
+		}
 		return nil
 	})
 	return validatedBlockHash, err
+}
+
+// sanitizeBlocks ensures the latest block is not skipped.
+func (v *Validator) sanitizeBlocks(blocks []*api.BlockMetadata) []*api.BlockMetadata {
+	numTrailingSkippedBlocks := 0
+	for i := len(blocks) - 1; i >= 0; i-- {
+		if !blocks[i].Skipped {
+			break
+		}
+		numTrailingSkippedBlocks += 1
+	}
+
+	if numTrailingSkippedBlocks > 0 {
+		newSize := len(blocks) - numTrailingSkippedBlocks
+		blocks = blocks[:newSize]
+	}
+
+	return blocks
 }

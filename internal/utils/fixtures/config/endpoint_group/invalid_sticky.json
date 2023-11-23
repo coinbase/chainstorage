@@ -24,9 +24,11 @@
       "weight": 4
     }
   ],
-  "sticky_session": {
-    "cookie_hash": "baz",
-    "header_hash": "qux"
+  "endpoint_config": {
+    "sticky_session": {
+      "cookie_hash": "baz",
+      "header_hash": "qux"
+    }
   },
   "use_failover": true
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
+	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -37,7 +38,7 @@ type (
 
 	ExtractorRequest struct {
 		Tag              uint32 `validate:"required"`
-		Height           uint64
+		Heights          []uint64
 		WithBestEffort   bool
 		RehydrateFromTag *uint32
 		UpgradeFromTag   *uint32
@@ -46,7 +47,7 @@ type (
 	}
 
 	ExtractorResponse struct {
-		Metadata *api.BlockMetadata
+		Metadatas []*api.BlockMetadata
 	}
 )
 
@@ -81,64 +82,78 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 	}
 
 	if request.Failover {
-		failoverCtx, err := a.failoverManager.WithFailoverContext(ctx)
+		failoverCtx, err := a.failoverManager.WithFailoverContext(ctx, endpoints.MasterSlaveClusters)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to create failover context: %w", err)
 		}
 		ctx = failoverCtx
 	}
 
-	var block *api.Block
-	var err error
-	if request.UpgradeFromTag != nil {
-		block, err = a.upgradeBlock(ctx, request, logger)
-		if err != nil {
-			logger.Error("failed to upgrade block", zap.Error(err))
-			return nil, xerrors.Errorf("failed to upgrade block: %w", err)
-		}
-	} else if request.RehydrateFromTag != nil {
-		block, err = a.rehydrateBlock(ctx, request, logger)
-		if err != nil {
-			logger.Error("failed to rehydrate block", zap.Error(err))
-			return nil, xerrors.Errorf("failed to rehydrate block: %w", err)
-		}
+	result := make([]*api.BlockMetadata, len(request.Heights))
+	group, ctx := syncgroup.New(ctx)
+	for i, height := range request.Heights {
+		i := i
+		height := height
+		group.Go(func() error {
+			var block *api.Block
+			var err error
+			if request.UpgradeFromTag != nil {
+				block, err = a.upgradeBlock(ctx, height, request, logger)
+				if err != nil {
+					logger.Error("failed to upgrade block", zap.Error(err))
+					return xerrors.Errorf("failed to upgrade block: %w", err)
+				}
+			} else if request.RehydrateFromTag != nil {
+				block, err = a.rehydrateBlock(ctx, height, request, logger)
+				if err != nil {
+					logger.Error("failed to rehydrate block", zap.Error(err))
+					return xerrors.Errorf("failed to rehydrate block: %w", err)
+				}
+			}
+
+			if block == nil {
+				var opts []client.ClientOption
+				if request.WithBestEffort {
+					// This option is enabled while reprocessing extractors.
+					// The block is queried in a best-effort manner and partial data may be returned.
+					opts = append(opts, client.WithBestEffort())
+				}
+
+				block, err = a.blockchainClient.GetBlockByHeight(ctx, request.Tag, height, opts...)
+				if err != nil {
+					logger.Error("failed to extract block", zap.Error(err))
+					return xerrors.Errorf("failed to extract block %v: %w", height, err)
+				}
+			}
+
+			objectKey, err := a.blobStorage.Upload(ctx, block, request.DataCompression)
+			if err != nil {
+				logger.Error("failed to upload to blob store", zap.Error(err))
+				return xerrors.Errorf("failed to upload to blob store: %w", err)
+			}
+
+			block.Metadata.ObjectKeyMain = objectKey
+			result[i] = block.Metadata
+			return nil
+		})
 	}
 
-	if block == nil {
-		var opts []client.ClientOption
-		if request.WithBestEffort {
-			// This option is enabled while reprocessing extractors.
-			// The block is queried in a best-effort manner and partial data may be returned.
-			opts = append(opts, client.WithBestEffort())
-		}
-
-		block, err = a.blockchainClient.GetBlockByHeight(ctx, request.Tag, request.Height, opts...)
-		if err != nil {
-			logger.Error("failed to extract block", zap.Error(err))
-			return nil, xerrors.Errorf("failed to extract block %v: %w", request.Height, err)
-		}
+	if err := group.Wait(); err != nil {
+		return nil, xerrors.Errorf("failed to finish extractor: %w", err)
 	}
-
-	objectKey, err := a.blobStorage.Upload(ctx, block, request.DataCompression)
-	if err != nil {
-		logger.Error("failed to upload to blob store", zap.Error(err))
-		return nil, xerrors.Errorf("failed to upload to blob store: %w", err)
-	}
-
-	block.Metadata.ObjectKeyMain = objectKey
 
 	response := &ExtractorResponse{
-		Metadata: block.Metadata,
+		Metadatas: result,
 	}
 	logger.Info(
 		"extracted block",
-		zap.Uint64("height", block.Metadata.Height),
+		zap.Reflect("heights", request.Heights),
 		zap.Reflect("response", response),
 	)
 	return response, nil
 }
 
-func (a *Extractor) upgradeBlock(ctx context.Context, request *ExtractorRequest, logger *zap.Logger) (*api.Block, error) {
+func (a *Extractor) upgradeBlock(ctx context.Context, height uint64, request *ExtractorRequest, logger *zap.Logger) (*api.Block, error) {
 	oldTag := *request.UpgradeFromTag
 	newTag := request.Tag
 
@@ -146,7 +161,7 @@ func (a *Extractor) upgradeBlock(ctx context.Context, request *ExtractorRequest,
 		return nil, xerrors.Errorf("invalid UpgradeFromTag (oldTag=%v, newTag=%v)", oldTag, newTag)
 	}
 
-	block, err := a.downloadBlock(ctx, oldTag, request.Height)
+	block, err := a.downloadBlock(ctx, oldTag, height)
 	if err != nil {
 		if xerrors.Is(err, storage.ErrItemNotFound) {
 			return nil, nil
@@ -173,7 +188,7 @@ func (a *Extractor) upgradeBlock(ctx context.Context, request *ExtractorRequest,
 	return block, nil
 }
 
-func (a *Extractor) rehydrateBlock(ctx context.Context, request *ExtractorRequest, logger *zap.Logger) (*api.Block, error) {
+func (a *Extractor) rehydrateBlock(ctx context.Context, height uint64, request *ExtractorRequest, logger *zap.Logger) (*api.Block, error) {
 	oldTag := *request.RehydrateFromTag
 	newTag := request.Tag
 
@@ -181,7 +196,7 @@ func (a *Extractor) rehydrateBlock(ctx context.Context, request *ExtractorReques
 		return nil, xerrors.Errorf("invalid RehydrateFromTag (oldTag=%v, newTag=%v)", oldTag, newTag)
 	}
 
-	block, err := a.downloadBlock(ctx, oldTag, request.Height)
+	block, err := a.downloadBlock(ctx, oldTag, height)
 	if err != nil {
 		if xerrors.Is(err, storage.ErrItemNotFound) {
 			return nil, nil

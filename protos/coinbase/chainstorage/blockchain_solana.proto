@@ -1,0 +1,508 @@
+syntax = "proto3";
+
+package coinbase.chainstorage;
+
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/chainstorage";
+
+import "google/protobuf/timestamp.proto";
+
+message SolanaBlobdata {
+  bytes header = 1;
+}
+
+message SolanaBlock {
+  SolanaHeader header = 1;
+  repeated SolanaTransaction transactions = 2;
+  repeated SolanaReward rewards = 3;
+}
+
+message SolanaBlockV2 {
+  SolanaHeader header = 1;
+  repeated SolanaTransactionV2 transactions = 2;
+  repeated SolanaReward rewards = 3;
+}
+
+message SolanaHeader {
+  string block_hash = 1;
+  string previous_block_hash = 2;
+  uint64 slot = 3;
+  uint64 parent_slot = 4;
+  google.protobuf.Timestamp block_time = 5;
+  uint64 block_height = 6;
+}
+
+message SolanaTransaction {
+  string transaction_id = 1;
+  SolanaTransactionPayload payload = 2;
+  SolanaTransactionMeta meta = 3;
+  // use int32 for `legacy` version
+  int32 version = 4;
+}
+
+message SolanaTransactionV2 {
+  string transaction_id = 1;
+  SolanaTransactionPayloadV2 payload = 2;
+  SolanaTransactionMetaV2 meta = 3;
+  // use int32 for `legacy` version
+  int32 version = 4;
+}
+
+message SolanaTransactionMeta {
+  string err = 1;
+  uint64 fee = 2;
+  repeated uint64 pre_balances = 3;
+  repeated uint64 post_balances = 4;
+  repeated SolanaTokenBalance pre_token_balances = 5;
+  repeated SolanaTokenBalance post_token_balances = 6;
+  repeated SolanaInnerInstruction inner_instructions = 7;
+  repeated string log_messages = 8;
+  repeated SolanaReward rewards = 9;
+}
+
+message SolanaTransactionMetaV2 {
+  string err = 1;
+  uint64 fee = 2;
+  repeated uint64 pre_balances = 3;
+  repeated uint64 post_balances = 4;
+  repeated SolanaTokenBalance pre_token_balances = 5;
+  repeated SolanaTokenBalance post_token_balances = 6;
+  repeated SolanaInnerInstructionV2 inner_instructions = 7;
+  repeated string log_messages = 8;
+  repeated SolanaReward rewards = 9;
+}
+
+message SolanaTokenBalance {
+  uint64 account_index = 1;
+  string mint = 2;
+  SolanaTokenAmount token_amount = 3;
+  string owner = 4;
+}
+
+message SolanaTokenAmount {
+  string amount = 1;
+  uint64 decimals = 2;
+  string ui_amount_string = 3;
+}
+
+message SolanaInnerInstruction {
+  uint64 index = 1;
+  repeated SolanaInstruction instructions = 2;
+}
+
+message SolanaInnerInstructionV2 {
+  uint64 index = 1;
+  repeated SolanaInstructionV2 instructions = 2;
+}
+
+
+message SolanaReward {
+  bytes pubkey = 1;
+  int64 lamports = 2;
+  uint64 post_balance = 3;
+  string reward_type = 4;
+  oneof optional_commission {
+    uint64 commission = 5;
+  }
+}
+
+message SolanaTransactionPayload {
+  repeated string signatures = 1;
+  SolanaMessage message = 2;
+}
+
+message SolanaTransactionPayloadV2 {
+  repeated string signatures = 1;
+  SolanaMessageV2 message = 2;
+}
+
+message SolanaMessage {
+  SolanaMessageHeader header = 1;
+  // repeated string account_keys = 2 [deprecated = true];
+  string recent_block_hash = 3;
+  repeated SolanaInstruction instructions = 4;
+  repeated SolanaAccount accounts = 5;
+}
+
+message SolanaMessageV2 {
+  repeated AccountKey account_keys = 1;
+  repeated AddressTableLookup address_table_lookups = 2;
+  repeated SolanaInstructionV2 instructions = 3;
+  string recent_block_hash = 4;
+}
+
+message AccountKey {
+  string pubkey = 1;
+  bool signer = 2;
+  string source = 3;
+  bool writable = 4;
+}
+
+message AddressTableLookup {
+  string account_key = 1;
+  repeated uint64 readonly_indexes = 2;
+  repeated uint64 writable_indexes = 3;
+}
+
+message SolanaMessageHeader {
+  uint64 num_required_signatures = 1;
+  uint64 num_readonly_signed_accounts = 2;
+  uint64 num_readonly_unsigned_accounts = 3;
+}
+
+message SolanaInstruction {
+  uint64 program_id_index = 1;
+  repeated uint64 accounts = 2;
+  bytes data = 3;
+  string program_id = 4;
+  repeated string account_keys = 5;
+}
+
+message SolanaRawInstruction {
+  repeated string accounts = 1;
+  bytes data = 2;
+}
+
+enum SolanaProgram {
+  RAW = 0;
+  ADDRESS_LOOKUP_TABLE = 1;
+  BPF_Loader = 2;
+  BPF_UPGRADEABLE_Loader = 3;
+  VOTE = 4;
+  SYSTEM = 5;
+  STAKE = 6;
+  SPL_MEMO = 7;
+  SPL_TOKEN  = 8;
+  SPL_TOKEN_2022 = 9;
+  SPL_ASSOCIATED_TOKEN_ACCOUNT = 10;
+  UNPARSED = 11;
+}
+
+message SolanaInstructionV2 {
+  SolanaProgram program = 1;
+  string program_id = 2;
+  oneof program_data {
+    SolanaRawInstruction raw_instruction = 100;
+    SolanaAddressLookupTableProgram address_lookup_table_program = 101;
+    SolanaBpfLoaderProgram bpf_loader_program = 102;
+    SolanaBpfUpgradeableLoaderProgram bpf_upgradeable_loader_program = 103;
+    SolanaVoteProgram vote_program = 104;
+    SolanaSystemProgram system_program = 105;
+    SolanaStakeProgram stake_program = 106;
+    SolanaSplMemoProgram spl_memo_program = 107;
+    SolanaSplTokenProgram spl_token_program = 108;
+    SolanaSplToken2022Program spl_token_2022_program = 109;
+    SolanaSplAssociatedTokenAccountProgram spl_associated_token_account_program = 110;
+  }
+}
+
+message SolanaAddressLookupTableProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+  }
+}
+
+message SolanaBpfLoaderProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+  }
+}
+
+message SolanaBpfUpgradeableLoaderProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+  }
+}
+
+
+message SolanaVoteProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+    INITIALIZE = 1;
+    VOTE = 2;
+    WITHDRAW = 3;
+    COMPACT_UPDATE_VOTE_STATE = 4;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+    SolanaVoteInitializeInstruction initialize = 101;
+    SolanaVoteVoteInstruction vote = 102;
+    SolanaVoteWithdrawInstruction withdraw = 103;
+    SolanaVoteCompactUpdateVoteStateInstruction compact_update_vote_state = 104;
+  }
+}
+
+message SolanaSystemProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+    CREATE_ACCOUNT = 1;
+    TRANSFER = 2;
+    CREATE_ACCOUNT_WITH_SEED = 3;
+    TRANSFER_WITH_SEED = 4;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+    SolanaSystemCreateAccountInstruction create_account = 101;
+    SolanaSystemTransferInstruction transfer = 102;
+    SolanaSystemCreateAccountWithSeedInstruction create_account_with_seed = 103;
+    SolanaSystemTransferWithSeedInstruction transfer_with_seed = 104;
+  }
+}
+
+message SolanaStakeProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+    INITIALIZE = 1;
+    DELEGATE = 2;
+    DEACTIVATE = 3;
+    MERGE = 4;
+    SPLIT = 5;
+    WITHDRAW = 6;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+    SolanaStakeInitializeInstruction initialize = 101;
+    SolanaStakeDelegateInstruction delegate = 102;
+    SolanaStakeDeactivateInstruction deactivate = 103;
+    SolanaStakeMergeInstruction merge = 104;
+    SolanaStakeSplitInstruction split = 105;
+    SolanaStakeWithdrawInstruction withdraw = 106;
+  }
+}
+
+message SolanaSplMemoProgram {
+  enum InstructionType {
+    SPL_MEMO = 0;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaSplMemoInstruction memo = 100;
+  }
+}
+
+message SolanaSplTokenProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+    GET_ACCOUNT_DATA_SIZE = 1;
+    INITIALIZE_IMMUTABLE_OWNER = 2;
+    TRANSFER = 3;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+    SolanaSplTokenGetAccountDataSizeInstruction get_account_data_size = 101;
+    SolanaSplTokenInitializeImmutableOwnerInstruction initialize_immutable_owner = 102;
+    SolanaSplTokenTransferInstruction transfer = 103;
+  }
+}
+
+message SolanaSplToken2022Program {
+  enum InstructionType {
+    UNKNOWN = 0;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+  }
+}
+
+message SolanaSplAssociatedTokenAccountProgram {
+  enum InstructionType {
+    UNKNOWN = 0;
+  }
+
+  InstructionType instruction_type = 1;
+  oneof instruction {
+    SolanaUnknownInstruction unknown = 100;
+  }
+}
+
+message SolanaUnknownInstruction {
+  bytes info = 1;
+}
+
+message SolanaVoteInitializeInstruction {
+  string vote_account = 1;
+  string rent_sysvar = 2;
+  string clock_sysvar = 3;
+  string node = 4;
+  string authorized_voter = 5;
+  string authorized_withdrawer = 6;
+  uint32 commission = 7;
+}
+
+message SolanaVoteVoteInstruction {
+  message Vote {
+    repeated uint64 slots = 1;
+    string hash = 2;
+    google.protobuf.Timestamp timestamp = 3;
+  }
+
+  string vote_account = 1;
+  string slot_hashes_sysvar = 2;
+  string clock_sysvar = 3;
+  string vote_authority = 4;
+  Vote vote = 5;
+}
+
+message SolanaVoteWithdrawInstruction {
+  string vote_account = 1;
+  string destination = 2;
+  string withdraw_authority = 3;
+  uint64 lamports = 4;
+}
+
+message SolanaVoteCompactUpdateVoteStateInstruction {
+  message Lockout {
+    uint64 confirmation_count = 1;
+    uint64 slot = 2;
+  }
+  message VoteStateUpdate {
+    string hash = 1;
+    repeated Lockout lockouts = 2;
+    uint64 root = 3;
+    google.protobuf.Timestamp timestamp = 4;
+  }
+  string vote_account = 1;
+  string vote_authority = 2;
+  VoteStateUpdate vote_state_update = 3;
+}
+
+message SolanaSystemCreateAccountInstruction {
+  string source = 1;
+  string new_account = 2;
+  uint64 lamports = 3;
+  uint64 space = 4;
+  string owner = 5;
+}
+
+message SolanaSystemTransferInstruction {
+  string source = 1;
+  string destination = 2;
+  uint64 lamports = 3;
+}
+
+message SolanaSystemCreateAccountWithSeedInstruction {
+  string source = 1;
+  string new_account = 2;
+  string base = 3;
+  string seed = 4;
+  uint64 lamports = 5;
+  uint64 space = 6;
+  string owner = 7;
+}
+
+message SolanaSystemTransferWithSeedInstruction {
+  string source = 1;
+  string source_base = 2;
+  string destination = 3;
+  uint64 lamports = 4;
+  string source_seed = 5;
+  string source_owner = 6;
+}
+
+message SolanaStakeInitializeInstruction {
+  message Authorized {
+    string staker = 1;
+    string withdrawer = 2;
+  }
+
+  message Lockup {
+    int64 unix_timestamp = 1;
+    uint64 epoch = 2;
+    string custodian = 3;
+  }
+
+  string stake_account = 1;
+  string rent_sysvar = 2;
+  Authorized authorized = 3;
+  Lockup lockup = 4;
+}
+
+message SolanaStakeDelegateInstruction {
+  string stake_account = 1;
+  string vote_account = 2;
+  string clock_sysvar = 3;
+  string stake_history_sysvar = 4;
+  string stake_config_account = 5;
+  string stake_authority = 6;
+}
+
+message SolanaStakeDeactivateInstruction {
+  string stake_account = 1;
+  string clock_sysvar = 2;
+  string stake_authority = 3;
+}
+
+message SolanaStakeMergeInstruction {
+  string destination = 1;
+  string source = 2;
+  string clock_sysvar = 3;
+  string stake_history_sysvar = 4;
+  string stake_authority = 5;
+}
+
+message SolanaStakeSplitInstruction {
+  string stake_account = 1;
+  string new_split_account = 2;
+  string stake_authority = 3;
+  uint64 lamports = 4;
+}
+
+message SolanaStakeWithdrawInstruction {
+  string stake_account = 1;
+  string destination = 2;
+  string clock_sysvar = 3;
+  string stake_history_sysvar = 4;
+  string withdraw_authority = 5;
+  uint64 lamports = 6;
+}
+
+message SolanaSplMemoInstruction {
+  string memo = 1;
+}
+
+message SolanaSplTokenGetAccountDataSizeInstruction {
+  string mint = 1;
+  repeated string extension_types = 2;
+}
+
+message SolanaSplTokenInitializeImmutableOwnerInstruction {
+  string account = 1;
+}
+
+message SolanaSplTokenTransferInstruction {
+  string source = 1;
+  string destination = 2;
+  string authority = 3;
+  string amount = 4;
+}
+
+message SolanaAccount {
+  string public_key = 1;
+  bool signer = 2;
+  bool writable = 3;
+}

@@ -36,6 +36,11 @@ bootstrap:
 	@echo "--- bootstrap"
 	scripts/bootstrap.sh
 
+.PHONY: validate
+build-validate: proto
+	@echo "--- build-validate"
+	git add -N . && git diff --exit-code
+
 .PHONY: bin
 bin:
 	@echo "--- bin"
@@ -73,17 +78,27 @@ functional:
 	TEST_TYPE=functional go test ./$(TARGET) -v -p=1 -parallel=1 -timeout=45m -failfast -run=$(TEST_INTEGRATION_FILTER)
 	$(call docker_compose_down)
 
-.PHONY: codegen
-codegen:
-	@echo "--- codegen"
+.PHONY: benchmark
+benchmark:
+	@echo "--- benchmark"
+	$(call docker_compose_up)
+	go test -v ./internal/blockchain/integration_test -tags=integration -run=^_ -bench=$(TEST_FILTER) -benchtime=200x
+	$(call docker_compose_down)
+
+.PHONY: proto
+proto:
+	@echo "--- proto"
 	./scripts/protogen.sh
+
+.PHONY: codegen
+codegen: proto
+	@echo "--- codegen"
 	./scripts/mockgen.sh
 
 .PHONY: config
 config:
 	@echo "--- config"
 	go run ./tools/config_gen ./config_templates/config .
-	go-bindata -ignore secrets\.yml -ignore config/config.go -nometadata -o config/config.go -pkg config config/...
 
 .PHONY: fmt
 fmt:
@@ -97,6 +112,14 @@ server:
 .PHONY: cron
 cron:
 	go run ./cmd/cron
+
+.PHONY: api
+api:
+	go run ./cmd/api
+
+.PHONY: worker
+worker:
+	go run ./cmd/worker
 
 .PHONY: localstack
 localstack:

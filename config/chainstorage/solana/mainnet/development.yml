@@ -5,15 +5,17 @@ aws:
 cadence:
   address: temporal-dev.example.com:7233
 chain:
-  block_start_height: 80000000
+  block_start_height: 190000000
+  feature:
+    transaction_indexing: true
+sdk:
+  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/solana/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
-sla:
-  block_height_delta: 1000
-  block_time_delta: 10m
-  out_of_sync_node_distance: 1000
-  tier: 2
-  time_since_last_block: 15m
 workflows:
-  backfiller:
-    num_concurrent_extractors: 48
+  poller:
+    activity_retry_maximum_attempts: 6
+    activity_schedule_to_start_timeout: 5m
+    num_blocks_to_skip: 10
+  streamer:
+    activity_schedule_to_start_timeout: 5m

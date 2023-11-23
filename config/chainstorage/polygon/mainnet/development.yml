@@ -5,9 +5,18 @@ aws:
 cadence:
   address: temporal-dev.example.com:7233
 chain:
-  block_tag:
-    stable: 2
   event_tag:
-    latest: 2
+    latest: 3
+    stable: 3
+sdk:
+  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/polygon/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
+workflows:
+  cross_validator:
+    validation_percentage: 20
+  poller:
+    activity_retry_maximum_attempts: 6
+    activity_schedule_to_start_timeout: 5m
+  streamer:
+    activity_schedule_to_start_timeout: 5m

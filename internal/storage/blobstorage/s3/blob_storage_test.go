@@ -91,6 +91,8 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 	require.NotNil(block)
 }
 
+//TODO: add TestBlobStorage_NoCompression_WithSidechain
+
 func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 	require := testutil.Require(t)
 
@@ -112,6 +114,7 @@ func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 	objectKey, err := storage.Upload(context.Background(), &api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		SideChain:  api.SideChain_SIDECHAIN_NONE,
 		Metadata:   metadata,
 	}, api.Compression_NONE)
 	require.NoError(err)
@@ -123,6 +126,7 @@ func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 	require.Equal(&api.Block{
 		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
 		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		SideChain:  api.SideChain_SIDECHAIN_NONE,
 		Metadata:   metadata,
 	}, block)
 }

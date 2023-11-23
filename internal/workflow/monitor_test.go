@@ -33,14 +33,13 @@ import (
 const (
 	monitorStartHeight               = uint64(0)
 	monitorTag                       = uint32(1)
-	monitorMaxHeightNativeClient     = uint64(1300)
+	monitorMaxHeightNativeClient     = uint64(600)
 	monitorMaxHeightIngested         = uint64(330)
-	monitorValidatorMaxReorgDistance = uint64(500)
+	monitorValidatorMaxReorgDistance = uint64(100)
 	monitorValidationHeightPadding   = monitorValidatorMaxReorgDistance * validationHeightPaddingMultiplier
 	monitorBatchSize                 = 290
 	monitorCheckpointSize            = 2
 	monitorMaxEventId                = int64(10000)
-	monitorEventTag                  = uint32(0)
 	totalBlocksToBeValidated         = int(monitorMaxHeightNativeClient - monitorValidationHeightPadding + 1)
 )
 
@@ -51,6 +50,7 @@ type monitorTestSuite struct {
 	masterClient           *clientmocks.MockClient
 	slaveClient            *clientmocks.MockClient
 	validatorClient        *clientmocks.MockClient
+	consensusClient        *clientmocks.MockClient
 	masterEndpointProvider endpoints.EndpointProvider
 	slaveEndpointProvider  endpoints.EndpointProvider
 	metadataAccessor       *metastoragemocks.MockMetaStorage
@@ -61,6 +61,7 @@ type monitorTestSuite struct {
 	seen                   *seenMap
 	ctrl                   *gomock.Controller
 	cfg                    *config.Config
+	monitorStableEventTag  uint32
 }
 
 type seenMap struct {
@@ -79,6 +80,7 @@ func (s *monitorTestSuite) SetupTest() {
 	s.masterClient = clientmocks.NewMockClient(s.ctrl)
 	s.slaveClient = clientmocks.NewMockClient(s.ctrl)
 	s.validatorClient = clientmocks.NewMockClient(s.ctrl)
+	s.consensusClient = clientmocks.NewMockClient(s.ctrl)
 	s.metadataAccessor = metastoragemocks.NewMockMetaStorage(s.ctrl)
 	s.blobStorage = blobstoragemocks.NewMockBlobStorage(s.ctrl)
 	require := testutil.Require(s.T())
@@ -136,7 +138,7 @@ func (s *monitorTestSuite) SetupTest() {
 		DoAndReturn(func(ctx context.Context, tag uint32, height uint64) (*api.BlockMetadata, error) {
 			require.Equal(monitorTag, tag)
 			count := getValue(&s.seen.metastorageGetBlockByHeight, height)
-			s.seen.metastorageGetBlockByHeight.Store(height, pointer.Int(count+1))
+			s.seen.metastorageGetBlockByHeight.Store(height, pointer.Ref(count+1))
 			return testutil.MakeBlockMetadata(height, tag), nil
 		})
 	s.slaveClient.EXPECT().BatchGetBlockMetadata(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -148,7 +150,7 @@ func (s *monitorTestSuite) SetupTest() {
 			for i := 0; i < numBlocks; i++ {
 				height := from + uint64(i)
 				count := getValue(&s.seen.blockchainClient, height)
-				s.seen.blockchainClient.Store(height, pointer.Int(count+1))
+				s.seen.blockchainClient.Store(height, pointer.Ref(count+1))
 				blocks[i] = testutil.MakeBlockMetadata(height, tag)
 			}
 			return blocks, nil
@@ -158,7 +160,7 @@ func (s *monitorTestSuite) SetupTest() {
 		DoAndReturn(func(ctx context.Context, metadata *api.BlockMetadata) (*api.Block, error) {
 			height := metadata.Height
 			count := getValue(&s.seen.blobStorage, height)
-			s.seen.blobStorage.Store(height, pointer.Int(count+1))
+			s.seen.blobStorage.Store(height, pointer.Ref(count+1))
 			return s.getMockBlock(height, monitorTag), nil
 		})
 
@@ -190,6 +192,12 @@ func (s *monitorTestSuite) SetupTest() {
 				return s.validatorClient
 			},
 		}),
+		fx.Provide(fx.Annotated{
+			Name: "consensus",
+			Target: func() client.Client {
+				return s.consensusClient
+			},
+		}),
 		fx.Provide(func() metastorage.MetaStorage {
 			return s.metadataAccessor
 		}),
@@ -200,6 +208,8 @@ func (s *monitorTestSuite) SetupTest() {
 
 	s.masterEndpointProvider = deps.MasterEndpoints
 	s.slaveEndpointProvider = deps.SlaveEndpoints
+
+	s.monitorStableEventTag = s.cfg.Chain.EventTag.Stable
 }
 
 func (s *monitorTestSuite) TearDownTest() {
@@ -215,16 +225,16 @@ func (s *monitorTestSuite) TestMonitor() {
 		DoAndReturn(func(ctx context.Context) (uint64, error) {
 			return monitorMaxHeightNativeClient, nil
 		})
-	s.metadataAccessor.EXPECT().GetMaxEventId(gomock.Any(), monitorEventTag).
+	s.metadataAccessor.EXPECT().GetMaxEventId(gomock.Any(), s.monitorStableEventTag).
 		AnyTimes().
 		Return(monitorMaxEventId, nil)
-	s.metadataAccessor.EXPECT().GetEventsAfterEventId(gomock.Any(), monitorEventTag, gomock.Any(), gomock.Any()).
+	s.metadataAccessor.EXPECT().GetEventsAfterEventId(gomock.Any(), s.monitorStableEventTag, gomock.Any(), gomock.Any()).
 		AnyTimes().
 		DoAndReturn(func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error) {
 			s.seen.metastorageGetEventsAfterEventId++
 			return testutil.MakeBlockEventEntries(
 				api.BlockchainEvent_BLOCK_ADDED,
-				monitorEventTag, eventId+int64(maxEvents-1), uint64(eventId), uint64(eventId)+maxEvents, monitorTag,
+				s.monitorStableEventTag, eventId+int64(maxEvents-1), uint64(eventId), uint64(eventId)+maxEvents, monitorTag,
 			), nil
 		})
 
@@ -266,13 +276,13 @@ func (s *monitorTestSuite) TestMonitorNoEventHistory() {
 		DoAndReturn(func(ctx context.Context) (uint64, error) {
 			return monitorMaxHeightNativeClient, nil
 		})
-	s.metadataAccessor.EXPECT().GetMaxEventId(gomock.Any(), monitorEventTag).
+	s.metadataAccessor.EXPECT().GetMaxEventId(gomock.Any(), s.monitorStableEventTag).
 		AnyTimes().
 		Return(int64(0), storage.ErrNoEventHistory)
 	s.env.ExecuteWorkflow(s.monitor.execute, &MonitorRequest{
 		StartHeight: monitorStartHeight,
 		Tag:         monitorTag,
-		EventTag:    monitorEventTag,
+		EventTag:    s.monitorStableEventTag,
 	})
 	s.True(s.env.IsWorkflowCompleted())
 	err := s.env.GetWorkflowError()
@@ -280,26 +290,32 @@ func (s *monitorTestSuite) TestMonitorNoEventHistory() {
 	require.True(IsContinueAsNewError(err))
 }
 
-func (s *monitorTestSuite) TestMonitorInvalidStartHeight() {
+func (s *monitorTestSuite) TestMonitor_Reorg() {
 	require := testutil.Require(s.T())
+
+	startBlockHeight := monitorMaxHeightNativeClient - monitorValidationHeightPadding + monitorValidatorMaxReorgDistance
 
 	s.masterClient.EXPECT().GetLatestHeight(gomock.Any()).
 		AnyTimes().
 		DoAndReturn(func(ctx context.Context) (uint64, error) {
 			return monitorMaxHeightNativeClient, nil
 		})
-	startHeight := monitorMaxHeightNativeClient - monitorValidationHeightPadding + monitorValidatorMaxReorgDistance
+	s.metadataAccessor.EXPECT().GetMaxEventId(gomock.Any(), s.monitorStableEventTag).
+		AnyTimes().
+		Return(int64(0), storage.ErrNoEventHistory)
+
 	s.env.ExecuteWorkflow(s.monitor.execute, &MonitorRequest{
-		StartHeight: startHeight,
+		StartHeight: startBlockHeight,
 		Tag:         monitorTag,
+		EventTag:    s.monitorStableEventTag,
 	})
 	s.True(s.env.IsWorkflowCompleted())
 	err := s.env.GetWorkflowError()
 	require.Error(err)
-	require.Contains(err.Error(), "InvalidStartHeight")
-	require.Equal(0, getValue(&s.seen.blobStorage, startHeight))
-	require.Equal(0, getValue(&s.seen.metastorageGetBlockByHeight, startHeight))
-	require.Equal(0, getValue(&s.seen.blockchainClient, startHeight))
+	require.True(IsContinueAsNewError(err))
+	require.Equal(0, getValue(&s.seen.blobStorage, startBlockHeight))
+	require.Equal(0, getValue(&s.seen.metastorageGetBlockByHeight, startBlockHeight))
+	require.Equal(0, getValue(&s.seen.blockchainClient, startBlockHeight))
 }
 
 func (s *monitorTestSuite) TestMonitor_AutomatedTriggerFailover() {
@@ -335,16 +351,16 @@ func (s *monitorTestSuite) TestMonitor_WithFailoverEnabled() {
 			require.True(s.slaveEndpointProvider.HasFailoverContext(ctx))
 			return monitorMaxHeightNativeClient, nil
 		})
-	s.metadataAccessor.EXPECT().GetMaxEventId(gomock.Any(), monitorEventTag).
+	s.metadataAccessor.EXPECT().GetMaxEventId(gomock.Any(), s.monitorStableEventTag).
 		AnyTimes().
 		Return(monitorMaxEventId, nil)
-	s.metadataAccessor.EXPECT().GetEventsAfterEventId(gomock.Any(), monitorEventTag, gomock.Any(), gomock.Any()).
+	s.metadataAccessor.EXPECT().GetEventsAfterEventId(gomock.Any(), s.monitorStableEventTag, gomock.Any(), gomock.Any()).
 		AnyTimes().
 		DoAndReturn(func(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error) {
 			s.seen.metastorageGetEventsAfterEventId++
 			return testutil.MakeBlockEventEntries(
 				api.BlockchainEvent_BLOCK_ADDED,
-				monitorEventTag, eventId+int64(maxEvents-1), uint64(eventId), uint64(eventId)+maxEvents, monitorTag,
+				s.monitorStableEventTag, eventId+int64(maxEvents-1), uint64(eventId), uint64(eventId)+maxEvents, monitorTag,
 			), nil
 		})
 
@@ -477,5 +493,5 @@ func getValue(m *sync.Map, key uint64) int {
 	if ok {
 		c = count.(*int)
 	}
-	return pointer.IntDeref(c)
+	return pointer.Deref(c)
 }

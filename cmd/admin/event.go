@@ -14,6 +14,7 @@ import (
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
+	"github.com/coinbase/chainstorage/internal/aws"
 	"github.com/coinbase/chainstorage/internal/storage"
 )
 
@@ -43,7 +44,7 @@ var (
 			}
 			app := startApp(
 				storage.Module,
-				// aws.Module,
+				aws.Module,
 				fx.Populate(&deps),
 			)
 			defer app.Close()
@@ -53,6 +54,11 @@ var (
 				return xerrors.Errorf("failed to get current max event id: %w", err)
 			}
 			logger.Info(fmt.Sprintf("current currentMaxEventId is %d", currentMaxEventId))
+
+			chainInfo := fmt.Sprintf("%v-%v", commonFlags.blockchain, commonFlags.network)
+			if commonFlags.sidechain != "" {
+				chainInfo = fmt.Sprintf("%v-%v", chainInfo, commonFlags.sidechain)
+			}
 			fmt.Printf(
 				"%v%v%v%v%v%v%v",
 				color.CyanString("Are you sure you want to set max event id to be "),
@@ -60,7 +66,7 @@ var (
 				color.CyanString("with event tag "),
 				color.MagentaString(fmt.Sprintf("%d ", eventTag)),
 				color.CyanString("for "),
-				color.MagentaString(fmt.Sprintf("%v::%v_%v", env, blockchain, network)),
+				color.MagentaString(fmt.Sprintf("%v::%v", env, chainInfo)),
 				color.CyanString("? (y/N) "),
 			)
 

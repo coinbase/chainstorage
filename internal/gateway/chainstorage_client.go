@@ -5,13 +5,16 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/credentials"
+
+	"github.com/coinbase/chainstorage/internal/utils/consts"
+
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
@@ -27,6 +30,14 @@ type (
 		fxparams.Params
 		Lifecycle fx.Lifecycle
 		Manager   services.SystemManager
+		Options   []ClientOption `group:"options"`
+	}
+
+	ClientOption func(cfg *clientConfig)
+
+	clientConfig struct {
+		serverAddress string
+		clientID      string
 	}
 
 	Client = api.ChainStorageClient
@@ -40,20 +51,22 @@ type (
 )
 
 const (
-	sendMsgSize   = 1024 * 1024       // 1 MB
-	recvMsgSize   = 1024 * 1024 * 100 // 100 MB
-	maxRetries    = 5
-	backoffScalar = 500 * time.Millisecond
-	backoffJitter = 0.2
+	sendMsgSize                    = 1024 * 1024       // 1 MB
+	recvMsgSize                    = 1024 * 1024 * 100 // 100 MB
+	maxRetries                     = 5
+	backoffScalar                  = 500 * time.Millisecond
+	backoffJitter                  = 0.2
+	resourceExhaustedBackoffScalar = 1000 * time.Millisecond
+	resourceExhaustedBackoffJitter = 0.5
 )
 
 var (
-	retryableCodesMap = map[codes.Code]bool{
-		codes.Unavailable:       true,
-		codes.Internal:          true,
-		codes.DeadlineExceeded:  true,
-		codes.Aborted:           true,
-		codes.ResourceExhausted: true,
+	// Note: codes.ResourceExhausted is also a retryable code and we handled it in a different retrying intercepter.
+	defaultRetryableCodesMap = map[codes.Code]bool{
+		codes.Unavailable:      true,
+		codes.Internal:         true,
+		codes.DeadlineExceeded: true,
+		codes.Aborted:          true,
 	}
 )
 
@@ -71,23 +84,47 @@ func NewChainstorageClient(params Params) (Client, error) {
 		return newRestClient(params)
 	}
 
-	retryableCodes := getRetryableCodes()
+	cfg := clientConfig{
+		serverAddress: params.Config.SDK.ChainstorageAddress,
+		clientID:      "",
+	}
+	for _, opt := range params.Options {
+		opt(&cfg)
+	}
+
+	retryableCodes := getDefaultRetryableCodes()
 	retryOpts := []grpc_retry.CallOption{
 		grpc_retry.WithMax(maxRetries),
 		grpc_retry.WithBackoff(grpc_retry.BackoffExponentialWithJitter(backoffScalar, backoffJitter)),
 		grpc_retry.WithCodes(retryableCodes...),
 	}
+
+	// For codes.ResourceExhausted error type, add separate retry interceptors with different backoff policy to avoid server overload and potential retry failures
+	resourceExhaustedRetryOpts := []grpc_retry.CallOption{
+		grpc_retry.WithMax(maxRetries),
+		grpc_retry.WithBackoff(grpc_retry.BackoffExponentialWithJitter(resourceExhaustedBackoffScalar, resourceExhaustedBackoffJitter)),
+		grpc_retry.WithCodes(codes.ResourceExhausted),
+	}
+
+	unaryChains := []grpc.UnaryClientInterceptor{
+		// XXX: Add your own interceptors here.
+		unaryAuthInterceptor(authHeader, authToken),
+		grpc_retry.UnaryClientInterceptor(retryOpts...),
+		grpc_retry.UnaryClientInterceptor(resourceExhaustedRetryOpts...),
+	}
+
+	streamChains := []grpc.StreamClientInterceptor{
+		// XXX: Add your own interceptors here.
+		streamAuthInterceptor(authHeader, authToken),
+	}
+	if cfg.clientID != "" {
+		unaryChains = append(unaryChains, unaryClientTaggingInterceptor(cfg.clientID))
+		streamChains = append(streamChains, streamClientTaggingInterceptor(cfg.clientID))
+	}
+
 	opts := []grpc.DialOption{
-		grpc.WithChainUnaryInterceptor(
-			// XXX: Add your own interceptors here.
-			unaryAuthInterceptor(authHeader, authToken),
-			grpc_retry.UnaryClientInterceptor(retryOpts...),
-		),
-		grpc.WithChainStreamInterceptor(
-			// XXX: Add your own interceptors here.
-			streamAuthInterceptor(authHeader, authToken),
-			grpc_retry.StreamClientInterceptor(retryOpts...),
-		),
+		grpc.WithChainUnaryInterceptor(unaryChains...),
+		grpc.WithChainStreamInterceptor(streamChains...),
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(sendMsgSize), grpc.MaxCallRecvMsgSize(recvMsgSize)),
 	}
 
@@ -119,27 +156,68 @@ func NewChainstorageClient(params Params) (Client, error) {
 		zap.String("blockchain", params.Config.Chain.Blockchain.String()),
 		zap.String("network", params.Config.Chain.Network.String()),
 		zap.String("address", address),
+		zap.String("sidechain", params.Config.Chain.Sidechain.String()),
+		zap.String("address", cfg.serverAddress),
+		zap.String("client_id", cfg.clientID),
 	)
 
 	return client, nil
 }
 
-func getRetryableCodes() []codes.Code {
-	retryableCodes := make([]codes.Code, 0, len(retryableCodesMap))
-	for code := range retryableCodesMap {
+func getDefaultRetryableCodes() []codes.Code {
+	retryableCodes := make([]codes.Code, 0, len(defaultRetryableCodesMap))
+	for code := range defaultRetryableCodesMap {
 		retryableCodes = append(retryableCodes, code)
 	}
 	return retryableCodes
 }
 
 func IsRetryableCode(code codes.Code) bool {
-	return retryableCodesMap[code]
+	return defaultRetryableCodesMap[code] || code == codes.ResourceExhausted
+}
+
+func WithClientID(clientID string) fx.Option {
+	return fx.Provide(fx.Annotated{
+		Group: "options",
+		Target: func() ClientOption {
+			return func(cfg *clientConfig) {
+				if clientID != "" {
+					cfg.clientID = clientID
+				}
+			}
+		},
+	})
+}
+
+func WithServerAddress(serverAddress string) fx.Option {
+	return fx.Provide(fx.Annotated{
+		Group: "options",
+		Target: func() ClientOption {
+			return func(cfg *clientConfig) {
+				if serverAddress != "" {
+					cfg.serverAddress = serverAddress
+				}
+			}
+		},
+	})
+}
+
+func unaryClientTaggingInterceptor(clientID string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		return invoker(metadata.AppendToOutgoingContext(ctx, consts.ClientIDHeader, clientID), method, req, reply, cc, opts...)
+	}
 }
 
 func unaryAuthInterceptor(authHeader string, authToken string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		ctx = getAuthContext(ctx, authHeader, authToken)
 		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+func streamClientTaggingInterceptor(clientID string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		return streamer(metadata.AppendToOutgoingContext(ctx, consts.ClientIDHeader, clientID), desc, cc, method, opts...)
 	}
 }
 

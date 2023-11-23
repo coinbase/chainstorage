@@ -23,18 +23,6 @@ func NewEventsToChainAdaptor() *EventsToChainAdaptor {
 	}
 }
 
-func castItemToEventEntry(outputItem interface{}) (*model.EventEntry, bool) {
-	eventEntry, ok := outputItem.(*model.EventEntry)
-	if !ok {
-		return nil, ok
-	}
-	// switch to defaultTag is not set
-	if eventEntry.Tag == 0 {
-		eventEntry.Tag = model.DefaultBlockTag
-	}
-	return eventEntry, true
-}
-
 func validateChainEvents(event *model.EventEntry, lastEvent *model.EventEntry) error {
 	if lastEvent.BlockHeight != event.BlockHeight-1 {
 		return xerrors.Errorf("chain is not continuous because of inconsistent heights (last={%+v}, curr={%+v})", lastEvent, event)
@@ -51,7 +39,7 @@ func (e *EventsToChainAdaptor) AppendEvents(events []*model.EventEntry) error {
 		event := events[i]
 		lastItem := e.eventList.Back()
 		if lastItem != nil {
-			lastEvent, ok := castItemToEventEntry(lastItem.Value)
+			lastEvent, ok := model.CastItemToEventEntry(lastItem.Value)
 			if !ok {
 				return xerrors.Errorf("failed to cast {%+v} to *model.EventEntry", lastItem.Value)
 			}
@@ -97,7 +85,7 @@ func (e *EventsToChainAdaptor) AppendEvents(events []*model.EventEntry) error {
 func (e *EventsToChainAdaptor) PopEventForTailBlock() (*model.EventEntry, error) {
 	headItem := e.eventList.Front()
 	if headItem != nil {
-		headEvent, ok := castItemToEventEntry(headItem.Value)
+		headEvent, ok := model.CastItemToEventEntry(headItem.Value)
 		if !ok {
 			return nil, xerrors.Errorf("failed to cast {%+v} to *EventEntry", headItem.Value)
 		}

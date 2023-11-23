@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 )
@@ -69,10 +70,9 @@ func TestHTTPClient_StickySessionHeader(t *testing.T) {
 
 func TestHTTPClient_TimeoutOverride(t *testing.T) {
 	require := testutil.Require(t)
-
-	timeout := 1000
+	timeout := 1000 * time.Second
 	client, err := newHTTPClient(withOverrideRequestTimeout(timeout))
 	require.NoError(err)
 	require.NotEmpty(client.Timeout)
-	require.Equal(float64(timeout), client.Timeout.Seconds())
+	require.Equal(timeout, client.Timeout)
 }

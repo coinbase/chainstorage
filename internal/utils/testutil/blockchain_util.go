@@ -11,6 +11,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/utils"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+	rosetta "github.com/coinbase/chainstorage/protos/coinbase/crypto/rosetta/types"
 )
 
 type (
@@ -20,6 +21,7 @@ type (
 		blockHashFormat string
 		dataCompression api.Compression
 		blockSkipped    bool
+		timestamp       int64
 	}
 
 	Header struct {
@@ -31,7 +33,8 @@ type (
 )
 
 const (
-	blockTimestamp = 0x5fbd2fb9
+	blockTimestamp  = 0x5fbd2fb9
+	transactionHash = "fake_txn_hash"
 )
 
 func MakeBlockEvent(eventType api.BlockchainEvent_Type, height uint64, tag uint32, opts ...Option) *model.BlockEvent {
@@ -78,6 +81,10 @@ func getBlock(height uint64, tag uint32, opts ...Option) *api.BlockMetadata {
 	if options.dataCompression == api.Compression_GZIP {
 		objectKeyMain += ".gzip"
 	}
+	timestamp := utils.ToTimestamp(blockTimestamp)
+	if options.timestamp != 0 {
+		timestamp = utils.ToTimestamp(options.timestamp)
+	}
 
 	return &api.BlockMetadata{
 		Tag:           tag,
@@ -86,7 +93,7 @@ func getBlock(height uint64, tag uint32, opts ...Option) *api.BlockMetadata {
 		Height:        height,
 		ParentHeight:  height - 1,
 		ObjectKeyMain: objectKeyMain,
-		Timestamp:     utils.ToTimestamp(blockTimestamp),
+		Timestamp:     timestamp,
 	}
 }
 
@@ -143,6 +150,117 @@ func MakeBlocksFromStartHeight(startHeight uint64, size int, tag uint32, opts ..
 	return blocks
 }
 
+func MakeBlocksWithTransactionsFromStartHeight(startHeight uint64, size int, tag uint32, transactionSize int, opts ...Option) []*api.Block {
+	metadata := MakeBlockMetadatasFromStartHeight(startHeight, size, tag, opts...)
+	blocks := make([]*api.Block, size)
+	for i := 0; i < size; i++ {
+		header := Header{
+			Hash:       metadata[i].Hash,
+			ParentHash: metadata[i].ParentHash,
+			Number:     hexutil.EncodeUint64(metadata[i].Height),
+			Timestamp:  hexutil.EncodeUint64(blockTimestamp),
+		}
+		headerData, err := json.Marshal(header)
+		if err != nil {
+			panic(err)
+		}
+
+		blocks[i] = &api.Block{
+			Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+			Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+			Metadata:   metadata[i],
+			TransactionMetadata: &api.TransactionMetadata{
+				Transactions: MakeTransactionHashList(transactionSize),
+			},
+			Blobdata: &api.Block_Ethereum{
+				Ethereum: &api.EthereumBlobdata{
+					Header: headerData,
+				},
+			},
+		}
+	}
+
+	return blocks
+}
+
+func MakeTransactionHashList(size int) []string {
+	transactions := make([]string, size)
+	for i := 0; i < size; i++ {
+		transactionHash := fmt.Sprintf("transactionHash%d", i)
+		transactions[i] = transactionHash
+	}
+
+	return transactions
+}
+
+func MakeTransactionsFromStartHeight(startHeight int, size int, tag uint32) []*model.Transaction {
+	transactions := make([]*model.Transaction, size)
+	for i := startHeight; i < size; i++ {
+		transactionHash := fmt.Sprintf("transactionHash%d", i)
+		blockHash := fmt.Sprintf("blockHash%d", i)
+
+		transaction := &model.Transaction{
+			Hash:        transactionHash,
+			BlockHash:   blockHash,
+			BlockNumber: uint64(i),
+			BlockTag:    tag,
+		}
+		transactions[i] = transaction
+	}
+
+	return transactions
+}
+
+func MakeNativeBlock(height uint64, tag uint32, opts ...Option) *api.NativeBlock {
+	meta := getBlock(height, tag, opts...)
+	return &api.NativeBlock{
+		Blockchain:      common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:         common.Network_NETWORK_ETHEREUM_MAINNET,
+		Tag:             meta.Tag,
+		Hash:            meta.Hash,
+		ParentHash:      meta.ParentHash,
+		Height:          meta.Height,
+		Timestamp:       meta.Timestamp,
+		NumTransactions: 1,
+		ParentHeight:    meta.ParentHeight,
+		Skipped:         meta.Skipped,
+		Block: &api.NativeBlock_Ethereum{
+			Ethereum: &api.EthereumBlock{
+				Header: &api.EthereumHeader{},
+				Transactions: []*api.EthereumTransaction{
+					{
+						Hash: transactionHash,
+					},
+				},
+			},
+		},
+	}
+}
+
+func MakeRosettaBlock(height uint64, tag uint32, opts ...Option) *api.RosettaBlock {
+	meta := getBlock(height, tag, opts...)
+	return &api.RosettaBlock{
+		Block: &rosetta.Block{
+			BlockIdentifier: &rosetta.BlockIdentifier{
+				Index: int64(meta.Height),
+				Hash:  meta.Hash,
+			},
+			ParentBlockIdentifier: &rosetta.BlockIdentifier{
+				Index: int64(meta.ParentHeight),
+				Hash:  meta.ParentHash,
+			},
+			Timestamp: meta.Timestamp,
+			Transactions: []*rosetta.Transaction{
+				{
+					TransactionIdentifier: &rosetta.TransactionIdentifier{
+						Hash: transactionHash,
+					},
+				},
+			},
+		},
+	}
+}
+
 func WithBlockHashFormat(format string) Option {
 	return func(opts *builderOptions) {
 		opts.blockHashFormat = format
@@ -158,5 +276,11 @@ func WithDataCompression(compression api.Compression) Option {
 func WithBlockSkipped() Option {
 	return func(opts *builderOptions) {
 		opts.blockSkipped = true
+	}
+}
+
+func WithTimestamp(timestamp int64) Option {
+	return func(opts *builderOptions) {
+		opts.timestamp = timestamp
 	}
 }
