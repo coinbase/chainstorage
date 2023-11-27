@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-YQ_VERSION=4.35.2
+YQ_VERSION=4.40.3
 SCRIPTS_DIR=$(dirname "${BASH_SOURCE[0]}")
 BIN_DIR=${SCRIPTS_DIR}/bin
 YQ_INSTALL_PATH=${BIN_DIR}/yq-${YQ_VERSION}
@@ -42,7 +42,8 @@ get_download_url() {
 
 if ! [ -x "$(command -v ${YQ_INSTALL_PATH})" ]; then
   mkdir -p "${BIN_DIR}"
+  rm -f ${BIN_DIR}/yq-*
   install_yq "${YQ_VERSION}" "${YQ_INSTALL_PATH}"
 fi
 
-exec ${YQ_INSTALL_PATH} "$1" "$2" "$3"
+exec ${YQ_INSTALL_PATH} "${@}"
