@@ -1,0 +1,27 @@
+chain:
+  client:
+    master:
+      endpoint_group: |
+        {
+          "endpoints": [
+            {
+              "name": "replayer",
+              "url": "http://eth-mainnet.local.gd:7090",
+              "weight": 1
+            }
+          ],
+          "sticky_session": {
+            "header_hash": "x-session-hash"
+          }
+        }
+    slave:
+      endpoint_group: |
+        {
+          "endpoints": [
+            {
+              "name": "replayer",
+              "url": "http://eth-mainnet.local.gd:7090",
+              "weight": 1
+            }
+          ]
+        }

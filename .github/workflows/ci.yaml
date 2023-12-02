@@ -73,8 +73,49 @@ jobs:
           echo "localstack ready"
       - name: Integration Tests
         run: make integration
+  functional:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        go-version:
+          - "1.21"
+          - "1.20"
+          - "1.19"
+          - "1.18"
+        test:
+          - internal/blockchain/integration_test/ethereum_integration_test.go
+          - internal/blockchain/integration_test/bsc_integration_test.go
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: "Setup environment"
+        uses: ./.github/workflows/setup
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Run localstack
+        shell: bash
+        run: |
+          docker compose -f docker-compose-testing.yml up -d --force-recreate
+          echo "Waiting for localstack to be ready..."
+          for i in $(seq 1 999); do
+            if [ "$(curl -s http://localhost:4566/_localstack/health | jq -r '.services.s3')" = "available" ]; then
+              break
+            fi
+            sleep 0.3
+            if [ $(($i % 30)) -eq 0 ]; then
+              echo .
+            fi 
+          done
+          echo "localstack ready"
+      - name: Functional Test
+        run: |
+          nohup go run tools/rpc_replayer/main.go &
+          cp tools/rpc_replayer/config/eth-mainnet.yml config/chainstorage/ethereum/mainnet/secrets.yml
+          cp tools/rpc_replayer/config/eth-goerli.yml config/chainstorage/ethereum/goerli/secrets.yml
+          cp tools/rpc_replayer/config/bsc-mainnet.yml config/chainstorage/bsc/mainnet/secrets.yml
+          make functional TARGET=${{ matrix.test }}
   ci-passed:
     runs-on: ubuntu-22.04
-    needs: [build, test, integration]
+    needs: [build, test, integration, functional]
     steps:
       - run: echo "All tests passed"
