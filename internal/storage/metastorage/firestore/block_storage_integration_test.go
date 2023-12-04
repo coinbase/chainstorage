@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"net/http"
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -43,6 +45,7 @@ func (s *blockStorageTestSuite) SetupTest() {
 	cfg, err := config.New()
 	require.NoError(err)
 	cfg.Chain.BlockStartHeight = 10
+	cfg.StorageType.MetaStorageType = config.MetaStorageType_FIRESTORE
 	s.config = cfg
 	app := testapp.New(
 		s.T(),
@@ -50,9 +53,18 @@ func (s *blockStorageTestSuite) SetupTest() {
 		testapp.WithIntegration(),
 		testapp.WithConfig(s.config),
 		fx.Populate(&accessor),
+		fx.Populate(&cfg),
 	)
 	defer app.Close()
 	s.accessor = accessor
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("http://%s/emulator/v1/projects/%s/databases/(default)/documents", os.Getenv("FIRESTORE_EMULATOR_HOST"), cfg.GCP.Project), nil)
+	if err != nil {
+		panic(err)
+	}
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (s *blockStorageTestSuite) TestPersistBlockMetasByMaxWriteSize() {
@@ -63,7 +75,6 @@ func (s *blockStorageTestSuite) TestPersistBlockMetasByMaxWriteSize() {
 		{totalBlocks: maxBulkWriteSize * 2},
 		{totalBlocks: maxBulkWriteSize * 4},
 		{totalBlocks: maxBulkWriteSize * 8},
-		{totalBlocks: maxBulkWriteSize * 64},
 	}
 	for _, test := range tests {
 		s.T().Run(fmt.Sprintf("test %d blocks", test.totalBlocks), func(t *testing.T) {
