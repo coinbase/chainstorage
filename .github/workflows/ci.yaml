@@ -72,7 +72,7 @@ jobs:
           done
           echo "localstack ready"
       - name: Integration Tests
-        run: make integration
+        run: ./scripts/gcp-emulators.sh exec make integration
   ci-passed:
     runs-on: ubuntu-22.04
     needs: [build, test, integration]
