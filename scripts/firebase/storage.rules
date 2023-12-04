@@ -1,0 +1,5 @@
+service firebase.storage {
+  match / {
+    allow read: if false;
+  }
+}

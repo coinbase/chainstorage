@@ -31,6 +31,7 @@ type (
 		StorageType    StorageType          `mapstructure:"storage_type"`
 		Chain          ChainConfig          `mapstructure:"chain"`
 		AWS            AwsConfig            `mapstructure:"aws"`
+		GCP            *GcpConfig           `mapstructure:"gcp"`
 		Cadence        CadenceConfig        `mapstructure:"cadence"`
 		Workflows      WorkflowsConfig      `mapstructure:"workflows"`
 		Api            ApiConfig            `mapstructure:"api"`
@@ -122,6 +123,10 @@ type (
 		DLQ                    SQSConfig      `mapstructure:"dlq"`
 		Storage                StorageConfig  `mapstructure:"storage"`
 		AWSAccount             AWSAccount     `mapstructure:"aws_account" validate:"required"`
+	}
+
+	GcpConfig struct {
+		Project string `mapstructure:"project" validate:"required"`
 	}
 
 	DynamoDBConfig struct {
@@ -438,6 +443,7 @@ var (
 	MetaStorageType_value = map[string]int32{
 		"UNSPECIFIED": 0,
 		"DYNAMODB":    1,
+		"FIRESTORE":   2,
 	}
 
 	DLQType_value = map[string]int32{
@@ -469,6 +475,7 @@ const (
 
 	MetaStorageType_UNSPECIFIED MetaStorageType = 0
 	MetaStorageType_DYNAMODB    MetaStorageType = 1
+	MetaStorageType_FIRESTORE   MetaStorageType = 2
 
 	DLQType_UNSPECIFIED DLQType = 0
 	DLQType_SQS         DLQType = 1
@@ -522,6 +529,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 	// All env set by codeflow has the prefix of CHAINSTORAGE
 	v.SetEnvPrefix("CHAINSTORAGE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	_ = v.BindEnv("gcp.project")
 
 	// Set default values.
 	// Note that the default values may be overridden by environment variable or config file.
