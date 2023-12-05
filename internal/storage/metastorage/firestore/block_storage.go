@@ -66,24 +66,15 @@ func newBlockStorage(params Params, client *firestore.Client) (internal.BlockSto
 
 // GetBlockByHash implements internal.BlockStorage.
 func (b *blockStorageImpl) GetBlockByHash(ctx context.Context, tag uint32, height uint64, blockHash string) (*chainstorage.BlockMetadata, error) {
-	if blockHash == "" {
-		return b.GetBlockByHeight(ctx, tag, height)
-	}
 	if err := b.validateHeight(height); err != nil {
 		return nil, err
 	}
-	if height < b.blockStartHeight {
-		return nil, xerrors.Errorf(
-			"height(%d) should be no less than blockStartHeight(%d): %w",
-			height, b.blockStartHeight, errors.ErrInvalidHeight)
-	}
-	block, err := b.instrumentGetBlockByHash.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
+	return b.instrumentGetBlockByHash.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
+		if blockHash == "" {
+			return b.GetBlockByHeight(ctx, tag, height)
+		}
 		return b.getBlock(ctx, fmt.Sprintf("env/%s/blocks/%d-%020d-%s", b.env, tag, height, blockHash))
 	})
-	if err != nil {
-		return nil, err
-	}
-	return block, nil
 }
 
 // GetBlockByHeight implements internal.BlockStorage.
@@ -91,14 +82,9 @@ func (b *blockStorageImpl) GetBlockByHeight(ctx context.Context, tag uint32, hei
 	if err := b.validateHeight(height); err != nil {
 		return nil, err
 	}
-	var block *chainstorage.BlockMetadata
-	block, err := b.instrumentGetBlockByHeight.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
+	return b.instrumentGetBlockByHeight.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
 		return b.getBlock(ctx, fmt.Sprintf("env/%s/blocks/canonical-%d-%020d", b.env, tag, height))
 	})
-	if err != nil {
-		return nil, err
-	}
-	return block, nil
 }
 
 // GetBlocksByHeightRange implements internal.BlockStorage.
@@ -111,7 +97,7 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 	if err := b.validateHeight(startHeight); err != nil {
 		return nil, err
 	}
-	blocks, err := b.instrumentGetBlocksByHeightRange.Instrument(ctx, func(ctx context.Context) ([]*chainstorage.BlockMetadata, error) {
+	return b.instrumentGetBlocksByHeightRange.Instrument(ctx, func(ctx context.Context) ([]*chainstorage.BlockMetadata, error) {
 		md, ok := metadata.FromOutgoingContext(ctx)
 		if !ok {
 			md = metadata.New(nil)
@@ -199,10 +185,6 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 		}
 		return blocks, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return blocks, nil
 }
 
 // GetBlocksByHeights implements internal.BlockStorage.
@@ -212,17 +194,16 @@ func (b *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, h
 			return nil, err
 		}
 	}
-	blocks, err := b.instrumentGetBlocksByHeights.Instrument(ctx, func(ctx context.Context) ([]*chainstorage.BlockMetadata, error) {
-		docRefs := make([]*firestore.DocumentRef, 0)
-		for _, height := range heights {
-			docRef := b.client.Doc(fmt.Sprintf("env/%s/blocks/canonical-%d-%020d", b.env, tag, height))
-			docRefs = append(docRefs, docRef)
+	return b.instrumentGetBlocksByHeights.Instrument(ctx, func(ctx context.Context) ([]*chainstorage.BlockMetadata, error) {
+		docRefs := make([]*firestore.DocumentRef, len(heights))
+		for i, height := range heights {
+			docRefs[i] = b.client.Doc(fmt.Sprintf("env/%s/blocks/canonical-%d-%020d", b.env, tag, height))
 		}
 		docs, err := b.client.GetAll(ctx, docRefs)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to get blocks by heights: %w", err)
 		}
-		blocks := make([]*chainstorage.BlockMetadata, 0)
+		blocks := make([]*chainstorage.BlockMetadata, len(heights))
 		expecting := 0
 		for i, doc := range docs {
 			if !doc.Exists() {
@@ -240,7 +221,7 @@ func (b *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, h
 					heights[expecting], errors.ErrItemNotFound)
 			}
 			expecting = expecting + 1
-			blocks = append(blocks, block)
+			blocks[i] = block
 		}
 		if expecting < len(heights) {
 			return nil, xerrors.Errorf(
@@ -249,21 +230,13 @@ func (b *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, h
 		}
 		return blocks, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return blocks, nil
 }
 
 // GetLatestBlock implements internal.BlockStorage.
 func (b *blockStorageImpl) GetLatestBlock(ctx context.Context, tag uint32) (*chainstorage.BlockMetadata, error) {
-	block, err := b.instrumentGetLatestBlock.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
+	return b.instrumentGetLatestBlock.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
 		return b.getBlock(ctx, fmt.Sprintf("env/%s/blocks/%d-latest", b.env, tag))
 	})
-	if err != nil {
-		return nil, err
-	}
-	return block, nil
 }
 
 // PersistBlockMetas implements internal.BlockStorage.
