@@ -3,17 +3,12 @@ package firestore
 import (
 	"context"
 	"fmt"
-	"io"
-	"reflect"
 	"sort"
-	"unsafe"
 
 	"cloud.google.com/go/firestore"
-	vkit "cloud.google.com/go/firestore/apiv1"
-	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"golang.org/x/xerrors"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
@@ -27,7 +22,6 @@ import (
 type (
 	blockStorageImpl struct {
 		client                           *firestore.Client
-		grpc_client                      *vkit.Client
 		projectId                        string
 		env                              string
 		blockStartHeight                 uint64
@@ -42,15 +36,8 @@ type (
 
 func newBlockStorage(params Params, client *firestore.Client) (internal.BlockStorage, error) {
 	metrics := params.Metrics.SubScope("block_storage_firestore")
-
-	field := reflect.ValueOf(client).Elem().FieldByName("c")
-	grpc_client, ok := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Interface().(*vkit.Client)
-	if !ok {
-		return nil, xerrors.New("failed to get firestore grpc client")
-	}
 	accessor := blockStorageImpl{
 		client:                           client,
-		grpc_client:                      grpc_client,
 		projectId:                        params.Config.GCP.Project,
 		env:                              params.Config.ConfigName,
 		blockStartHeight:                 params.Config.Chain.BlockStartHeight,
@@ -98,76 +85,23 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 		return nil, err
 	}
 	return b.instrumentGetBlocksByHeightRange.Instrument(ctx, func(ctx context.Context) ([]*chainstorage.BlockMetadata, error) {
-		databasePath := fmt.Sprintf("projects/%s/databases/(default)", b.projectId)
-		parent := databasePath + "/documents"
-		md, ok := metadata.FromOutgoingContext(ctx)
-		if !ok {
-			md = metadata.New(nil)
-		}
-		md = md.Copy()
-		md["google-cloud-resource-prefix"] = []string{databasePath}
-		c, err := b.grpc_client.RunQuery(metadata.NewOutgoingContext(ctx, md), &firestorepb.RunQueryRequest{
-			Parent: parent,
-			QueryType: &firestorepb.RunQueryRequest_StructuredQuery{
-				StructuredQuery: &firestorepb.StructuredQuery{
-					From: []*firestorepb.StructuredQuery_CollectionSelector{
-						{
-							AllDescendants: true,
-						},
-					},
-					StartAt: &firestorepb.Cursor{
-						Values: []*firestorepb.Value{
-							{
-								ValueType: &firestorepb.Value_ReferenceValue{
-									ReferenceValue: b.getCanonicalBlockDocRef(tag, startHeight).Path,
-								},
-							},
-						},
-						Before: true,
-					},
-					EndAt: &firestorepb.Cursor{
-						Values: []*firestorepb.Value{
-							{
-								ValueType: &firestorepb.Value_ReferenceValue{
-									ReferenceValue: b.getCanonicalBlockDocRef(tag, endHeight).Path,
-								},
-							},
-						},
-						Before: true,
-					},
-					OrderBy: []*firestorepb.StructuredQuery_Order{
-						{
-							Field: &firestorepb.StructuredQuery_FieldReference{
-								FieldPath: "__name__",
-							},
-							Direction: firestorepb.StructuredQuery_ASCENDING,
-						},
-					},
-				},
-			},
-		})
-		if err != nil {
-			return nil, xerrors.Errorf("failed to get blocks: %w", err)
-		}
+		startDocRef := b.getCanonicalBlockDocRef(tag, startHeight)
+		endDocRef := b.getCanonicalBlockDocRef(tag, endHeight)
+		docs := startDocRef.Parent.Query.
+			StartAt(startDocRef).EndBefore(endDocRef).
+			OrderBy(firestore.DocumentID, firestore.Asc).
+			Documents(ctx)
 		blocks := make([]*chainstorage.BlockMetadata, endHeight-startHeight)
-		r, err := c.Recv()
 		expecting := startHeight
 		for {
-			if err == io.EOF {
+			doc, err := docs.Next()
+			if err == iterator.Done {
 				break
 			}
 			if err != nil {
 				return nil, xerrors.Errorf("failed to get blocks: %w", err)
 			}
-			if r.Document == nil {
-				r, err = c.Recv()
-				continue
-			}
-			doc := &firestore.DocumentSnapshot{}
-			field := reflect.ValueOf(doc).Elem().FieldByName("proto")
-			reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(r.Document))
-			var block *chainstorage.BlockMetadata
-			block, err = b.intoBlockMetadata(doc)
+			block, err := b.intoBlockMetadata(doc)
 			if err != nil {
 				return nil, xerrors.Errorf("failed to parse block data: %w", err)
 			}
@@ -178,7 +112,6 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 			}
 			blocks[expecting-startHeight] = block
 			expecting = expecting + 1
-			r, err = c.Recv()
 		}
 		if expecting < endHeight {
 			return nil, xerrors.Errorf(
