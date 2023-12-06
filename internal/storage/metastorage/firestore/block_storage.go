@@ -329,31 +329,33 @@ func (b *blockStorageImpl) getBlock(ctx context.Context, docRef *firestore.Docum
 	return block, nil
 }
 
-func (*blockStorageImpl) fromBlockMetadata(block *chainstorage.BlockMetadata) map[string]interface{} {
-	v := make(map[string]interface{})
-	v["Hash"] = block.Hash
-	v["ParentHash"] = block.ParentHash
-	v["Height"] = int64(block.Height)
-	v["ParentHeight"] = int64(block.ParentHeight)
-	v["ObjectKeyMain"] = block.ObjectKeyMain
-	v["Skipped"] = block.Skipped
-	v["Tag"] = block.Tag
-	v["Timestamp"] = block.Timestamp
-	return v
+// firestore does not support storing uin64, hence we use int64 to store block height
+type firestoreBlockMetadata struct {
+	Hash          string
+	ParentHash    string
+	Height        int64
+	ParentHeight  int64
+	ObjectKeyMain string
+	Skipped       bool
+	Timestamp     *timestamppb.Timestamp
+	Tag           uint32
+}
+
+func (*blockStorageImpl) fromBlockMetadata(block *chainstorage.BlockMetadata) *firestoreBlockMetadata {
+	return &firestoreBlockMetadata{
+		Hash:          block.Hash,
+		ParentHash:    block.ParentHash,
+		Height:        int64(block.Height),
+		ParentHeight:  int64(block.ParentHeight),
+		ObjectKeyMain: block.ObjectKeyMain,
+		Skipped:       block.Skipped,
+		Tag:           block.Tag,
+		Timestamp:     block.Timestamp,
+	}
 }
 
 func (*blockStorageImpl) intoBlockMetadata(doc *firestore.DocumentSnapshot) (*chainstorage.BlockMetadata, error) {
-	b := &chainstorage.BlockMetadata{}
-	var s struct {
-		Hash          string
-		ParentHash    string
-		Height        int64
-		ParentHeight  int64
-		ObjectKeyMain string
-		Skipped       bool
-		Timestamp     *timestamppb.Timestamp
-		Tag           uint32
-	}
+	var s firestoreBlockMetadata
 	err := doc.DataTo(&s)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to parse document into BlockMetadata: %w", err)
@@ -364,13 +366,14 @@ func (*blockStorageImpl) intoBlockMetadata(doc *firestore.DocumentSnapshot) (*ch
 	if s.ParentHeight < 0 {
 		return nil, xerrors.Errorf("expecting block ParentHeight to be uint64, but got %d", s.ParentHeight)
 	}
-	b.Hash = s.Hash
-	b.ParentHash = s.ParentHash
-	b.Height = uint64(s.Height)
-	b.ParentHeight = uint64(s.ParentHeight)
-	b.ObjectKeyMain = s.ObjectKeyMain
-	b.Skipped = s.Skipped
-	b.Timestamp = s.Timestamp
-	b.Tag = s.Tag
-	return b, nil
+	return &chainstorage.BlockMetadata{
+		Hash:          s.Hash,
+		ParentHash:    s.ParentHash,
+		Height:        uint64(s.Height),
+		ParentHeight:  uint64(s.ParentHeight),
+		ObjectKeyMain: s.ObjectKeyMain,
+		Skipped:       s.Skipped,
+		Timestamp:     s.Timestamp,
+		Tag:           s.Tag,
+	}, nil
 }
