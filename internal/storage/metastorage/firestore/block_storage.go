@@ -73,7 +73,7 @@ func (b *blockStorageImpl) GetBlockByHash(ctx context.Context, tag uint32, heigh
 		if blockHash == "" {
 			return b.GetBlockByHeight(ctx, tag, height)
 		}
-		return b.getBlock(ctx, fmt.Sprintf("env/%s/blocks/%d-%020d-%s", b.env, tag, height, blockHash))
+		return b.getBlock(ctx, b.getBlockDocRef(tag, height, blockHash))
 	})
 }
 
@@ -83,7 +83,7 @@ func (b *blockStorageImpl) GetBlockByHeight(ctx context.Context, tag uint32, hei
 		return nil, err
 	}
 	return b.instrumentGetBlockByHeight.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
-		return b.getBlock(ctx, fmt.Sprintf("env/%s/blocks/canonical-%d-%020d", b.env, tag, height))
+		return b.getBlock(ctx, b.getCanonicalBlockDocRef(tag, height))
 	})
 }
 
@@ -98,14 +98,16 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 		return nil, err
 	}
 	return b.instrumentGetBlocksByHeightRange.Instrument(ctx, func(ctx context.Context) ([]*chainstorage.BlockMetadata, error) {
+		databasePath := fmt.Sprintf("projects/%s/databases/(default)", b.projectId)
+		parent := databasePath + "/documents"
 		md, ok := metadata.FromOutgoingContext(ctx)
 		if !ok {
 			md = metadata.New(nil)
 		}
 		md = md.Copy()
-		md["google-cloud-resource-prefix"] = []string{fmt.Sprintf("projects/%s/databases/(default)", b.projectId)}
+		md["google-cloud-resource-prefix"] = []string{databasePath}
 		c, err := b.grpc_client.RunQuery(metadata.NewOutgoingContext(ctx, md), &firestorepb.RunQueryRequest{
-			Parent: fmt.Sprintf("projects/%s/databases/(default)/documents", b.projectId),
+			Parent: parent,
 			QueryType: &firestorepb.RunQueryRequest_StructuredQuery{
 				StructuredQuery: &firestorepb.StructuredQuery{
 					From: []*firestorepb.StructuredQuery_CollectionSelector{
@@ -117,7 +119,7 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 						Values: []*firestorepb.Value{
 							{
 								ValueType: &firestorepb.Value_ReferenceValue{
-									ReferenceValue: fmt.Sprintf("projects/chainstorage-local/databases/(default)/documents/env/%s/blocks/canonical-%d-%020d", b.env, tag, startHeight),
+									ReferenceValue: b.getCanonicalBlockDocRef(tag, startHeight).Path,
 								},
 							},
 						},
@@ -127,7 +129,7 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 						Values: []*firestorepb.Value{
 							{
 								ValueType: &firestorepb.Value_ReferenceValue{
-									ReferenceValue: fmt.Sprintf("projects/chainstorage-local/databases/(default)/documents/env/%s/blocks/canonical-%d-%020d", b.env, tag, endHeight),
+									ReferenceValue: b.getCanonicalBlockDocRef(tag, endHeight).Path,
 								},
 							},
 						},
@@ -147,7 +149,7 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 		if err != nil {
 			return nil, xerrors.Errorf("failed to get blocks: %w", err)
 		}
-		blocks := make([]*chainstorage.BlockMetadata, 0)
+		blocks := make([]*chainstorage.BlockMetadata, endHeight-startHeight)
 		r, err := c.Recv()
 		expecting := startHeight
 		for {
@@ -174,8 +176,8 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 					"block metadata with height %d not found: %w",
 					expecting, errors.ErrItemNotFound)
 			}
+			blocks[expecting-startHeight] = block
 			expecting = expecting + 1
-			blocks = append(blocks, block)
 			r, err = c.Recv()
 		}
 		if expecting < endHeight {
@@ -197,7 +199,7 @@ func (b *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, h
 	return b.instrumentGetBlocksByHeights.Instrument(ctx, func(ctx context.Context) ([]*chainstorage.BlockMetadata, error) {
 		docRefs := make([]*firestore.DocumentRef, len(heights))
 		for i, height := range heights {
-			docRefs[i] = b.client.Doc(fmt.Sprintf("env/%s/blocks/canonical-%d-%020d", b.env, tag, height))
+			docRefs[i] = b.getCanonicalBlockDocRef(tag, height)
 		}
 		docs, err := b.client.GetAll(ctx, docRefs)
 		if err != nil {
@@ -235,7 +237,7 @@ func (b *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, h
 // GetLatestBlock implements internal.BlockStorage.
 func (b *blockStorageImpl) GetLatestBlock(ctx context.Context, tag uint32) (*chainstorage.BlockMetadata, error) {
 	return b.instrumentGetLatestBlock.Instrument(ctx, func(ctx context.Context) (*chainstorage.BlockMetadata, error) {
-		return b.getBlock(ctx, fmt.Sprintf("env/%s/blocks/%d-latest", b.env, tag))
+		return b.getBlock(ctx, b.getLatestBlockDocRef(tag))
 	})
 }
 
@@ -255,7 +257,7 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 		bulkWriter := b.client.BulkWriter(ctx)
 
 		for _, block := range blocks {
-			docRef := b.client.Doc(fmt.Sprintf("env/%s/blocks/%d-%020d-%s", b.env, block.Tag, block.Height, block.Hash))
+			docRef := b.getBlockDocRef(block.Tag, block.Height, block.Hash)
 			_, err := bulkWriter.Set(docRef, b.fromBlockMetadata(block))
 			if err != nil {
 				return xerrors.Errorf("failed to add block %+v to BulkWriter: %w", block, err)
@@ -265,7 +267,7 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 				bulkWriter.Flush()
 				bulkSize = 0
 			}
-			docRef = b.client.Doc(fmt.Sprintf("env/%s/blocks/canonical-%d-%020d", b.env, block.Tag, block.Height))
+			docRef = b.getCanonicalBlockDocRef(block.Tag, block.Height)
 			_, err = bulkWriter.Set(docRef, b.fromBlockMetadata(block))
 			if err != nil {
 				return xerrors.Errorf("failed to add block to BulkWriter: %w", err)
@@ -280,7 +282,7 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 
 		if updateWatermark {
 			watermarkBlock := blocks[len(blocks)-1]
-			docRef := b.client.Doc(fmt.Sprintf("env/%s/blocks/%d-latest", b.env, watermarkBlock.Tag))
+			docRef := b.getLatestBlockDocRef(watermarkBlock.Tag)
 			_, err := docRef.Set(ctx, b.fromBlockMetadata(watermarkBlock))
 			if err != nil {
 				return xerrors.Errorf("failed to update watermark block: %w", err)
@@ -300,8 +302,19 @@ func (b *blockStorageImpl) validateHeight(height uint64) error {
 	return nil
 }
 
-func (b *blockStorageImpl) getBlock(ctx context.Context, docName string) (*chainstorage.BlockMetadata, error) {
-	docRef := b.client.Doc(docName)
+func (b *blockStorageImpl) getLatestBlockDocRef(tag uint32) *firestore.DocumentRef {
+	return b.client.Doc(fmt.Sprintf("env/%s/blocks/%d-latest", b.env, tag))
+}
+
+func (b *blockStorageImpl) getCanonicalBlockDocRef(tag uint32, height uint64) *firestore.DocumentRef {
+	return b.client.Doc(fmt.Sprintf("env/%s/blocks/canonical-%d-%020d", b.env, tag, height))
+}
+
+func (b *blockStorageImpl) getBlockDocRef(tag uint32, height uint64, hash string) *firestore.DocumentRef {
+	return b.client.Doc(fmt.Sprintf("env/%s/blocks/%d-%020d-%s", b.env, tag, height, hash))
+}
+
+func (b *blockStorageImpl) getBlock(ctx context.Context, docRef *firestore.DocumentRef) (*chainstorage.BlockMetadata, error) {
 	doc, err := docRef.Get(ctx)
 	if err != nil && status.Code(err) != codes.NotFound {
 		return nil, xerrors.Errorf("failed to get block: %w", err)
