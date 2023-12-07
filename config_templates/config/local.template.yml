@@ -5,3 +5,5 @@ storage_type:
   blob: S3
   meta: DYNAMODB
   dlq: SQS
+gcp:
+  project: chainstorage-local

@@ -529,7 +529,6 @@ func New(opts ...ConfigOption) (*Config, error) {
 	// All env set by codeflow has the prefix of CHAINSTORAGE
 	v.SetEnvPrefix("CHAINSTORAGE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	_ = v.BindEnv("gcp.project")
 
 	// Set default values.
 	// Note that the default values may be overridden by environment variable or config file.
