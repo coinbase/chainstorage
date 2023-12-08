@@ -17,7 +17,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
-	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 	"github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -189,95 +188,51 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 			return xerrors.Errorf("failed to validate chain: %w", err)
 		}
 
-		sg, sg_ctx := syncgroup.New(sg_ctx, syncgroup.WithThrottling(maxWriteWorkers))
-
-		for c := 0; c < (len(blocks)+maxBulkWriteSize-1)/maxBulkWriteSize; c++ {
-			endIndex := (c + 1) * maxBulkWriteSize
-			if endIndex > len(blocks) {
-				endIndex = len(blocks)
-			}
-			chunk := blocks[c*maxBulkWriteSize : endIndex]
-			sg.Go(func() error {
-				bulkWriter := b.client.BulkWriter(sg_ctx)
-				for _, block := range chunk {
-					docRef := b.getBlockDocRef(block.Tag, block.Height, block.Hash)
-					_, err := bulkWriter.Set(docRef, b.fromBlockMetadata(block))
-					if err != nil {
-						return xerrors.Errorf("failed to add block %+v to BulkWriter: %w", block, err)
-					}
-				}
-				bulkWriter.End()
-				return nil
-			})
-		}
-
-		lastChunkMaxSize := maxBulkWriteSize
-		if updateWatermark {
-			lastChunkMaxSize = maxBulkWriteSize - 1
-		}
-		for c := 0; c < (len(blocks)+maxBulkWriteSize-lastChunkMaxSize-1)/maxBulkWriteSize; c++ {
-			endIndex := (c + 1) * maxBulkWriteSize
-			if endIndex > len(blocks)-lastChunkMaxSize {
-				endIndex = len(blocks) - lastChunkMaxSize
-			}
-			chunk := blocks[c*maxBulkWriteSize : endIndex]
-			sg.Go(func() error {
-				return b.client.RunTransaction(sg_ctx, func(ctx context.Context, t *firestore.Transaction) error {
-					for _, block := range chunk {
-						docRef := b.getCanonicalBlockDocRef(block.Tag, block.Height)
-						err := t.Set(docRef, b.fromBlockMetadata(block))
-						if err != nil {
-							return xerrors.Errorf("failed to add block %+v to firestore transaction: %w", block, err)
-						}
-					}
-					return nil
-				})
-			})
-		}
-
-		startIndex := len(blocks) - lastChunkMaxSize
-		if startIndex < 0 {
-			startIndex = 0
-		}
-		lastChunk := blocks[startIndex:]
-		if updateWatermark {
-			err := sg.Wait()
+		// Blocks with hash as key can be written in random order
+		bulkWriter := b.client.BulkWriter(sg_ctx)
+		for _, block := range blocks {
+			docRef := b.getBlockDocRef(block.Tag, block.Height, block.Hash)
+			_, err := bulkWriter.Set(docRef, b.fromBlockMetadata(block))
 			if err != nil {
-				return err
+				return xerrors.Errorf("failed to add block %+v to BulkWriter: %w", block, err)
 			}
-			err = b.client.RunTransaction(ctx, func(ctx context.Context, t *firestore.Transaction) error {
-				for _, block := range lastChunk {
-					docRef := b.getCanonicalBlockDocRef(block.Tag, block.Height)
+		}
+		bulkWriter.End()
+
+		// Canonical blocks must be written in order to avoid canonical chain inconsistency with best effort
+		writeCount := len(blocks)
+		if updateWatermark {
+			// Append watermark block to be the last one to update
+			writeCount++
+		}
+		for c := 0; c < (writeCount+maxBulkWriteSize-1)/maxBulkWriteSize; c++ {
+			// First chunk as the residual
+			endIndex := (writeCount % maxBulkWriteSize) + c*maxBulkWriteSize
+			startIndex := endIndex - maxBulkWriteSize
+			if startIndex < 0 {
+				startIndex = 0
+			}
+			err := b.client.RunTransaction(sg_ctx, func(ctx context.Context, t *firestore.Transaction) error {
+				for i := startIndex; i < endIndex; i++ {
+					var docRef *firestore.DocumentRef
+					var block *chainstorage.BlockMetadata
+					if i == len(blocks) {
+						block = blocks[i-1]
+						docRef = b.getLatestBlockDocRef(block.Tag)
+					} else {
+						block = blocks[i]
+						docRef = b.getCanonicalBlockDocRef(block.Tag, block.Height)
+					}
 					err := t.Set(docRef, b.fromBlockMetadata(block))
 					if err != nil {
 						return xerrors.Errorf("failed to add block %+v to firestore transaction: %w", block, err)
 					}
 				}
-				latestBlock := lastChunk[len(lastChunk)-1]
-				latestDocRef := b.getLatestBlockDocRef(latestBlock.Tag)
-				err := t.Set(latestDocRef, b.fromBlockMetadata(latestBlock))
-				if err != nil {
-					return xerrors.Errorf("failed to add block %+v to firestore transaction: %w", latestBlock, err)
-				}
 				return nil
 			})
 			if err != nil {
-				return xerrors.Errorf("firestore transaction failed: %w", err)
+				return xerrors.Errorf("failed to add canonical blocks in firestore transaction: %w", err)
 			}
-		} else {
-			sg.Go(func() error {
-				return b.client.RunTransaction(sg_ctx, func(ctx context.Context, t *firestore.Transaction) error {
-					for _, block := range lastChunk {
-						docRef := b.getCanonicalBlockDocRef(block.Tag, block.Height)
-						err := t.Set(docRef, b.fromBlockMetadata(block))
-						if err != nil {
-							return xerrors.Errorf("failed to add block %+v to firestore transaction: %w", block, err)
-						}
-					}
-					return nil
-				})
-			})
-			return sg.Wait()
 		}
 		return nil
 	})
