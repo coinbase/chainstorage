@@ -205,15 +205,11 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 			// Append watermark block to be the last one to update
 			writeCount++
 		}
-		for c := 0; c < (writeCount+maxBulkWriteSize-1)/maxBulkWriteSize; c++ {
-			// First chunk as the residual
-			endIndex := (writeCount % maxBulkWriteSize) + c*maxBulkWriteSize
-			startIndex := endIndex - maxBulkWriteSize
-			if startIndex < 0 {
-				startIndex = 0
-			}
+		// First chunk as the residual
+		firstChunkSize := writeCount % maxBulkWriteSize
+		for start, end := 0, firstChunkSize; end <= writeCount; start, end = end, end+maxBulkWriteSize {
 			err := b.client.RunTransaction(sg_ctx, func(ctx context.Context, t *firestore.Transaction) error {
-				for i := startIndex; i < endIndex; i++ {
+				for i := start; i < end; i++ {
 					var docRef *firestore.DocumentRef
 					var block *chainstorage.BlockMetadata
 					if i == len(blocks) {
@@ -225,7 +221,7 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 					}
 					err := t.Set(docRef, b.fromBlockMetadata(block))
 					if err != nil {
-						return xerrors.Errorf("failed to add block %+v to firestore transaction: %w", block, err)
+						return xerrors.Errorf("failed to add block %+v in firestore transaction: %w", block, err)
 					}
 				}
 				return nil
