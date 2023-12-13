@@ -1,0 +1,13 @@
+{
+  "emulators": {
+    "ui": { "enabled": true, "host": "0.0.0.0" },
+    "firestore": { "host": "0.0.0.0" },
+    "pubsub": { "host": "0.0.0.0" },
+    "storage": { "host": "0.0.0.0" }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": { "rules": "storage.rules" }
+}

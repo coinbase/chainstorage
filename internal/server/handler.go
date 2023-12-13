@@ -794,14 +794,14 @@ func (s *Server) getBlocksFromMetaStorage(ctx context.Context, req requestByRang
 
 	blocks, err := s.metaStorage.GetBlocksByHeightRange(ctx, tag, startHeight, endHeight)
 	if err != nil {
-		return nil, xerrors.Errorf("internal dynamodb error: %w", err)
+		return nil, xerrors.Errorf("internal meta storage error: %w", err)
 	}
 
 	// A chain reorg may happen after calling GetBlocksByHeightRange
 	// Validate requests do not go beyond the latest watermark
 	latestBlock, err := s.metaStorage.GetLatestBlock(ctx, tag)
 	if err != nil {
-		return nil, xerrors.Errorf("internal dynamodb error: %w", err)
+		return nil, xerrors.Errorf("internal meta storage error: %w", err)
 	}
 
 	latest := latestBlock.Height

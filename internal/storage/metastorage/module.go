@@ -4,6 +4,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb"
+	"github.com/coinbase/chainstorage/internal/storage/metastorage/firestore"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 )
@@ -27,5 +28,6 @@ func NewEventsToChainAdaptor() *EventsToChainAdaptor {
 
 var Module = fx.Options(
 	dynamodb.Module,
+	firestore.Module,
 	fx.Provide(internal.WithMetaStorageFactory),
 )
