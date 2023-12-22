@@ -147,9 +147,9 @@ func (e *eventStorageImpl) AddEventEntries(ctx context.Context, eventTag uint32,
 					if i+1 == end || i+1 == len(eventEntries) {
 						data.Latest = true
 					}
-					err = t.Set(e.getEventDocRef(eventTag, data.EventId), data)
+					err = t.Set(e.getEventDocRef(eventTag, data.Payload.EventId), data)
 					if err != nil {
-						return xerrors.Errorf("failed to save event entry with id %d: %w", data.EventId, err)
+						return xerrors.Errorf("failed to save event entry with id %d: %w", data.Payload.EventId, err)
 					}
 				}
 				return nil
@@ -393,7 +393,7 @@ func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, m
 /////////////////////////////////////////////////////////
 // firestore storage
 
-type firestoreEventEntry struct {
+type firestoreEventEntryPayload struct {
 	EventId        int64
 	EventType      api.BlockchainEvent_Type
 	BlockHeight    int64
@@ -404,25 +404,35 @@ type firestoreEventEntry struct {
 	BlockSkipped   bool
 	EventTag       uint32
 	BlockTimestamp int64
-	Latest         bool
+}
+
+type firestoreEventEntry struct {
+	EventTag    uint32
+	BlockHeight int64
+	Latest      bool
+	Payload     firestoreEventEntryPayload
 }
 
 func (*eventStorageImpl) fromEventEntry(eventEntry *model.EventEntry) *firestoreEventEntry {
 	entry := &firestoreEventEntry{
-		EventId:        eventEntry.EventId,
-		EventType:      eventEntry.EventType,
-		BlockHeight:    int64(eventEntry.BlockHeight),
-		BlockHash:      eventEntry.BlockHash,
-		Tag:            eventEntry.Tag,
-		ParentHash:     eventEntry.ParentHash,
-		MaxEventId:     eventEntry.MaxEventId,
-		BlockSkipped:   eventEntry.BlockSkipped,
-		EventTag:       eventEntry.EventTag,
-		BlockTimestamp: eventEntry.BlockTimestamp,
-		Latest:         false,
+		EventTag:    eventEntry.EventTag,
+		BlockHeight: int64(eventEntry.BlockHeight),
+		Latest:      false,
+		Payload: firestoreEventEntryPayload{
+			EventId:        eventEntry.EventId,
+			EventType:      eventEntry.EventType,
+			BlockHeight:    int64(eventEntry.BlockHeight),
+			BlockHash:      eventEntry.BlockHash,
+			Tag:            eventEntry.Tag,
+			ParentHash:     eventEntry.ParentHash,
+			MaxEventId:     eventEntry.MaxEventId,
+			BlockSkipped:   eventEntry.BlockSkipped,
+			EventTag:       eventEntry.EventTag,
+			BlockTimestamp: eventEntry.BlockTimestamp,
+		},
 	}
-	if entry.Tag == 0 {
-		entry.Tag = model.DefaultBlockTag
+	if entry.Payload.Tag == 0 {
+		entry.Payload.Tag = model.DefaultBlockTag
 	}
 	return entry
 }
@@ -437,16 +447,16 @@ func (*eventStorageImpl) intoEventEntry(doc *firestore.DocumentSnapshot) (*model
 		return nil, xerrors.Errorf("expecting block Height to be uint64, but got %d", s.BlockHeight)
 	}
 	return &model.EventEntry{
-		EventId:        s.EventId,
-		EventType:      s.EventType,
-		BlockHeight:    uint64(s.BlockHeight),
-		BlockHash:      s.BlockHash,
-		Tag:            s.Tag,
-		ParentHash:     s.ParentHash,
-		MaxEventId:     s.MaxEventId,
-		BlockSkipped:   s.BlockSkipped,
-		EventTag:       s.EventTag,
-		BlockTimestamp: s.BlockTimestamp,
+		EventId:        s.Payload.EventId,
+		EventType:      s.Payload.EventType,
+		BlockHeight:    uint64(s.Payload.BlockHeight),
+		BlockHash:      s.Payload.BlockHash,
+		Tag:            s.Payload.Tag,
+		ParentHash:     s.Payload.ParentHash,
+		MaxEventId:     s.Payload.MaxEventId,
+		BlockSkipped:   s.Payload.BlockSkipped,
+		EventTag:       s.Payload.EventTag,
+		BlockTimestamp: s.Payload.BlockTimestamp,
 	}, nil
 }
 
