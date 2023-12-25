@@ -7,12 +7,14 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"golang.org/x/xerrors"
+	"google.golang.org/grpc/codes"
 
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+	"github.com/gogo/status"
 )
 
 const (
@@ -60,36 +62,6 @@ func (e *eventStorageImpl) validateEventTag(eventTag uint32) error {
 	return nil
 }
 
-func (e *eventStorageImpl) getLatestEventEntry(ctx context.Context, eventTag uint32, t *firestore.Transaction) (*model.EventEntry, error) {
-	query := e.client.
-		Collection("env").Doc(e.env).
-		Collection("events").Query.
-		Where("EventTag", "==", eventTag).
-		Where("Latest", "==", true).
-		Limit(2)
-	var latestDocs []*firestore.DocumentSnapshot
-	var err error
-	if t != nil {
-		latestDocs, err = t.Documents(query).GetAll()
-	} else {
-		latestDocs, err = query.Documents(ctx).GetAll()
-	}
-	if err != nil {
-		return nil, xerrors.Errorf("failed to get latest event entry: %w", err)
-	}
-	if len(latestDocs) > 1 {
-		return nil, xerrors.Errorf("failed to get latest event entry: more than 1 latest event entries")
-	}
-	if len(latestDocs) == 1 {
-		latest, err := e.intoEventEntry(latestDocs[0])
-		if err != nil {
-			return nil, xerrors.Errorf("failed to read latest event entry: %w", err)
-		}
-		return latest, nil
-	}
-	return nil, nil
-}
-
 // AddEventEntries implements internal.EventStorage.
 func (e *eventStorageImpl) AddEventEntries(ctx context.Context, eventTag uint32, eventEntries []*model.EventEntry) error {
 	if err := e.validateEventTag(eventTag); err != nil {
@@ -124,35 +96,25 @@ func (e *eventStorageImpl) AddEventEntries(ctx context.Context, eventTag uint32,
 
 		for start, end := 0, maxBulkWriteSize; start < len(eventEntries); start, end = end, end+maxBulkWriteSize {
 			err = e.client.RunTransaction(ctx, func(ctx context.Context, t *firestore.Transaction) error {
-				latestEvent, err := e.getLatestEventEntry(ctx, eventTag, t)
+				maxEventId, err := e.getMaxEventId(ctx, eventTag, t)
 				if err != nil {
 					return xerrors.Errorf("failed to get max event id: %w", err)
 				}
-				if latestEvent != nil && latestEvent.EventId >= startEventId {
+				if maxEventId != model.EventIdDeleted && maxEventId >= startEventId {
 					return xerrors.Errorf(
 						"cannot override existing event entry with max event id %d with events starting from event id %d",
-						latestEvent.EventId, startEventId)
-				}
-				if latestEvent != nil {
-					err = t.Set(e.getEventDocRef(eventTag, latestEvent.EventId), map[string]bool{
-						"Latest": false,
-					}, firestore.MergeAll)
-					if err != nil {
-						return xerrors.Errorf("failed to set max event id: %w", err)
-					}
+						maxEventId, startEventId)
 				}
 
-				for i := start; i < end && i < len(eventEntries); i++ {
+				i := start
+				for ; i < end && i < len(eventEntries); i++ {
 					data := e.fromEventEntry(eventEntries[i])
-					if i+1 == end || i+1 == len(eventEntries) {
-						data.Latest = true
-					}
 					err = t.Set(e.getEventDocRef(eventTag, data.Payload.EventId), data)
 					if err != nil {
 						return xerrors.Errorf("failed to save event entry with id %d: %w", data.Payload.EventId, err)
 					}
 				}
-				return nil
+				return e.setMaxEventId(ctx, eventTag, eventEntries[i-1].EventId, t)
 			})
 			if err != nil {
 				return xerrors.Errorf("failed to save event entries: %w", err)
@@ -185,12 +147,12 @@ func (e *eventStorageImpl) GetEventByEventId(ctx context.Context, eventTag uint3
 	}
 
 	return e.instrumentGetEventByEventId.Instrument(ctx, func(ctx context.Context) (*model.EventEntry, error) {
-		maxEventId, err := e.GetMaxEventId(ctx, eventTag)
+		maxEventId, err := e.getMaxEventId(ctx, eventTag, nil)
 		if err != nil {
-			if xerrors.Is(err, errors.ErrNoEventHistory) {
-				return nil, errors.ErrNoMaxEventIdFound
-			}
 			return nil, xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
+		}
+		if maxEventId == model.EventIdDeleted {
+			return nil, errors.ErrNoMaxEventIdFound
 		}
 		if eventId > maxEventId {
 			return nil, xerrors.Errorf("invalid eventId %d (event ends at %d) for eventTag=%d: %w", eventId, maxEventId, eventTag, errors.ErrInvalidEventId)
@@ -218,6 +180,7 @@ func (e *eventStorageImpl) GetEventsAfterEventId(ctx context.Context, eventTag u
 	return e.instrumentGetEventsAfterEventId.Instrument(ctx, func(ctx context.Context) ([]*model.EventEntry, error) {
 		docs, err := e.client.
 			Collection("env").Doc(e.env).
+			Collection("event-tags").Doc(fmt.Sprintf("%d", eventTag)).
 			Collection("events").Query.
 			StartAfter(e.getEventDocRef(eventTag, eventId)).
 			OrderBy(firestore.DocumentID, firestore.Asc).
@@ -240,8 +203,8 @@ func (e *eventStorageImpl) GetEventsAfterEventId(ctx context.Context, eventTag u
 func (e *eventStorageImpl) getEventsByBlockHeight(ctx context.Context, eventTag uint32, blockHeight uint64) ([]*model.EventEntry, error) {
 	docs, err := e.client.
 		Collection("env").Doc(e.env).
+		Collection("event-tags").Doc(fmt.Sprintf("%d", eventTag)).
 		Collection("events").Query.
-		Where("EventTag", "==", eventTag).
 		Where("BlockHeight", "==", int64(blockHeight)).
 		Documents(ctx).GetAll()
 	if err != nil {
@@ -279,6 +242,7 @@ func (e *eventStorageImpl) GetEventsByEventIdRange(ctx context.Context, eventTag
 	return e.instrumentGetEventsByEventIdRange.Instrument(ctx, func(ctx context.Context) ([]*model.EventEntry, error) {
 		docs, err := e.client.
 			Collection("env").Doc(e.env).
+			Collection("event-tags").Doc(fmt.Sprintf("%d", eventTag)).
 			Collection("events").Query.
 			StartAt(e.getEventDocRef(eventTag, minEventId)).
 			EndBefore(e.getEventDocRef(eventTag, maxEventId)).
@@ -333,14 +297,14 @@ func (e *eventStorageImpl) GetMaxEventId(ctx context.Context, eventTag uint32) (
 		return 0, err
 	}
 	return e.instrumentGetMaxEventId.Instrument(ctx, func(ctx context.Context) (int64, error) {
-		latestEvent, err := e.getLatestEventEntry(ctx, eventTag, nil)
+		maxEventId, err := e.getMaxEventId(ctx, eventTag, nil)
 		if err != nil {
-			return 0, err
+			return 0, nil
 		}
-		if latestEvent == nil {
+		if maxEventId == model.EventIdDeleted {
 			return 0, errors.ErrNoEventHistory
 		}
-		return latestEvent.EventId, nil
+		return maxEventId, nil
 	})
 }
 
@@ -354,12 +318,12 @@ func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, m
 	}
 	return e.instrumentSetMaxEventId.Instrument(ctx, func(ctx context.Context) error {
 		return e.client.RunTransaction(ctx, func(ctx context.Context, t *firestore.Transaction) error {
-			latestEvent, err := e.getLatestEventEntry(ctx, eventTag, t)
+			currentMaxEventId, err := e.getMaxEventId(ctx, eventTag, t)
 			if err != nil {
-				return err
+				return xerrors.Errorf("failed to get max event id: %w", err)
 			}
-			if latestEvent != nil && latestEvent.EventId < maxEventId {
-				return xerrors.Errorf("can not set max event id to be %d, which is bigger than current max event id: %d", maxEventId, latestEvent.EventId)
+			if maxEventId > currentMaxEventId {
+				return xerrors.Errorf("can not set max event id to be %d, which is bigger than current max event id: %d", maxEventId, currentMaxEventId)
 			}
 			if maxEventId != model.EventIdDeleted {
 				newLatestEventDocRef := e.getEventDocRef(eventTag, maxEventId)
@@ -370,22 +334,8 @@ func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, m
 				if !newLatestEventDoc.Exists() {
 					return xerrors.Errorf("event entry with new max event id %d does not exist", maxEventId)
 				}
-				err = t.Set(newLatestEventDocRef, map[string]bool{
-					"Latest": true,
-				}, firestore.MergeAll)
-				if err != nil {
-					return xerrors.Errorf("failed to set new max event id, error: %w", err)
-				}
 			}
-			if latestEvent != nil {
-				err = t.Set(e.getEventDocRef(eventTag, latestEvent.EventId), map[string]bool{
-					"Latest": false,
-				}, firestore.MergeAll)
-				if err != nil {
-					return xerrors.Errorf("failed to update previous max event id, error: %w", err)
-				}
-			}
-			return nil
+			return e.setMaxEventId(ctx, eventTag, maxEventId, t)
 		})
 	})
 }
@@ -393,31 +343,70 @@ func (e *eventStorageImpl) SetMaxEventId(ctx context.Context, eventTag uint32, m
 /////////////////////////////////////////////////////////
 // firestore storage
 
+// Fields in the payload map are configured not to be automatically indexed.
 type firestoreEventEntryPayload struct {
+	EventTag       uint32
 	EventId        int64
 	EventType      api.BlockchainEvent_Type
 	BlockHeight    int64
 	BlockHash      string
 	Tag            uint32
 	ParentHash     string
-	MaxEventId     int64
 	BlockSkipped   bool
-	EventTag       uint32
 	BlockTimestamp int64
 }
 
 type firestoreEventEntry struct {
-	EventTag    uint32
 	BlockHeight int64
-	Latest      bool
 	Payload     firestoreEventEntryPayload
+}
+
+type firestoreEventsCollectionMetadata struct {
+	MaxEventId int64
+}
+
+func (e *eventStorageImpl) getMaxEventId(ctx context.Context, eventTag uint32, t *firestore.Transaction) (int64, error) {
+	docRef := e.getEventsCollectionMetadataDocRef(eventTag)
+	var doc *firestore.DocumentSnapshot
+	var err error
+	if t == nil {
+		doc, err = docRef.Get(ctx)
+	} else {
+		doc, err = t.Get(docRef)
+	}
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return model.EventIdDeleted, nil
+		}
+		return 0, xerrors.Errorf("failed to get max event id, error: %w", err)
+	}
+	if doc.Exists() {
+		var entry firestoreEventsCollectionMetadata
+		err = doc.DataTo(&entry)
+		if err != nil {
+			return 0, xerrors.Errorf("failed to parse max event id from firestore, error: %w", err)
+		}
+		return entry.MaxEventId, nil
+	}
+	return model.EventIdDeleted, nil
+}
+
+func (e *eventStorageImpl) setMaxEventId(ctx context.Context, eventTag uint32, eventId int64, t *firestore.Transaction) error {
+	docRef := e.getEventsCollectionMetadataDocRef(eventTag)
+	var err error
+	var entry firestoreEventsCollectionMetadata
+	entry.MaxEventId = eventId
+	if t == nil {
+		_, err = docRef.Set(ctx, &entry)
+	} else {
+		err = t.Set(docRef, &entry)
+	}
+	return err
 }
 
 func (*eventStorageImpl) fromEventEntry(eventEntry *model.EventEntry) *firestoreEventEntry {
 	entry := &firestoreEventEntry{
-		EventTag:    eventEntry.EventTag,
 		BlockHeight: int64(eventEntry.BlockHeight),
-		Latest:      false,
 		Payload: firestoreEventEntryPayload{
 			EventId:        eventEntry.EventId,
 			EventType:      eventEntry.EventType,
@@ -425,7 +414,6 @@ func (*eventStorageImpl) fromEventEntry(eventEntry *model.EventEntry) *firestore
 			BlockHash:      eventEntry.BlockHash,
 			Tag:            eventEntry.Tag,
 			ParentHash:     eventEntry.ParentHash,
-			MaxEventId:     eventEntry.MaxEventId,
 			BlockSkipped:   eventEntry.BlockSkipped,
 			EventTag:       eventEntry.EventTag,
 			BlockTimestamp: eventEntry.BlockTimestamp,
@@ -453,7 +441,7 @@ func (*eventStorageImpl) intoEventEntry(doc *firestore.DocumentSnapshot) (*model
 		BlockHash:      s.Payload.BlockHash,
 		Tag:            s.Payload.Tag,
 		ParentHash:     s.Payload.ParentHash,
-		MaxEventId:     s.Payload.MaxEventId,
+		MaxEventId:     0,
 		BlockSkipped:   s.Payload.BlockSkipped,
 		EventTag:       s.Payload.EventTag,
 		BlockTimestamp: s.Payload.BlockTimestamp,
@@ -461,5 +449,9 @@ func (*eventStorageImpl) intoEventEntry(doc *firestore.DocumentSnapshot) (*model
 }
 
 func (e *eventStorageImpl) getEventDocRef(eventTag uint32, eventId int64) *firestore.DocumentRef {
-	return e.client.Doc(fmt.Sprintf("env/%s/events/%d-%020d", e.env, eventTag, eventId))
+	return e.client.Doc(fmt.Sprintf("env/%s/event-tags/%d/events/%020d", e.env, eventTag, eventId))
+}
+
+func (e *eventStorageImpl) getEventsCollectionMetadataDocRef(eventTag uint32) *firestore.DocumentRef {
+	return e.client.Doc(fmt.Sprintf("env/%s/event-tags/%d", e.env, eventTag))
 }

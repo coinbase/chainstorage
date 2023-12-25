@@ -93,7 +93,7 @@ func (s *eventStorageTestSuite) verifyEvents(eventTag uint32, numEvents uint64, 
 		}
 		followingEvents, err := s.storage.GetEventsAfterEventId(ctx, eventTag, event.EventId, numFollowingEventsToFetch)
 		require.NoError(err)
-		require.Equal(uint64(len(followingEvents)), expectedNumEvents)
+		require.Equal(expectedNumEvents, uint64(len(followingEvents)))
 		for j, followingEvent := range followingEvents {
 			require.Equal(int64(i+j+1)+model.EventIdStartValue, followingEvent.EventId)
 			require.Equal(uint64(i+j+1), followingEvent.BlockHeight)
