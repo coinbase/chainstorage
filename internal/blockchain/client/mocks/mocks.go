@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/blockchain/client/mocks/mocks.go -package clientmocks github.com/coinbase/chainstorage/internal/blockchain/client Client
 //
+
 // Package clientmocks is a generated GoMock package.
 package clientmocks
 

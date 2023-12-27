@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/storage/blobstorage/downloader/mocks/mocks.go -package downloadermocks github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader BlockDownloader
 //
+
 // Package downloadermocks is a generated GoMock package.
 package downloadermocks
 

@@ -5,6 +5,7 @@
 //
 //	mockgen -destination sdk/mocks/mocks.go -package sdkmocks github.com/coinbase/chainstorage/sdk Client,Parser,Session
 //
+
 // Package sdkmocks is a generated GoMock package.
 package sdkmocks
 

@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/dlq/mocks/mocks.go -package dlqmocks github.com/coinbase/chainstorage/internal/dlq DLQ
 //
+
 // Package dlqmocks is a generated GoMock package.
 package dlqmocks
 
