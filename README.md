@@ -24,19 +24,12 @@
   - [Running Server](#running-server)
   - [AWS localstack](#aws-localstack)
   - [Temporal Workflow](#temporal-workflow)
-  - [Checking Workflow Statuses](#checking-workflow-statuses)
 - [Failover](#failover)
   - [Nodes Failover](#nodes-failover)
   - [Failover in Workflows](#failover-in-workflows)
   - [Automatic Failover in Poller Workflow](#automatic-failover-in-poller-workflow)
-- [Deployment](#deployment)
-  - [Deploy Local Changes](#deploy-local-changes)
-  - [Deploy with Codeflow UI](#deploy-with-codeflow-ui)
-    - [Deploy a PR](#deploy-a-pr)
-    - [Deploy from Master](#deploy-from-master)
-  - [Deploy with Script](#deploy-with-script)
-  - [Post-deployment Validation](#post-deployment-validation)
-- [APIs](#apis)
+  - [Checking Workflow Statuses](#checking-workflow-statuses)
+  - [APIs](#apis)
   - [APIs List](#apis-list)
 - [SDK](#sdk)
   - [Data Processing Pattern](#data-processing-pattern)
@@ -70,7 +63,7 @@ brew install go@1.20
 brew unlink go
 brew link go@1.20
 
-brew install protobuf@25
+brew install protobuf@25.1
 brew unlink protobuf
 brew link protobuf
 
