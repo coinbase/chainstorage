@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/blockchain/restapi/mocks/mocks.go -package restapimocks github.com/coinbase/chainstorage/internal/blockchain/restapi Client,HTTPClient
 //
+
 // Package restapimocks is a generated GoMock package.
 package restapimocks
 

@@ -9,12 +9,13 @@ import (
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 
+	"github.com/gogo/status"
+
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
-	"github.com/gogo/status"
 )
 
 const (

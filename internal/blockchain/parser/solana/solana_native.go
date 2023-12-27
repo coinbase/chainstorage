@@ -698,7 +698,10 @@ func (p *solanaNativeParserImpl) parseTransactionMessage(message *SolanaMessage,
 		return nil, nil, xerrors.Errorf("failed to parse message: %w", err)
 	}
 
-	accounts := richMessage.AccountMetaList()
+	accounts, err := richMessage.AccountMetaList()
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to get account meta: %w", err)
+	}
 
 	// Need to append addresses from lookup tables for non-legacy transaction type.
 	// https://docs.solana.com/developing/clients/jsonrpc-api#results-2

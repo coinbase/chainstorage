@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/blockchain/jsonrpc/mocks/mocks.go -package jsonrpcmocks github.com/coinbase/chainstorage/internal/blockchain/jsonrpc Client,HTTPClient
 //
+
 // Package jsonrpcmocks is a generated GoMock package.
 package jsonrpcmocks
 

@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/storage/blobstorage/mocks/mocks.go -package blobstoragemocks github.com/coinbase/chainstorage/internal/storage/blobstorage BlobStorage
 //
+
 // Package blobstoragemocks is a generated GoMock package.
 package blobstoragemocks
 

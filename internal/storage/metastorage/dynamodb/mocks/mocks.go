@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/storage/metastorage/dynamodb/mocks/mocks.go -package dynamodbmocks github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb DynamoAPI
 //
+
 // Package dynamodbmocks is a generated GoMock package.
 package dynamodbmocks
 

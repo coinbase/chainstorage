@@ -5,6 +5,7 @@
 //
 //	mockgen -destination protos/coinbase/chainstorage/mocks/mocks.go -package chainstoragemocks github.com/coinbase/chainstorage/protos/coinbase/chainstorage ChainStorageClient,ChainStorage_StreamChainEventsClient
 //
+
 // Package chainstoragemocks is a generated GoMock package.
 package chainstoragemocks
 

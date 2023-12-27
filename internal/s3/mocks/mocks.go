@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/s3/mocks/mocks.go -package s3mocks github.com/coinbase/chainstorage/internal/s3 Downloader,Uploader,Client
 //
+
 // Package s3mocks is a generated GoMock package.
 package s3mocks
 
@@ -416,6 +417,56 @@ func (mr *MockClientMockRecorder) CreateMultipartUploadWithContext(arg0, arg1 an
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMultipartUploadWithContext", reflect.TypeOf((*MockClient)(nil).CreateMultipartUploadWithContext), varargs...)
+}
+
+// CreateSession mocks base method.
+func (m *MockClient) CreateSession(arg0 *s3.CreateSessionInput) (*s3.CreateSessionOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSession", arg0)
+	ret0, _ := ret[0].(*s3.CreateSessionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSession indicates an expected call of CreateSession.
+func (mr *MockClientMockRecorder) CreateSession(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSession", reflect.TypeOf((*MockClient)(nil).CreateSession), arg0)
+}
+
+// CreateSessionRequest mocks base method.
+func (m *MockClient) CreateSessionRequest(arg0 *s3.CreateSessionInput) (*request.Request, *s3.CreateSessionOutput) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSessionRequest", arg0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*s3.CreateSessionOutput)
+	return ret0, ret1
+}
+
+// CreateSessionRequest indicates an expected call of CreateSessionRequest.
+func (mr *MockClientMockRecorder) CreateSessionRequest(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSessionRequest", reflect.TypeOf((*MockClient)(nil).CreateSessionRequest), arg0)
+}
+
+// CreateSessionWithContext mocks base method.
+func (m *MockClient) CreateSessionWithContext(arg0 context.Context, arg1 *s3.CreateSessionInput, arg2 ...request.Option) (*s3.CreateSessionOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateSessionWithContext", varargs...)
+	ret0, _ := ret[0].(*s3.CreateSessionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSessionWithContext indicates an expected call of CreateSessionWithContext.
+func (mr *MockClientMockRecorder) CreateSessionWithContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSessionWithContext", reflect.TypeOf((*MockClient)(nil).CreateSessionWithContext), varargs...)
 }
 
 // DeleteBucket mocks base method.
@@ -3166,6 +3217,89 @@ func (mr *MockClientMockRecorder) ListBucketsWithContext(arg0, arg1 any, arg2 ..
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBucketsWithContext", reflect.TypeOf((*MockClient)(nil).ListBucketsWithContext), varargs...)
+}
+
+// ListDirectoryBuckets mocks base method.
+func (m *MockClient) ListDirectoryBuckets(arg0 *s3.ListDirectoryBucketsInput) (*s3.ListDirectoryBucketsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListDirectoryBuckets", arg0)
+	ret0, _ := ret[0].(*s3.ListDirectoryBucketsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListDirectoryBuckets indicates an expected call of ListDirectoryBuckets.
+func (mr *MockClientMockRecorder) ListDirectoryBuckets(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDirectoryBuckets", reflect.TypeOf((*MockClient)(nil).ListDirectoryBuckets), arg0)
+}
+
+// ListDirectoryBucketsPages mocks base method.
+func (m *MockClient) ListDirectoryBucketsPages(arg0 *s3.ListDirectoryBucketsInput, arg1 func(*s3.ListDirectoryBucketsOutput, bool) bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListDirectoryBucketsPages", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ListDirectoryBucketsPages indicates an expected call of ListDirectoryBucketsPages.
+func (mr *MockClientMockRecorder) ListDirectoryBucketsPages(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDirectoryBucketsPages", reflect.TypeOf((*MockClient)(nil).ListDirectoryBucketsPages), arg0, arg1)
+}
+
+// ListDirectoryBucketsPagesWithContext mocks base method.
+func (m *MockClient) ListDirectoryBucketsPagesWithContext(arg0 context.Context, arg1 *s3.ListDirectoryBucketsInput, arg2 func(*s3.ListDirectoryBucketsOutput, bool) bool, arg3 ...request.Option) error {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1, arg2}
+	for _, a := range arg3 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListDirectoryBucketsPagesWithContext", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ListDirectoryBucketsPagesWithContext indicates an expected call of ListDirectoryBucketsPagesWithContext.
+func (mr *MockClientMockRecorder) ListDirectoryBucketsPagesWithContext(arg0, arg1, arg2 any, arg3 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1, arg2}, arg3...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDirectoryBucketsPagesWithContext", reflect.TypeOf((*MockClient)(nil).ListDirectoryBucketsPagesWithContext), varargs...)
+}
+
+// ListDirectoryBucketsRequest mocks base method.
+func (m *MockClient) ListDirectoryBucketsRequest(arg0 *s3.ListDirectoryBucketsInput) (*request.Request, *s3.ListDirectoryBucketsOutput) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListDirectoryBucketsRequest", arg0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*s3.ListDirectoryBucketsOutput)
+	return ret0, ret1
+}
+
+// ListDirectoryBucketsRequest indicates an expected call of ListDirectoryBucketsRequest.
+func (mr *MockClientMockRecorder) ListDirectoryBucketsRequest(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDirectoryBucketsRequest", reflect.TypeOf((*MockClient)(nil).ListDirectoryBucketsRequest), arg0)
+}
+
+// ListDirectoryBucketsWithContext mocks base method.
+func (m *MockClient) ListDirectoryBucketsWithContext(arg0 context.Context, arg1 *s3.ListDirectoryBucketsInput, arg2 ...request.Option) (*s3.ListDirectoryBucketsOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListDirectoryBucketsWithContext", varargs...)
+	ret0, _ := ret[0].(*s3.ListDirectoryBucketsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListDirectoryBucketsWithContext indicates an expected call of ListDirectoryBucketsWithContext.
+func (mr *MockClientMockRecorder) ListDirectoryBucketsWithContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDirectoryBucketsWithContext", reflect.TypeOf((*MockClient)(nil).ListDirectoryBucketsWithContext), varargs...)
 }
 
 // ListMultipartUploads mocks base method.

@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/blockchain/parser/mocks/mocks.go -package parsermocks github.com/coinbase/chainstorage/internal/blockchain/parser Parser
 //
+
 // Package parsermocks is a generated GoMock package.
 package parsermocks
 

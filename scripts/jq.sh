@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-JQ_VERSION=1.7
+JQ_VERSION=1.7.1
 SCRIPTS_DIR=$(dirname "${BASH_SOURCE[0]}")
 BIN_DIR=${SCRIPTS_DIR}/bin
 JQ_INSTALL_PATH=${BIN_DIR}/jq-${JQ_VERSION}

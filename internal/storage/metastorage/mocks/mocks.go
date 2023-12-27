@@ -5,6 +5,7 @@
 //
 //	mockgen -destination internal/storage/metastorage/mocks/mocks.go -package metastoragemocks github.com/coinbase/chainstorage/internal/storage/metastorage MetaStorage,EventStorage,BlockStorage,TransactionStorage
 //
+
 // Package metastoragemocks is a generated GoMock package.
 package metastoragemocks
 
