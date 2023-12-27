@@ -1,6 +1,7 @@
 package ratelimiter
 
 import (
+	"context"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -14,7 +15,7 @@ type (
 
 // New returns a new Limiter that allows events up to r requests per second.
 func New(rps int) *RateLimiter {
-	if rps == 0 {
+	if rps <= 0 {
 		// Unlimited
 		return nil
 	}
@@ -43,6 +44,15 @@ func (l *RateLimiter) AllowN(n int) bool {
 	}
 
 	return l.limiter.AllowN(time.Now(), n)
+}
+
+// WaitN blocks until it permits n events to happen
+func (l *RateLimiter) WaitN(ctx context.Context, n int) (err error) {
+	if l == nil {
+		return nil
+	}
+
+	return l.limiter.WaitN(ctx, n)
 }
 
 // Limit returns the maximum overall event rate.

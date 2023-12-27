@@ -296,6 +296,7 @@ type (
 		Password   string            `json:"password"`
 		Weight     uint8             `json:"weight"`
 		ExtraUrls  map[string]string `json:"extra_urls"`
+		RPS        int               `json:"rps"`
 	}
 
 	EndpointConfig struct {
