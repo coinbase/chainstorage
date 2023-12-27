@@ -264,20 +264,6 @@ func makeWatermarkVersionedDDBEntry(eventTag uint32, eventId int64) *ddbmodel.Ve
 	}
 }
 
-func convertBlockEventsToEventEntries(blockEvents []*model.BlockEvent, eventTag uint32, eventId int64) []*model.EventEntry {
-	if len(blockEvents) == 0 {
-		return []*model.EventEntry{}
-	}
-	eventEntries := make([]*model.EventEntry, len(blockEvents))
-	for i, inputEvent := range blockEvents {
-		event := model.NewEventEntry(eventTag, eventId, inputEvent)
-		eventEntries[i] = event
-		eventId += 1
-	}
-
-	return eventEntries
-}
-
 func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error {
 	if err := e.validateEventTag(eventTag); err != nil {
 		return err
@@ -294,7 +280,7 @@ func (e *eventStorageImpl) AddEvents(ctx context.Context, eventTag uint32, event
 		startEventId = maxEventId + 1
 	}
 
-	eventsToAdd := convertBlockEventsToEventEntries(events, eventTag, startEventId)
+	eventsToAdd := model.ConvertBlockEventsToEventEntries(events, eventTag, startEventId)
 
 	return e.AddEventEntries(ctx, eventTag, eventsToAdd)
 }
@@ -323,7 +309,7 @@ func (e *eventStorageImpl) AddEventEntries(ctx context.Context, eventTag uint32,
 			eventsToValidate = eventEntries
 		}
 
-		err := e.validateEvents(eventsToValidate)
+		err := internal.ValidateEvents(eventsToValidate)
 		if err != nil {
 			return xerrors.Errorf("events failed validation: %w", err)
 		}
@@ -476,24 +462,10 @@ func (e *eventStorageImpl) GetEventsAfterEventId(ctx context.Context, eventTag u
 		return nil, err
 	}
 
-	if err := e.validateEvents(events); err != nil {
+	if err := internal.ValidateEvents(events); err != nil {
 		return nil, xerrors.Errorf("events failed validation for eventTag=%d: %w", eventTag, err)
 	}
 	return events, nil
-}
-
-func (e *eventStorageImpl) validateEvents(events []*model.EventEntry) error {
-	// check if event ids are continuous
-	for i, event := range events {
-		if i > 0 {
-			if event.EventId != events[i-1].EventId+1 {
-				return xerrors.Errorf("events are not continuous: prev event id: %d, current event id: %d", events[i-1].EventId, event.EventId)
-			}
-		}
-	}
-	// check if we can prepend events to an event-chain adaptor to make sure it can construct a continuous chain
-	eventsToChainAdaptor := internal.NewEventsToChainAdaptor()
-	return eventsToChainAdaptor.AppendEvents(events)
 }
 
 func (e *eventStorageImpl) GetMaxEventId(ctx context.Context, eventTag uint32) (int64, error) {

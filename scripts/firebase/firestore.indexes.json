@@ -1,3 +1,10 @@
 {
-  "indexes": []
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "events",
+      "fieldPath": "Payload",
+      "indexes": []
+    }
+  ]
 }

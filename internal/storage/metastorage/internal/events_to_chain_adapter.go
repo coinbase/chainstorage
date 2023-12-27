@@ -96,3 +96,17 @@ func (e *EventsToChainAdaptor) PopEventForTailBlock() (*model.EventEntry, error)
 	}
 	return nil, errors.ErrNoEventAvailable
 }
+
+func ValidateEvents(events []*model.EventEntry) error {
+	// check if event ids are continuous
+	for i, event := range events {
+		if i > 0 {
+			if event.EventId != events[i-1].EventId+1 {
+				return xerrors.Errorf("events are not continuous: prev event id: %d, current event id: %d", events[i-1].EventId, event.EventId)
+			}
+		}
+	}
+	// check if we can prepend events to an event-chain adaptor to make sure it can construct a continuous chain
+	eventsToChainAdaptor := NewEventsToChainAdaptor()
+	return eventsToChainAdaptor.AppendEvents(events)
+}

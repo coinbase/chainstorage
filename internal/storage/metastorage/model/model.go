@@ -108,3 +108,17 @@ func CastItemToEventEntry(outputItem any) (*EventEntry, bool) {
 	}
 	return eventEntry, true
 }
+
+func ConvertBlockEventsToEventEntries(blockEvents []*BlockEvent, eventTag uint32, eventId int64) []*EventEntry {
+	if len(blockEvents) == 0 {
+		return []*EventEntry{}
+	}
+	eventEntries := make([]*EventEntry, len(blockEvents))
+	for i, inputEvent := range blockEvents {
+		event := NewEventEntry(eventTag, eventId, inputEvent)
+		eventEntries[i] = event
+		eventId += 1
+	}
+
+	return eventEntries
+}

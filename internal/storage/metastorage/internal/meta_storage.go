@@ -26,7 +26,7 @@ type (
 
 	EventStorage interface {
 		AddEvents(ctx context.Context, eventTag uint32, events []*model.BlockEvent) error
-		AddEventEntries(ctx context.Context, eventTag uint32, eventDDBEntries []*model.EventEntry) error
+		AddEventEntries(ctx context.Context, eventTag uint32, eventEntries []*model.EventEntry) error
 		GetEventByEventId(ctx context.Context, eventTag uint32, eventId int64) (*model.EventEntry, error)
 		GetEventsAfterEventId(ctx context.Context, eventTag uint32, eventId int64, maxEvents uint64) ([]*model.EventEntry, error)
 		GetEventsByEventIdRange(ctx context.Context, eventTag uint32, minEventId int64, maxEventId int64) ([]*model.EventEntry, error)

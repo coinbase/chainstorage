@@ -58,13 +58,9 @@ func (s *blockStorageTestSuite) SetupTest() {
 	defer app.Close()
 	s.accessor = accessor
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("http://%s/emulator/v1/projects/%s/databases/(default)/documents", os.Getenv("FIRESTORE_EMULATOR_HOST"), cfg.GCP.Project), nil)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 	_, err = http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 }
 
 func (s *blockStorageTestSuite) TestPersistBlockMetasByMaxWriteSize() {
