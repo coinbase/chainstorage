@@ -401,6 +401,7 @@ func TestEndpointParsing(t *testing.T) {
 				User:     "testUser",
 				Password: "testPassword",
 				Weight:   1,
+				RPS:      0,
 			},
 		},
 		EndpointConfig: config.EndpointConfig{
@@ -550,6 +551,22 @@ func TestEndpointGroup(t *testing.T) {
 						User:     "foo",
 						Password: "bar",
 						Weight:   4,
+					},
+				},
+				UseFailover: false,
+			},
+		},
+		{
+			fixture: "non_zero_rps",
+			expected: config.EndpointGroup{
+				Endpoints: []config.Endpoint{
+					{
+						Name:     "chain-storage-eth-04",
+						Url:      "https://254c3b9c-be59-41c3-8f6f-3cc3342c7b3c.ethereum.bison.run",
+						User:     "foo",
+						Password: "bar",
+						Weight:   4,
+						RPS:      100,
 					},
 				},
 				UseFailover: false,

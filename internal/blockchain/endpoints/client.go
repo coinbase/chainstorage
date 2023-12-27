@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"golang.org/x/xerrors"
+
+	"github.com/coinbase/chainstorage/internal/utils/ratelimiter"
 )
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -12,20 +16,24 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			req.Header.Set(key, val)
 		}
 	}
-
+	err := rt.rateLimiter.WaitN(req.Context(), 1)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to wait for rate limiting: %w", err)
+	}
 	res, err := rt.base.RoundTrip(req)
 	return res, err
 }
 
-func WrapHTTPClient(client *http.Client, headers map[string]string) *http.Client {
+func WrapHTTPClient(client *http.Client, headers map[string]string, rps int) *http.Client {
 	transport := client.Transport
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
 
 	client.Transport = &roundTripper{
-		base:    transport,
-		headers: headers,
+		base:        transport,
+		headers:     headers,
+		rateLimiter: ratelimiter.New(rps),
 	}
 
 	return client

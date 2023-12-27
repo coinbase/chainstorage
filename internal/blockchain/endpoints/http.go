@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
 	tracehttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
+
+	"github.com/coinbase/chainstorage/internal/utils/ratelimiter"
 )
 
 type (
@@ -24,6 +26,7 @@ type (
 		stickySessionHeader *stickySessionHeader
 		headers             map[string]string
 		rootCAs             *x509.CertPool
+		rps                 int
 	}
 
 	// stickySessionJar implements passive cookie affinity.
@@ -42,9 +45,10 @@ type (
 	}
 
 	roundTripper struct {
-		base    http.RoundTripper
-		logger  *zap.Logger
-		headers map[string]string
+		base        http.RoundTripper
+		logger      *zap.Logger
+		headers     map[string]string
+		rateLimiter *ratelimiter.RateLimiter
 	}
 )
 
@@ -94,7 +98,7 @@ func newDefaultClient(options *clientOptions) (*http.Client, error) {
 		Timeout:   options.timeout,
 		Transport: transport,
 	}
-	wrapClient := WrapHTTPClient(client, options.headers)
+	wrapClient := WrapHTTPClient(client, options.headers, options.rps)
 	return wrapClient, nil
 }
 
@@ -125,7 +129,7 @@ func newStickyClient(options *clientOptions) (*http.Client, error) {
 		headers[key] = val
 	}
 
-	wrapClient := WrapHTTPClient(client, headers)
+	wrapClient := WrapHTTPClient(client, headers, options.rps)
 	return wrapClient, nil
 }
 
@@ -192,5 +196,11 @@ func withOverrideRequestTimeout(timeout time.Duration) ClientOption {
 func withRootCAs(roots *x509.CertPool) ClientOption {
 	return func(opts *clientOptions) {
 		opts.rootCAs = roots
+	}
+}
+
+func withRPS(rps int) ClientOption {
+	return func(opts *clientOptions) {
+		opts.rps = rps
 	}
 }
