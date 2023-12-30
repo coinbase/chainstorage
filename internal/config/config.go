@@ -154,8 +154,8 @@ type (
 	}
 
 	CadenceTLSConfig struct {
-		Enabled              bool   `mapstructure:"enabled" validate:"required"`
-		ValidateHostname     bool   `mapstructure:"validate_hostname" validate:"required"`
+		Enabled              bool   `mapstructure:"enabled"`
+		ValidateHostname     bool   `mapstructure:"validate_hostname"`
 		CertificateAuthority string `mapstructure:"certificate_authority"`
 		ClientCertificate    string `mapstructure:"client_certificate"`
 		ClientPrivateKey     string `mapstructure:"client_private_key"`
