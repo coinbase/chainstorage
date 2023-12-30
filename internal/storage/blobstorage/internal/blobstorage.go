@@ -24,7 +24,8 @@ type (
 	BlobStorageFactoryParams struct {
 		fx.In
 		fxparams.Params
-		S3 BlobStorageFactory `name:"blobstorage/s3"`
+		S3  BlobStorageFactory `name:"blobstorage/s3"`
+		GCS BlobStorageFactory `name:"blobstorage/gcs"`
 	}
 )
 
@@ -34,6 +35,8 @@ func WithBlobStorageFactory(params BlobStorageFactoryParams) (BlobStorage, error
 	switch storageType {
 	case config.BlobStorageType_UNSPECIFIED, config.BlobStorageType_S3:
 		factory = params.S3
+	case config.BlobStorageType_GCS:
+		factory = params.GCS
 	}
 	if factory == nil {
 		return nil, xerrors.Errorf("blob storage type is not implemented: %v", storageType)

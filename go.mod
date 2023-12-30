@@ -4,9 +4,10 @@ go 1.20
 
 require (
 	cloud.google.com/go/firestore v1.14.0
+	cloud.google.com/go/storage v1.35.1
 	github.com/VividCortex/ewma v1.2.0
-	github.com/aws/aws-sdk-go v1.49.10
-	github.com/btcsuite/btcd/btcutil v1.1.4
+	github.com/aws/aws-sdk-go v1.49.13
+	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/coinbase/rosetta-sdk-go v0.8.3
@@ -57,6 +58,7 @@ require (
 	cloud.google.com/go v0.110.10 // indirect
 	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/iam v1.1.5 // indirect
 	cloud.google.com/go/longrunning v0.5.4 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.4 // indirect
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
