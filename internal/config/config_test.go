@@ -40,7 +40,7 @@ var (
 	}
 )
 
-func TestConfig(t *testing.T) {
+func TestValidateConfigs(t *testing.T) {
 	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
 		require := testutil.Require(t)
 
@@ -119,17 +119,36 @@ func TestConfig(t *testing.T) {
 		if cfg.Api.RateLimit.GlobalRPS > 0 && cfg.Api.RateLimit.PerClientRPS > 0 {
 			require.Greater(cfg.Api.RateLimit.GlobalRPS, cfg.Api.RateLimit.PerClientRPS)
 		}
+	})
+}
 
-		// Verify derived configs.
+func TestDerivedConfigValues(t *testing.T) {
+	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
+		require := testutil.Require(t)
+		configName := cfg.ConfigName
+		normalizedConfigName := strings.ReplaceAll(configName, "_", "-")
+
+		// Verify template derived configs.
+		dynamoDB := config.DynamoDBConfig{
+			BlockTable:                    fmt.Sprintf("example_chainstorage_blocks_%v", configName),
+			EventTable:                    cfg.AWS.DynamoDB.EventTable,
+			EventTableHeightIndex:         cfg.AWS.DynamoDB.EventTableHeightIndex,
+			VersionedEventTable:           fmt.Sprintf("example_chainstorage_versioned_block_events_%v", configName),
+			VersionedEventTableBlockIndex: fmt.Sprintf("example_chainstorage_versioned_block_events_by_block_id_%v", configName),
+			TransactionTable:              cfg.AWS.DynamoDB.TransactionTable,
+			// Skip DynamoDB.Arn verification
+			Arn: "",
+		}
+
 		expectedAWS := config.AwsConfig{
 			Region:                 "us-east-1",
-			Bucket:                 cfg.AWS.Bucket,
-			DynamoDB:               cfg.AWS.DynamoDB,
+			Bucket:                 fmt.Sprintf("example-chainstorage-%v-%v", normalizedConfigName, cfg.AwsEnv()),
+			DynamoDB:               dynamoDB,
 			IsLocalStack:           true,
 			IsResetLocal:           true,
 			PresignedUrlExpiration: 30 * time.Minute,
 			DLQ: config.SQSConfig{
-				Name:                  cfg.AWS.DLQ.Name,
+				Name:                  fmt.Sprintf("example_chainstorage_blocks_%v_dlq", configName),
 				VisibilityTimeoutSecs: 600,
 				DelaySecs:             900,
 				OwnerAccountId:        cfg.AWS.DLQ.OwnerAccountId,
@@ -141,19 +160,6 @@ func TestConfig(t *testing.T) {
 			AWSAccount: cfg.AWS.AWSAccount,
 		}
 		require.Equal(expectedAWS, cfg.AWS)
-	})
-}
-
-func TestConfigAWSResourceNames(t *testing.T) {
-	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
-		require := testutil.Require(t)
-		configName := cfg.ConfigName
-		normalizedConfigName := strings.ReplaceAll(configName, "_", "-")
-		require.Equal(fmt.Sprintf("example-chainstorage-%v-%v", normalizedConfigName, cfg.AwsEnv()), cfg.AWS.Bucket)
-		require.Equal(fmt.Sprintf("example_chainstorage_blocks_%v", configName), cfg.AWS.DynamoDB.BlockTable)
-		require.Equal(fmt.Sprintf("example_chainstorage_versioned_block_events_%v", configName), cfg.AWS.DynamoDB.VersionedEventTable)
-		require.Equal(fmt.Sprintf("example_chainstorage_versioned_block_events_by_block_id_%v", configName), cfg.AWS.DynamoDB.VersionedEventTableBlockIndex)
-		require.Equal(fmt.Sprintf("example_chainstorage_blocks_%v_dlq", configName), cfg.AWS.DLQ.Name)
 	})
 }
 

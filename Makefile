@@ -55,7 +55,7 @@ docker-build:
 .PHONY: validate-configs
 validate-configs:
 	@echo "--- validate-config"
-	TEST_TYPE=unit go test ./internal/config -run=TestConfig$
+	TEST_TYPE=unit go test ./internal/config -run=TestValidateConfigs$
 
 .PHONY: test
 test: fmt lint
