@@ -52,6 +52,11 @@ docker-build:
 	@echo "--- docker-build"
 	docker build -t coinbase/chainstorage .
 
+.PHONY: validate-configs
+validate-configs:
+	@echo "--- validate-config"
+	TEST_TYPE=unit go test ./internal/config -run=TestValidateConfigs$
+
 .PHONY: test
 test: fmt lint
 	@echo "--- test"

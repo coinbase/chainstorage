@@ -40,7 +40,7 @@ var (
 	}
 )
 
-func TestConfig(t *testing.T) {
+func TestValidateConfigs(t *testing.T) {
 	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
 		require := testutil.Require(t)
 
@@ -119,8 +119,16 @@ func TestConfig(t *testing.T) {
 		if cfg.Api.RateLimit.GlobalRPS > 0 && cfg.Api.RateLimit.PerClientRPS > 0 {
 			require.Greater(cfg.Api.RateLimit.GlobalRPS, cfg.Api.RateLimit.PerClientRPS)
 		}
+	})
+}
 
-		// Verify derived configs.
+func TestDerivedConfigValues(t *testing.T) {
+	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
+		require := testutil.Require(t)
+		configName := cfg.ConfigName
+		normalizedConfigName := strings.ReplaceAll(configName, "_", "-")
+
+		// Verify template derived configs.
 		dynamoDB := config.DynamoDBConfig{
 			BlockTable:                    fmt.Sprintf("example_chainstorage_blocks_%v", configName),
 			EventTable:                    cfg.AWS.DynamoDB.EventTable,
