@@ -440,7 +440,7 @@ var (
 	BlobStorageType_value = map[string]int32{
 		"UNSPECIFIED": 0,
 		"S3":          1,
-		"GCS":         1,
+		"GCS":         2,
 	}
 
 	MetaStorageType_value = map[string]int32{
