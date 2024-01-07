@@ -12,15 +12,15 @@ import (
 
 type (
 	Config struct {
-		Blockchain      common.Blockchain `validate:"required"`
-		Network         common.Network    `validate:"required"`
-		Env             Env               `validate:"required,oneof=production development local"`
-		Sidechain       api.SideChain
-		Tag             uint32
-		ClientID        string
-		ServerAddress   string
-		ClientTimeout   time.Duration
-		BlockValidation *bool
+		Blockchain      common.Blockchain `mapstructure:"blockchain" validate:"required"`
+		Network         common.Network    `mapstructure:"network" validate:"required"`
+		Env             Env               `mapstructure:"env" validate:"required,oneof=production development local"`
+		Sidechain       api.SideChain     `mapstructure:"side_chain"`
+		Tag             uint32            `mapstructure:"tag"`
+		ClientID        string            `mapstructure:"client_id"`
+		ServerAddress   string            `mapstructure:"server_address"`
+		ClientTimeout   time.Duration     `mapstructure:"client_timeout"`
+		BlockValidation *bool             `mapstructure:"block_validation"`
 	}
 
 	Env = config.Env
