@@ -1,7 +1,6 @@
 package gcs
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5" // #nosec G501
 	"fmt"
@@ -144,6 +143,7 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 
 		object := s.client.Bucket(s.bucket).Object(key)
 		w := object.NewWriter(ctx)
+		w.MD5 = checksum
 		_, err = w.Write(data)
 		if err != nil {
 			return "", xerrors.Errorf("failed to upload block data: %w", err)
@@ -151,14 +151,6 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 		err = w.Close()
 		if err != nil {
 			return "", xerrors.Errorf("failed to upload block data: %w", err)
-		}
-
-		attrs, err := object.Attrs(ctx)
-		if err != nil {
-			return "", xerrors.Errorf("failed to load attributes for uploaded block data: %w", err)
-		}
-		if !bytes.Equal(checksum, attrs.MD5) {
-			return "", xerrors.Errorf("uploaded block md5 checksum %x is different from expected %x", attrs.MD5, checksum)
 		}
 
 		// a workaround to use timer
