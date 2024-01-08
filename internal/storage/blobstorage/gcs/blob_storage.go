@@ -144,7 +144,6 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 
 		object := s.client.Bucket(s.bucket).Object(key)
 		w := object.NewWriter(ctx)
-		w.MD5 = checksum
 		_, err = w.Write(data)
 		if err != nil {
 			return "", xerrors.Errorf("failed to upload block data: %w", err)
@@ -154,7 +153,7 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 			return "", xerrors.Errorf("failed to upload block data: %w", err)
 		}
 
-		attrs, err := object.Attrs(ctx)
+		attrs := w.Attrs()
 		if err != nil {
 			return "", xerrors.Errorf("failed to load attributes for uploaded block data: %w", err)
 		}
