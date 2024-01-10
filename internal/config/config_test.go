@@ -400,7 +400,7 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 
 func TestConfigOverrideConfigPath(t *testing.T) {
 	require := testutil.Require(t)
-	err := os.Setenv(config.EnvVarConfigPath, "config/chainstorage/ethereum/mainnet/base.yml")
+	err := os.Setenv(config.EnvVarConfigPath, "../../config/chainstorage/ethereum/mainnet/base.yml")
 	require.NoError(err)
 	defer os.Unsetenv(config.EnvVarConfigPath)
 
