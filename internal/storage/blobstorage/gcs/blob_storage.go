@@ -18,6 +18,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	storage_utils "github.com/coinbase/chainstorage/internal/storage/utils"
+	"github.com/coinbase/chainstorage/internal/utils/finalizer"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -146,6 +147,8 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 		w := object.NewWriter(ctx)
 		_, err = w.Write(data)
 		if err != nil {
+			finalizer := finalizer.WithCloser(w)
+			defer finalizer.Finalize()
 			return "", xerrors.Errorf("failed to upload block data: %w", err)
 		}
 		err = w.Close()
@@ -187,6 +190,8 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 
 		object := s.client.Bucket(s.bucket).Object(key)
 		reader, err := object.NewReader(ctx)
+		finalizer := finalizer.WithCloser(reader)
+		defer finalizer.Finalize()
 		if err != nil {
 			return nil, xerrors.Errorf("failed to download from gcs (bucket=%s, key=%s): %w", s.bucket, key, err)
 		}
