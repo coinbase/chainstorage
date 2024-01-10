@@ -70,7 +70,9 @@ func (f *blobStorageFactory) Create() (internal.BlobStorage, error) {
 }
 
 func New(params BlobStorageParams) (internal.BlobStorage, error) {
-	metrics := params.Metrics.SubScope("gcs_blob_storage")
+	metrics := params.Metrics.SubScope("blob_storage").Tagged(map[string]string{
+		"storage_type": "gcs",
+	})
 	if params.Config.GCP == nil {
 		return nil, xerrors.Errorf("GCP project id not configured")
 	}
@@ -225,7 +227,8 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 
 func (s *blobStorageImpl) logDuration(method string, start time.Time) {
 	s.logger.Debug(
-		"gcs_blob_storage",
+		"blob_storage",
+		zap.String("storage_type", "gcs"),
 		zap.String("method", method),
 		zap.Duration("duration", time.Since(start)),
 	)
