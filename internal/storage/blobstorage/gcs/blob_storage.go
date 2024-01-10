@@ -147,13 +147,14 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 
 		object := s.client.Bucket(s.bucket).Object(key)
 		w := object.NewWriter(ctx)
+		finalizer := finalizer.WithCloser(w)
+		defer finalizer.Finalize()
+
 		_, err = w.Write(data)
 		if err != nil {
-			finalizer := finalizer.WithCloser(w)
-			defer finalizer.Finalize()
 			return "", xerrors.Errorf("failed to upload block data: %w", err)
 		}
-		err = w.Close()
+		err = finalizer.Close()
 		if err != nil {
 			return "", xerrors.Errorf("failed to upload block data: %w", err)
 		}
