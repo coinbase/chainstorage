@@ -398,6 +398,19 @@ func TestConfigOverridingByEnvSettings(t *testing.T) {
 	})
 }
 
+func TestConfigOverrideConfigPath(t *testing.T) {
+	require := testutil.Require(t)
+	err := os.Setenv(config.EnvVarConfigPath, "../../config/chainstorage/ethereum/mainnet/base.yml")
+	require.NoError(err)
+	defer os.Unsetenv(config.EnvVarConfigPath)
+
+	cfg, err := config.New()
+	require.NoError(err)
+
+	require.Equal(common.Blockchain_BLOCKCHAIN_ETHEREUM, cfg.Blockchain())
+	require.Equal(common.Network_NETWORK_ETHEREUM_MAINNET, cfg.Network())
+}
+
 func TestEndpointParsing(t *testing.T) {
 	require := testutil.Require(t)
 
