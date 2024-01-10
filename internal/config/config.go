@@ -127,6 +127,7 @@ type (
 
 	GcpConfig struct {
 		Project string `mapstructure:"project" validate:"required"`
+		Bucket  string `mapstructure:"bucket"`
 	}
 
 	DynamoDBConfig struct {
@@ -439,6 +440,7 @@ var (
 	BlobStorageType_value = map[string]int32{
 		"UNSPECIFIED": 0,
 		"S3":          1,
+		"GCS":         2,
 	}
 
 	MetaStorageType_value = map[string]int32{
@@ -473,6 +475,7 @@ const (
 
 	BlobStorageType_UNSPECIFIED BlobStorageType = 0
 	BlobStorageType_S3          BlobStorageType = 1
+	BlobStorageType_GCS         BlobStorageType = 2
 
 	MetaStorageType_UNSPECIFIED MetaStorageType = 0
 	MetaStorageType_DYNAMODB    MetaStorageType = 1
