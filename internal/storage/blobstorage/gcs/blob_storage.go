@@ -79,7 +79,7 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create GCS client, error: %w", err)
+		return nil, xerrors.Errorf("failed to create GCS client: %w", err)
 	}
 	blobStorageMetrics := &blobStorageMetrics{
 		blobDownloadedSize: metrics.SubScope(blobDownloaderScopeName).Timer(blobSizeMetricName),
