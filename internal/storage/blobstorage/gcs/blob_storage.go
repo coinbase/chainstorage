@@ -222,7 +222,7 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 		// the new fields, e.g. ParentHeight, may be populated with default values.
 		// Overwrite metadata using the one loaded from meta storage.
 		block.Metadata = metadata
-		return &block, nil
+		return &block, finalizer.Close()
 	})
 }
 
