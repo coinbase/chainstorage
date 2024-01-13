@@ -39,7 +39,9 @@ type (
 )
 
 func newEventStorage(params Params, client *firestore.Client) (internal.EventStorage, error) {
-	metrics := params.Metrics.SubScope("event_storage_firestore")
+	metrics := params.Metrics.SubScope("event_storage").Tagged(map[string]string{
+		"storage_type": "firestore",
+	})
 	storage := eventStorageImpl{
 		client:                                 client,
 		env:                                    params.Config.ConfigName,

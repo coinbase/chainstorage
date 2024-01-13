@@ -21,7 +21,9 @@ type (
 var _ internal.TransactionStorage = (*transactionStorageImpl)(nil)
 
 func newTransactionStorage(params Params, client *firestore.Client) (internal.TransactionStorage, error) {
-	metrics := params.Metrics.SubScope("transaction_storage_firestore")
+	metrics := params.Metrics.SubScope("transaction_storage").Tagged(map[string]string{
+		"storage_type": "firestore",
+	})
 	return &transactionStorageImpl{
 		client:                           client,
 		instrumentAddOrUpdateTransaction: instrument.New(metrics, "add_transactions"),

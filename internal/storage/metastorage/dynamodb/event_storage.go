@@ -73,7 +73,9 @@ func newEventStorage(params Params) (internal.EventStorage, error) {
 		return nil, xerrors.Errorf("failed to create versioned event table: %w", err)
 	}
 
-	metrics := params.Metrics.SubScope("event_storage")
+	metrics := params.Metrics.SubScope("event_storage").Tagged(map[string]string{
+		"storage_type": "dynamodb",
+	})
 	storage := eventStorageImpl{
 		eventTable:                             eventTable,
 		heightIndexName:                        heightIndexName,
