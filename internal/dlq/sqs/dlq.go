@@ -63,10 +63,6 @@ const (
 	retriesAttributeDataType = "Number"
 )
 
-var (
-	ErrNotFound = xerrors.New("not found")
-)
-
 func New(params DLQParams) (DLQ, error) {
 	client := sqs.New(params.Session)
 	metrics := params.Metrics.SubScope("dlq")
@@ -76,7 +72,7 @@ func New(params DLQParams) (DLQ, error) {
 		client:                   client,
 		instrumentSendMessage:    instrument.New(metrics, "send_message"),
 		instrumentResendMessage:  instrument.New(metrics, "resend_message"),
-		instrumentReceiveMessage: instrument.New(metrics, "receive_message", instrument.WithFilter(filterError)),
+		instrumentReceiveMessage: instrument.New(metrics, "receive_message", instrument.WithFilter(internal.FilterError)),
 		instrumentDeleteMessage:  instrument.New(metrics, "delete_message"),
 	}
 	if params.Config.AWS.IsLocalStack {
@@ -194,7 +190,7 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 
 		numMessages := len(output.Messages)
 		if numMessages == 0 {
-			return ErrNotFound
+			return internal.ErrNotFound
 		}
 
 		if numMessages != 1 {
@@ -308,8 +304,4 @@ func (q *dlqImpl) initQueueURL() error {
 		zap.Reflect("config", q.config.AWS.DLQ),
 	)
 	return nil
-}
-
-func filterError(err error) bool {
-	return xerrors.Is(err, ErrNotFound)
 }
