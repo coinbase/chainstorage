@@ -13,10 +13,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/gogo/status"
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -34,6 +36,7 @@ type (
 	BlobStorageParams struct {
 		fx.In
 		fxparams.Params
+		Client     s3.Client
 		Downloader s3.Downloader
 		Uploader   s3.Uploader
 	}
@@ -46,6 +49,7 @@ type (
 		logger             *zap.Logger
 		config             *config.Config
 		bucket             string
+		client             s3.Client
 		downloader         s3.Downloader
 		uploader           s3.Uploader
 		blobStorageMetrics *blobStorageMetrics
@@ -85,6 +89,7 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 		logger:             log.WithPackage(params.Logger),
 		config:             params.Config,
 		bucket:             params.Config.AWS.Bucket,
+		client:             params.Client,
 		downloader:         params.Downloader,
 		uploader:           params.Uploader,
 		blobStorageMetrics: newBlobStorageMetrics(metrics),
@@ -212,6 +217,19 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 		block.Metadata = metadata
 		return &block, nil
 	})
+}
+
+func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string, error) {
+	getObjectReq, _ := s.client.GetObjectRequest(&awss3.GetObjectInput{
+		Bucket: aws.String(s.config.AWS.Bucket),
+		Key:    aws.String(objectKey),
+	})
+	fileUrl, err := getObjectReq.Presign(s.config.AWS.PresignedUrlExpiration)
+	if err != nil {
+		s.logger.Error("block file s3 presign error", zap.Reflect("key", objectKey), zap.Error(err))
+		return "", status.Errorf(codes.Internal, "internal block file url generation error: %+v", err)
+	}
+	return fileUrl, nil
 }
 
 func (s *blobStorageImpl) logDuration(method string, start time.Time) {

@@ -14,8 +14,6 @@ import (
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/aws/aws-sdk-go/aws"
-	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/cenkalti/backoff"
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
@@ -55,7 +53,6 @@ type (
 		metaStorage        metastorage.MetaStorage
 		blobStorage        blobstorage.BlobStorage
 		transactionStorage metastorage.TransactionStorage
-		s3Client           s3.Client
 		blockchainClient   client.Client
 		parser             parser.Parser
 		metrics            *serverMetrics
@@ -204,7 +201,6 @@ func NewServer(params ServerParams) *Server {
 		metaStorage:        params.MetaStorage,
 		blobStorage:        params.BlobStorage,
 		transactionStorage: params.TransactionStorage,
-		s3Client:           params.S3Client,
 		blockchainClient:   params.BlockchainClient,
 		parser:             params.Parser,
 		metrics:            newServerMetrics(params.Metrics),
@@ -717,14 +713,9 @@ func (s *Server) newBlockFile(block *api.BlockMetadata) (*api.BlockFile, error) 
 
 	key := block.GetObjectKeyMain()
 	compression := storage_utils.GetCompressionType(key)
-	getObjectReq, _ := s.s3Client.GetObjectRequest(&awss3.GetObjectInput{
-		Bucket: aws.String(s.config.AWS.Bucket),
-		Key:    aws.String(key),
-	})
-	fileUrl, err := getObjectReq.Presign(s.config.AWS.PresignedUrlExpiration)
+	fileUrl, err := s.blobStorage.PreSign(context.Background(), key)
 	if err != nil {
-		s.logger.Error("block file s3 presign error", zap.Reflect("block", block), zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "internal block file url generation error: %+v", err)
+		return nil, err
 	}
 
 	return &api.BlockFile{

@@ -7,13 +7,14 @@ import (
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
-	"github.com/stretchr/testify/suite"
 )
 
 type gcpBlobStorageTestSuite struct {
