@@ -56,6 +56,7 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 
 			return &s3manager.UploadOutput{}, nil
 		})
+	client := s3mocks.NewMockClient(ctrl)
 
 	var storage internal.BlobStorage
 	app := testapp.New(
@@ -63,6 +64,7 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 		fx.Provide(New),
 		fx.Provide(func() s3.Downloader { return downloader }),
 		fx.Provide(func() s3.Uploader { return uploader }),
+		fx.Provide(func() s3.Client { return client }),
 		fx.Populate(&storage),
 	)
 	defer app.Close()
@@ -102,6 +104,7 @@ func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 		fx.Provide(New),
 		fx.Provide(func() s3.Downloader { return nil }),
 		fx.Provide(func() s3.Uploader { return nil }),
+		fx.Provide(func() s3.Client { return nil }),
 		fx.Populate(&storage),
 	)
 	defer app.Close()
@@ -139,6 +142,7 @@ func TestBlobStorage_DownloadErrRequestCanceled(t *testing.T) {
 
 	uploader := s3mocks.NewMockUploader(ctrl)
 	downloader := s3manager.NewDownloader(unit.Session)
+	client := s3mocks.NewMockClient(ctrl)
 
 	var blobStorage internal.BlobStorage
 	app := testapp.New(
@@ -146,6 +150,7 @@ func TestBlobStorage_DownloadErrRequestCanceled(t *testing.T) {
 		fx.Provide(New),
 		fx.Provide(func() s3.Downloader { return downloader }),
 		fx.Provide(func() s3.Uploader { return uploader }),
+		fx.Provide(func() s3.Client { return client }),
 		fx.Populate(&blobStorage),
 	)
 	defer app.Close()
