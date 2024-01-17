@@ -71,7 +71,6 @@ var (
 )
 
 func NewChainstorageClient(params Params) (Client, error) {
-	address := params.Config.SDK.ChainstorageAddress
 	authHeader := params.Config.SDK.AuthHeader
 	authToken := params.Config.SDK.AuthToken
 	restful := params.Config.SDK.Restful
@@ -128,7 +127,10 @@ func NewChainstorageClient(params Params) (Client, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(sendMsgSize), grpc.MaxCallRecvMsgSize(recvMsgSize)),
 	}
 
+	address := cfg.serverAddress
 	if strings.HasPrefix(address, "http://") || strings.Contains(address, "localhost") {
+		// Remove http:// prefix since grpc.DialContext does not support it.
+		address = strings.Replace(address, "http://", "", 1)
 		opts = append(opts, grpc.WithInsecure())
 	} else {
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
@@ -155,7 +157,6 @@ func NewChainstorageClient(params Params) (Client, error) {
 		zap.String("env", string(params.Config.Env())),
 		zap.String("blockchain", params.Config.Chain.Blockchain.String()),
 		zap.String("network", params.Config.Chain.Network.String()),
-		zap.String("address", address),
 		zap.String("sidechain", params.Config.Chain.Sidechain.String()),
 		zap.String("address", cfg.serverAddress),
 		zap.String("client_id", cfg.clientID),
