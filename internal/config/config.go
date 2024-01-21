@@ -39,6 +39,7 @@ type (
 		Cron           CronConfig           `mapstructure:"cron"`
 		SLA            SLAConfig            `mapstructure:"sla"`
 		FunctionalTest FunctionalTestConfig `mapstructure:"functional_test"`
+		StatsD         *StatsDConfig        `mapstructure:"statsd"`
 
 		namespace string
 		env       Env
@@ -392,6 +393,11 @@ type (
 	RateLimitConfig struct {
 		GlobalRPS    int `mapstructure:"global_rps"`
 		PerClientRPS int `mapstructure:"per_client_rps"`
+	}
+
+	StatsDConfig struct {
+		Address string `mapstructure:"address" validate:"required"`
+		Prefix  string `mapstructure:"prefix"`
 	}
 
 	ConfigOption func(options *configOptions)
