@@ -1,9 +1,9 @@
 package blobstorage
 
 import (
-	"github.com/coinbase/chainstorage/internal/storage/blobstorage/gcs"
 	"go.uber.org/fx"
 
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/gcs"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/s3"
 )
