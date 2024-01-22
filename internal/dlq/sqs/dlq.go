@@ -69,10 +69,12 @@ var (
 
 func New(params DLQParams) (DLQ, error) {
 	client := sqs.New(params.Session)
-	metrics := params.Metrics.SubScope("dlq")
+	metrics := params.Metrics.SubScope("dlq").Tagged(map[string]string{
+		"storage_type": "sqs",
+	})
 	impl := &dlqImpl{
 		config:                   params.Config,
-		logger:                   log.WithPackage(params.Logger),
+		logger:                   log.WithPackage(params.Logger).With(zap.String("storage_type", "sqs")),
 		client:                   client,
 		instrumentSendMessage:    instrument.New(metrics, "send_message"),
 		instrumentResendMessage:  instrument.New(metrics, "resend_message"),

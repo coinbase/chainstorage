@@ -36,7 +36,9 @@ type (
 )
 
 func newBlockStorage(params Params, client *firestore.Client) (internal.BlockStorage, error) {
-	metrics := params.Metrics.SubScope("block_storage_firestore")
+	metrics := params.Metrics.SubScope("block_storage").Tagged(map[string]string{
+		"storage_type": "firestore",
+	})
 	accessor := blockStorageImpl{
 		client:                           client,
 		projectId:                        params.Config.GCP.Project,

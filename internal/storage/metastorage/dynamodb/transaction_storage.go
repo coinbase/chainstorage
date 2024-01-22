@@ -57,7 +57,9 @@ func newTransactionStorage(params Params) (internal.TransactionStorage, error) {
 		return nil, xerrors.Errorf("failed to create transaction table accessor: %w", err)
 	}
 
-	metrics := params.Metrics.SubScope("transaction_storage")
+	metrics := params.Metrics.SubScope("transaction_storage").Tagged(map[string]string{
+		"storage_type": "dynamodb",
+	})
 
 	return &transactionStorageImpl{
 		transactionTable:                 transactionTable,
