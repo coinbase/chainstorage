@@ -19,7 +19,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/config"
-	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -40,6 +39,7 @@ type (
 		Cron           CronConfig           `mapstructure:"cron"`
 		SLA            SLAConfig            `mapstructure:"sla"`
 		FunctionalTest FunctionalTestConfig `mapstructure:"functional_test"`
+		StatsD         *StatsDConfig        `mapstructure:"statsd"`
 
 		namespace string
 		env       Env
@@ -396,6 +396,11 @@ type (
 		PerClientRPS int `mapstructure:"per_client_rps"`
 	}
 
+	StatsDConfig struct {
+		Address string `mapstructure:"address" validate:"required"`
+		Prefix  string `mapstructure:"prefix"`
+	}
+
 	ConfigOption func(options *configOptions)
 
 	Env string
@@ -460,6 +465,8 @@ const (
 	EnvVarNamespace   = "CHAINSTORAGE_NAMESPACE"
 	EnvVarConfigName  = "CHAINSTORAGE_CONFIG"
 	EnvVarEnvironment = "CHAINSTORAGE_ENVIRONMENT"
+	EnvVarConfigRoot  = "CHAINSTORAGE_CONFIG_ROOT"
+	EnvVarConfigPath  = "CHAINSTORAGE_CONFIG_PATH"
 	EnvVarTestType    = "TEST_TYPE"
 	EnvVarCI          = "CI"
 
@@ -614,12 +621,12 @@ func getConfigName() string {
 	return configName
 }
 
-func GetProjectName() string {
-	projectName, ok := os.LookupEnv("CODEFLOW_PROJECT_NAME")
-	if !ok {
-		projectName = consts.ProjectName
-	}
-	return projectName
+func GetConfigRoot() string {
+	return os.Getenv(EnvVarConfigRoot)
+}
+
+func GetConfigPath() string {
+	return os.Getenv(EnvVarConfigPath)
 }
 
 func mergeInConfig(v *viper.Viper, configOpts *configOptions, env Env) error {
@@ -854,17 +861,22 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 	networkName := strings.TrimPrefix(network.GetName(), blockchainName+"-")
 	sidechainName := strings.TrimPrefix(sidechain.GetName(), blockchainName+"-"+networkName+"-")
 
+	configRoot := GetConfigRoot()
 	if env == envSecrets {
 		// .secrets.yml is intentionally not embedded in config.Store.
 		// Read it from the file system instead.
-		_, filename, _, ok := runtime.Caller(0)
-		if !ok {
-			return nil, xerrors.Errorf("failed to recover the filename information")
+		// If configRoot is not set, use the default path.
+		if len(configRoot) == 0 {
+			_, filename, _, ok := runtime.Caller(0)
+			if !ok {
+				return nil, xerrors.Errorf("failed to recover the filename information")
+			}
+			rootDir := strings.TrimSuffix(filename, CurrentFileName)
+			configRoot = fmt.Sprintf("%v/config", rootDir)
 		}
-		rootDir := strings.TrimSuffix(filename, CurrentFileName)
-		configPath := fmt.Sprintf("%v/config/%v/%v/%v/.secrets.yml", rootDir, namespace, blockchainName, networkName)
+		configPath := fmt.Sprintf("%v/%v/%v/%v/.secrets.yml", configRoot, namespace, blockchainName, networkName)
 		if sidechain != api.SideChain_SIDECHAIN_NONE {
-			configPath = fmt.Sprintf("%v/config/%v/%v/%v/%v/.secrets.yml", rootDir, namespace, blockchainName, networkName, sidechainName)
+			configPath = fmt.Sprintf("%v/%v/%v/%v/%v/.secrets.yml", configRoot, namespace, blockchainName, networkName, sidechainName)
 		}
 		reader, err := os.Open(configPath)
 		if err != nil {
@@ -873,7 +885,26 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 		return reader, nil
 	}
 
-	configPath := fmt.Sprintf("%v/%v/%v/%v.yml", namespace, blockchainName, networkName, env)
+	configPath := GetConfigPath()
+	// If configPath is not set, try to construct the file system path from configRoot.
+	if len(configPath) == 0 && len(configRoot) > 0 {
+		configPath = fmt.Sprintf("%v/%v/%v/%v/%v.yml", configRoot, namespace, blockchainName, networkName, env)
+		if sidechain != api.SideChain_SIDECHAIN_NONE {
+			configPath = fmt.Sprintf("%v/%v/%v/%v/%v/%v.yml", configRoot, namespace, blockchainName, networkName, sidechainName, env)
+		}
+	}
+
+	// If either configRoot or configPath is set, read the config from the file system.
+	if len(configPath) > 0 {
+		reader, err := os.Open(configPath)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to read config file %v: %w", configPath, err)
+		}
+		return reader, nil
+	}
+
+	// Read the config from the embedded config.Store.
+	configPath = fmt.Sprintf("%v/%v/%v/%v.yml", namespace, blockchainName, networkName, env)
 	if sidechain != api.SideChain_SIDECHAIN_NONE {
 		configPath = fmt.Sprintf("%v/%v/%v/%v/%v.yml", namespace, blockchainName, networkName, sidechainName, env)
 	}

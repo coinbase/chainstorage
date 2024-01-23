@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
 

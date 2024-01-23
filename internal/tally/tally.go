@@ -2,7 +2,6 @@ package tally
 
 import (
 	"context"
-	"time"
 
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
@@ -16,27 +15,18 @@ type (
 		fx.In
 		Lifecycle fx.Lifecycle
 		Config    *config.Config
-		Reporter  tally.StatsReporter `optional:"true"`
+		Reporter  tally.StatsReporter
 	}
-)
-
-const (
-	reportingInterval = time.Second
 )
 
 func NewRootScope(params MetricParams) tally.Scope {
-	// XXX: Inject your own reporter here.
-	reporter := params.Reporter
-	if reporter == nil {
-		reporter = tally.NullStatsReporter
-	}
-
 	opts := tally.ScopeOptions{
 		Prefix:   consts.ServiceName,
-		Reporter: reporter,
+		Reporter: params.Reporter,
 		Tags:     params.Config.GetCommonTags(),
 	}
-	scope, closer := tally.NewRootScope(opts, reportingInterval)
+	//report interval will be set on reporter
+	scope, closer := tally.NewRootScope(opts, 0)
 	params.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			return closer.Close()

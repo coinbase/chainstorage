@@ -73,7 +73,9 @@ func newBlockStorage(params Params) (internal.BlockStorage, error) {
 		return nil, xerrors.Errorf("failed to create metadata accessor: %w", err)
 	}
 
-	metrics := params.Metrics.SubScope("block_storage")
+	metrics := params.Metrics.SubScope("block_storage").Tagged(map[string]string{
+		"storage_type": "dynamodb",
+	})
 	accessor := blockStorageImpl{
 		blockTable:                       metadataTable,
 		blockStartHeight:                 params.Config.Chain.BlockStartHeight,

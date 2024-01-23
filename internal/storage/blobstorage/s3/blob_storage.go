@@ -84,7 +84,9 @@ func (f *blobStorageFactory) Create() (internal.BlobStorage, error) {
 }
 
 func New(params BlobStorageParams) (internal.BlobStorage, error) {
-	metrics := params.Metrics.SubScope("blob_storage")
+	metrics := params.Metrics.SubScope("blob_storage").Tagged(map[string]string{
+		"storage_type": "s3",
+	})
 	return &blobStorageImpl{
 		logger:             log.WithPackage(params.Logger),
 		config:             params.Config,
@@ -235,6 +237,7 @@ func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string
 func (s *blobStorageImpl) logDuration(method string, start time.Time) {
 	s.logger.Debug(
 		"blob_storage",
+		zap.String("storage_type", "s3"),
 		zap.String("method", method),
 		zap.Duration("duration", time.Since(start)),
 	)
