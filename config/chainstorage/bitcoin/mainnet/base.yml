@@ -65,6 +65,9 @@ cron:
   block_range_size: 2
   disable_dlq_processor: true
 functional_test: ""
+gcp:
+  presigned_url_expiration: 30m
+  project: development
 sdk:
   auth_header: ""
   auth_token: ""

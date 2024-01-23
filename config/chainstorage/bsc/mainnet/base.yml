@@ -65,6 +65,9 @@ cron:
   disable_polling_canary: false
   disable_streaming_canary: false
 functional_test: ""
+gcp:
+  presigned_url_expiration: 30m
+  project: development
 sdk:
   auth_header: ""
   auth_token: ""

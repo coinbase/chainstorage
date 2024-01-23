@@ -62,6 +62,9 @@ config_name: aptos_mainnet
 cron:
   block_range_size: 4
 functional_test: ""
+gcp:
+  presigned_url_expiration: 30m
+  project: development
 sdk:
   auth_header: ""
   auth_token: ""
