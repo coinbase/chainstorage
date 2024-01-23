@@ -239,7 +239,7 @@ func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string
 		Expires: time.Now().Add(s.presignedUrlExpiration),
 	})
 	if err != nil {
-		s.logger.Error("block file gcs presign error", zap.Reflect("key", objectKey), zap.Error(err))
+		s.logger.Error("block file gcs presign error", zap.String("key", objectKey), zap.Error(err))
 		return "", status.Errorf(codes.Internal, "internal block file url generation error: %+v", err)
 	}
 	return fileUrl, nil
