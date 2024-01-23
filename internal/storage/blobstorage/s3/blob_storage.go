@@ -13,12 +13,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/gogo/status"
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -228,8 +226,7 @@ func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string
 	})
 	fileUrl, err := getObjectReq.Presign(s.config.AWS.PresignedUrlExpiration)
 	if err != nil {
-		s.logger.Error("block file s3 presign error", zap.Reflect("key", objectKey), zap.Error(err))
-		return "", status.Errorf(codes.Internal, "internal block file url generation error: %+v", err)
+		return "", xerrors.Errorf("failed to generate presigned url: %w", err)
 	}
 	return fileUrl, nil
 }

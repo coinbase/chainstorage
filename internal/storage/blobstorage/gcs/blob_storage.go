@@ -9,12 +9,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/gogo/status"
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -239,8 +237,7 @@ func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string
 		Expires: time.Now().Add(s.presignedUrlExpiration),
 	})
 	if err != nil {
-		s.logger.Error("block file gcs presign error", zap.String("key", objectKey), zap.Error(err))
-		return "", status.Errorf(codes.Internal, "internal block file url generation error: %+v", err)
+		return "", xerrors.Errorf("failed to generate presigned url: %w", err)
 	}
 	return fileUrl, nil
 }
