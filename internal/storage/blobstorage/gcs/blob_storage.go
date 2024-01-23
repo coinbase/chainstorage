@@ -80,7 +80,7 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 	if len(params.Config.GCP.Bucket) == 0 {
 		return nil, xerrors.Errorf("GCP bucket not configure for blob storage")
 	}
-	if params.Config.GCP.PresignedUrlExpiration == nil {
+	if params.Config.GCP.PresignedUrlExpiration == 0 {
 		return nil, xerrors.Errorf("GCP presign url expiration not configure for blob storage")
 	}
 	ctx := context.Background()
@@ -98,7 +98,7 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 		project:                params.Config.GCP.Project,
 		bucket:                 params.Config.GCP.Bucket,
 		client:                 client,
-		presignedUrlExpiration: *params.Config.GCP.PresignedUrlExpiration,
+		presignedUrlExpiration: params.Config.GCP.PresignedUrlExpiration,
 		blobStorageMetrics:     blobStorageMetrics,
 		instrumentUpload:       instrument.NewWithResult[string](metrics, "upload"),
 		instrumentDownload:     instrument.NewWithResult[*api.Block](metrics, "download"),
