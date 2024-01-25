@@ -58,3 +58,7 @@ func WithDLQFactory(params DLQFactoryParams) (DLQ, error) {
 	}
 	return dlq, nil
 }
+
+func FilterError(err error) bool {
+	return xerrors.Is(err, ErrNotFound)
+}

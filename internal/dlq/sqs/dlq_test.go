@@ -54,7 +54,7 @@ func TestIntegrationDLQ(t *testing.T) {
 
 	_, err = q.ReceiveMessage(context.Background())
 	require.Error(err)
-	require.True(xerrors.Is(err, ErrNotFound))
+	require.True(xerrors.Is(err, internal.ErrNotFound))
 }
 
 func TestIntegrationDLQ_Resend(t *testing.T) {
@@ -109,7 +109,7 @@ func TestIntegrationDLQ_Resend(t *testing.T) {
 
 	_, err = q.ReceiveMessage(context.Background())
 	require.Error(err)
-	require.True(xerrors.Is(err, ErrNotFound))
+	require.True(xerrors.Is(err, internal.ErrNotFound))
 }
 
 func TestIntegrationDLQ_UnknownTopic(t *testing.T) {
@@ -149,5 +149,5 @@ func TestIntegrationDLQ_UnknownTopic(t *testing.T) {
 
 	_, err = q.ReceiveMessage(context.Background())
 	require.Error(err)
-	require.True(xerrors.Is(err, ErrNotFound))
+	require.True(xerrors.Is(err, internal.ErrNotFound))
 }
