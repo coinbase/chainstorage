@@ -126,8 +126,9 @@ type (
 	}
 
 	GcpConfig struct {
-		Project string `mapstructure:"project" validate:"required"`
-		Bucket  string `mapstructure:"bucket"`
+		Project                string        `mapstructure:"project" validate:"required"`
+		Bucket                 string        `mapstructure:"bucket"`
+		PresignedUrlExpiration time.Duration `mapstructure:"presigned_url_expiration" validate:"required"`
 	}
 
 	DynamoDBConfig struct {

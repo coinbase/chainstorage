@@ -25,6 +25,9 @@ aws:
   region: us-east-1
   storage:
     data_compression: GZIP
+gcp:
+  project: "development"
+  presigned_url_expiration: 30m
 cadence:
   address: ""
   retention_period: 7
