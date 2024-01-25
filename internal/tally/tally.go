@@ -26,7 +26,7 @@ func NewRootScope(params MetricParams) tally.Scope {
 		Tags:     params.Config.GetCommonTags(),
 	}
 	//report interval will be set on reporter
-	scope, closer := tally.NewRootScope(opts, 0)
+	scope, closer := tally.NewRootScope(opts, reportingInterval)
 	params.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			return closer.Close()
