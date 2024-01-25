@@ -457,6 +457,7 @@ var (
 	DLQType_value = map[string]int32{
 		"UNSPECIFIED": 0,
 		"SQS":         1,
+		"FIRESTORE":   2,
 	}
 )
 
@@ -490,6 +491,7 @@ const (
 
 	DLQType_UNSPECIFIED DLQType = 0
 	DLQType_SQS         DLQType = 1
+	DLQType_FIRESTORE   DLQType = 2
 
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
