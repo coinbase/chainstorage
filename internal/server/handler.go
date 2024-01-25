@@ -715,8 +715,7 @@ func (s *Server) newBlockFile(block *api.BlockMetadata) (*api.BlockFile, error) 
 	compression := storage_utils.GetCompressionType(key)
 	fileUrl, err := s.blobStorage.PreSign(context.Background(), key)
 	if err != nil {
-		s.logger.Error("block file s3 presign error", zap.Reflect("block", block), zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "internal block file url generation error: %+v", err)
+		return nil, xerrors.Errorf("failed to generate presigned url: %w", err)
 	}
 
 	return &api.BlockFile{
