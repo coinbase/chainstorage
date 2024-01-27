@@ -244,7 +244,7 @@ func (i *instrumentWithResult[T]) onSuccess(logger *zap.Logger, span tracer.Span
 
 func (i *instrumentWithResult[T]) onSuccessWithFilter(logger *zap.Logger, span tracer.Span, finishTime time.Time, err error) {
 	i.successWithFilter.Inc(1)
-	logger.Info(i.loggerMsg, zap.Error(err))
+	logger.Debug(i.loggerMsg, zap.Error(err))
 	span.Finish(tracer.FinishTime(finishTime), tracer.WithError(err))
 }
 
