@@ -3,6 +3,7 @@ package dlq
 import (
 	"go.uber.org/fx"
 
+	"github.com/coinbase/chainstorage/internal/dlq/firestore"
 	"github.com/coinbase/chainstorage/internal/dlq/internal"
 	"github.com/coinbase/chainstorage/internal/dlq/sqs"
 )
@@ -29,5 +30,6 @@ func NewNop() DLQ {
 
 var Module = fx.Options(
 	sqs.Module,
+	firestore.Module,
 	fx.Provide(internal.WithDLQFactory),
 )
