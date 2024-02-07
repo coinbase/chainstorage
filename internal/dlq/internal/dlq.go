@@ -34,7 +34,8 @@ type (
 	DLQFactoryParams struct {
 		fx.In
 		fxparams.Params
-		SQS DLQFactory `name:"dlq/sqs"`
+		SQS       DLQFactory `name:"dlq/sqs"`
+		Firestore DLQFactory `name:"dlq/firestore"`
 	}
 )
 
@@ -48,6 +49,8 @@ func WithDLQFactory(params DLQFactoryParams) (DLQ, error) {
 	switch dlqType {
 	case config.DLQType_UNSPECIFIED, config.DLQType_SQS:
 		factory = params.SQS
+	case config.DLQType_FIRESTORE:
+		factory = params.Firestore
 	}
 	if factory == nil {
 		return nil, xerrors.Errorf("dlq type is not implemented: %v", dlqType)
