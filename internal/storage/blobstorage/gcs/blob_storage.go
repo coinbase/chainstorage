@@ -235,6 +235,7 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string, error) {
 	fileUrl, err := s.client.Bucket(s.bucket).SignedURL(objectKey, &storage.SignedURLOptions{
 		Expires: time.Now().Add(s.presignedUrlExpiration),
+		Method:  "GET",
 	})
 	if err != nil {
 		return "", xerrors.Errorf("failed to generate presigned url: %w", err)
