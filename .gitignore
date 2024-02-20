@@ -14,7 +14,7 @@
 /.vscode/
 
 # Auto-generated config file for local execution
-/config/**/**/**/secrets.yml
+/config/**/**/**/.secrets.yml
 
 # Build output
 /bin/

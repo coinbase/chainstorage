@@ -18,6 +18,7 @@ const (
 	StreamerIdentity
 	CrossValidatorIdentity
 	EventBackfillerIdentity
+	ReplicatorIdentity
 )
 
 var workflowIdentityToString = map[WorkflowIdentity]string{
@@ -28,6 +29,7 @@ var workflowIdentityToString = map[WorkflowIdentity]string{
 	StreamerIdentity:        "workflow.streamer",
 	CrossValidatorIdentity:  "workflow.cross_validator",
 	EventBackfillerIdentity: "workflow.event_backfiller",
+	ReplicatorIdentity:      "workflow.replicator",
 }
 
 var workflowIdentities = map[string]WorkflowIdentity{
@@ -38,6 +40,7 @@ var workflowIdentities = map[string]WorkflowIdentity{
 	"streamer":         StreamerIdentity,
 	"cross_validator":  CrossValidatorIdentity,
 	"event_backfiller": EventBackfillerIdentity,
+	"replicator":       ReplicatorIdentity,
 }
 
 func GetWorkflowIdentify(name string) WorkflowIdentity {
@@ -94,6 +97,11 @@ func (w WorkflowIdentity) UnmarshalJsonStringToRequest(str string) (any, error) 
 		}
 	case EventBackfillerIdentity:
 		var req EventBackfillerRequest
+		if err = decoder.Decode(&req); err == nil {
+			return req, nil
+		}
+	case ReplicatorIdentity:
+		var req ReplicatorRequest
 		if err = decoder.Decode(&req); err == nil {
 			return req, nil
 		}

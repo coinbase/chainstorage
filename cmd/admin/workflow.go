@@ -18,6 +18,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/storage"
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	"github.com/coinbase/chainstorage/internal/tracer"
 	"github.com/coinbase/chainstorage/internal/workflow"
 )
@@ -46,6 +47,7 @@ type executors struct {
 	Benchmarker     *workflow.Benchmarker
 	CrossValidator  *workflow.CrossValidator
 	EventBackfiller *workflow.EventBackfiller
+	Replicator      *workflow.Replicator
 }
 
 var (
@@ -158,6 +160,12 @@ func startWorkflow() error {
 			return xerrors.Errorf("error converting to request type")
 		}
 		run, err = executors.EventBackfiller.Execute(ctx, &request)
+	case workflow.ReplicatorIdentity:
+		request, ok := req.(workflow.ReplicatorRequest)
+		if !ok {
+			return xerrors.Errorf("error converting to request type")
+		}
+		run, err = executors.Replicator.Execute(ctx, &request)
 	default:
 		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}
@@ -247,6 +255,7 @@ func initApp() (CmdApp, *executors, error) {
 		cadence.Module,
 		blockchainModule.Module,
 		s3.Module,
+		downloader.Module,
 		storage.Module,
 		workflow.Module,
 		aws.Module,

@@ -37,6 +37,7 @@ type (
 		streamer        *Streamer
 		crossValidator  *CrossValidator
 		eventBackfiller *EventBackfiller
+		replicator      *Replicator
 	}
 
 	ManagerParams struct {
@@ -51,6 +52,7 @@ type (
 		Streamer        *Streamer
 		CrossValidator  *CrossValidator
 		EventBackfiller *EventBackfiller
+		Replicator      *Replicator
 	}
 
 	InstrumentedRequest interface {
@@ -85,11 +87,13 @@ func NewManager(params ManagerParams) *Manager {
 		logger:          log.WithPackage(params.Logger),
 		runtime:         params.Runtime,
 		backfiller:      params.Backfiller,
+		poller:          params.Poller,
 		benchmarker:     params.Benchmarker,
 		monitor:         params.Monitor,
 		streamer:        params.Streamer,
 		crossValidator:  params.CrossValidator,
 		eventBackfiller: params.EventBackfiller,
+		replicator:      params.Replicator,
 	}
 
 	params.Lifecycle.Append(fx.Hook{

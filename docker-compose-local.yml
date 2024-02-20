@@ -6,10 +6,10 @@ volumes:
 
 services:
   localstack:
-    image: localstack/localstack:2.3.2
+    image: localstack/localstack:3.1.0
     ports:
       - 4566:4566
-      - 4510-4559:4510-4559  # external services port range
+      - 4510-4559:4510-4559 # external services port range
     environment:
       - DEBUG=1
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -22,7 +22,7 @@ services:
       - ./bin/localstack/policies:/policies
       - localstack_data:/var/lib/localstack
   postgresql:
-    image: postgres:15.4-alpine
+    image: postgres:15.6-alpine
     ports:
       - ${CHAINSTORAGE_TEMPORAL_POSTGRES_PORT:-5432}:5432
     environment:
@@ -31,7 +31,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
   temporal:
-    image: temporalio/auto-setup:1.22.0
+    image: temporalio/auto-setup:1.22.4
     depends_on:
       - postgresql
     ports:
@@ -47,7 +47,7 @@ services:
       - USE_HOSTNAME_IP=true
     restart: always
   temporal-ui:
-    image: temporalio/ui:2.18.2
+    image: temporalio/ui:2.23.0
     ports:
       - 8088:8080
     labels:
