@@ -26,6 +26,7 @@ const (
 	ActivityEventReader     = "activity.event_reader"
 	ActivityEventReconciler = "activity.event_reconciler"
 	ActivityEventLoader     = "activity.event_loader"
+	ActivityReplicator      = "activity.replicator"
 
 	loggerMsg = "activity.request"
 

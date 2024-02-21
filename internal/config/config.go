@@ -172,6 +172,7 @@ type (
 		Streamer        StreamerWorkflowConfig        `mapstructure:"streamer"`
 		CrossValidator  CrossValidatorWorkflowConfig  `mapstructure:"cross_validator"`
 		EventBackfiller EventBackfillerWorkflowConfig `mapstructure:"event_backfiller"`
+		Replicator      ReplicatorWorkflowConfig      `mapstructure:"replicator"`
 	}
 
 	WorkerConfig struct {
@@ -204,6 +205,12 @@ type (
 		CheckpointSize          uint64 `mapstructure:"checkpoint_size" validate:"required,gtfield=BatchSize"`
 		MaxReprocessedPerBatch  uint64 `mapstructure:"max_reprocessed_per_batch"`
 		NumConcurrentExtractors int    `mapstructure:"num_concurrent_extractors" validate:"required"`
+	}
+
+	ReplicatorWorkflowConfig struct {
+		WorkflowConfig `mapstructure:",squash"`
+		BatchSize      uint64 `mapstructure:"batch_size" validate:"required"`
+		Parallelism    int    `mapstructure:"parallelism" validate:"required"`
 	}
 
 	EventBackfillerWorkflowConfig struct {

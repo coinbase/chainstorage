@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-YQ_VERSION=4.40.5
+YQ_VERSION=4.41.1
 SCRIPTS_DIR=$(dirname "${BASH_SOURCE[0]}")
 BIN_DIR=${SCRIPTS_DIR}/bin
 YQ_INSTALL_PATH=${BIN_DIR}/yq-${YQ_VERSION}

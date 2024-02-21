@@ -17,4 +17,5 @@ var Module = fx.Options(
 	fx.Provide(NewEventReader),
 	fx.Provide(NewEventReconciler),
 	fx.Provide(NewEventLoader),
+	fx.Provide(NewReplicator),
 )
