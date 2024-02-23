@@ -18,4 +18,5 @@ var Module = fx.Options(
 	fx.Provide(NewEventReconciler),
 	fx.Provide(NewEventLoader),
 	fx.Provide(NewReplicator),
+	fx.Provide(NewUpdateWatermark),
 )
