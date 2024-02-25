@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 
+	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
@@ -30,8 +31,9 @@ type (
 	}
 
 	UpdateWatermarkRequest struct {
-		Tag         uint32
-		BlockHeight uint64
+		Tag           uint32
+		BlockHeight   uint64
+		ValidateSince uint64
 	}
 
 	UpdateWatermarkResponse struct {
@@ -63,13 +65,30 @@ func (a *UpdateWatermark) execute(ctx context.Context, request *UpdateWatermarkR
 	tag := a.config.GetEffectiveBlockTag(request.Tag)
 	logger.Info("Updating watermark",
 		zap.Uint32("tag", tag),
+		zap.Uint64("validate_since", request.ValidateSince),
 		zap.Uint64("height", request.BlockHeight))
 
-	block, err := a.metaStorage.GetBlockByHeight(ctx, tag, request.BlockHeight)
-	if err != nil {
-		return nil, xerrors.Errorf("failed to get block by tag %d height %d: %w", tag, request.BlockHeight, err)
+	validateStart := request.BlockHeight - 1
+	if request.ValidateSince > 0 {
+		if request.ValidateSince >= request.BlockHeight {
+			return nil, xerrors.Errorf("ValidateSince %d should be smaller than BlockHeight %d",
+				request.ValidateSince, request.BlockHeight)
+		}
+		validateStart = request.ValidateSince
 	}
-	err = a.metaStorage.PersistBlockMetas(ctx, true, []*api.BlockMetadata{block}, nil)
+	if validateStart <= 0 {
+		validateStart = 1
+	}
+	blocks, err := a.metaStorage.GetBlocksByHeightRange(ctx, tag, validateStart, request.BlockHeight+1)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get blocks by tag %d: %w", tag, err)
+	}
+	if len(blocks) > 1 {
+		if err := parser.ValidateChain(blocks[1:], blocks[0]); err != nil {
+			return nil, xerrors.Errorf("failed to validate chain: %w", err)
+		}
+	}
+	err = a.metaStorage.PersistBlockMetas(ctx, true, []*api.BlockMetadata{blocks[len(blocks)-1]}, nil)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to set watermark: %w", err)
 	}

@@ -207,8 +207,9 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			// Phase 3: update watermark
 			if request.UpdateWatermark {
 				_, err := w.updateWatermark.Execute(ctx, &activity.UpdateWatermarkRequest{
-					Tag:         request.Tag,
-					BlockHeight: endHeight - 1,
+					Tag:           request.Tag,
+					ValidateSince: startHeight - 1,
+					BlockHeight:   endHeight - 1,
 				})
 				if err != nil {
 					return xerrors.Errorf("failed to update watermark: %w", err)
