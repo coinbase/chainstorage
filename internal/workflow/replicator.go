@@ -208,7 +208,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			if request.UpdateWatermark {
 				_, err := w.updateWatermark.Execute(ctx, &activity.UpdateWatermarkRequest{
 					Tag:           request.Tag,
-					ValidateSince: startHeight - 1,
+					ValidateStart: startHeight - 1,
 					BlockHeight:   endHeight - 1,
 				})
 				if err != nil {

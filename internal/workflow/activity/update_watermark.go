@@ -31,9 +31,10 @@ type (
 	}
 
 	UpdateWatermarkRequest struct {
-		Tag           uint32
-		BlockHeight   uint64
-		ValidateSince uint64
+		Tag         uint32
+		BlockHeight uint64
+		// validate the chain starting from this block (inclusive)
+		ValidateStart uint64
 	}
 
 	UpdateWatermarkResponse struct {
@@ -65,16 +66,16 @@ func (a *UpdateWatermark) execute(ctx context.Context, request *UpdateWatermarkR
 	tag := a.config.GetEffectiveBlockTag(request.Tag)
 	logger.Info("Updating watermark",
 		zap.Uint32("tag", tag),
-		zap.Uint64("validate_since", request.ValidateSince),
+		zap.Uint64("validate_since", request.ValidateStart),
 		zap.Uint64("height", request.BlockHeight))
 
 	validateStart := request.BlockHeight - 1
-	if request.ValidateSince > 0 {
-		if request.ValidateSince >= request.BlockHeight {
+	if request.ValidateStart > 0 {
+		if request.ValidateStart >= request.BlockHeight {
 			return nil, xerrors.Errorf("ValidateSince %d should be smaller than BlockHeight %d",
-				request.ValidateSince, request.BlockHeight)
+				request.ValidateStart, request.BlockHeight)
 		}
-		validateStart = request.ValidateSince
+		validateStart = request.ValidateStart
 	}
 	if validateStart <= 0 {
 		validateStart = 1
