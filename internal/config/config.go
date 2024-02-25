@@ -210,6 +210,8 @@ type (
 	ReplicatorWorkflowConfig struct {
 		WorkflowConfig `mapstructure:",squash"`
 		BatchSize      uint64 `mapstructure:"batch_size" validate:"required"`
+		MiniBatchSize  uint64 `mapstructure:"mini_batch_size" validate:"required"`
+		CheckpointSize uint64 `mapstructure:"checkpoint_size" validate:"required,gtfield=BatchSize"`
 		Parallelism    int    `mapstructure:"parallelism" validate:"required"`
 	}
 

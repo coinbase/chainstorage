@@ -167,10 +167,12 @@ workflows:
     workflow_execution_timeout: 24h
     workflow_identity: workflow.poller
   replicator:
-    activity_retry_maximum_attempts: 3
+    activity_retry_maximum_attempts: 5
     activity_schedule_to_start_timeout: 5m
     activity_start_to_close_timeout: 10m
     batch_size: 1000
+    checkpoint_size: 10000
+    mini_batch_size: 100
     parallelism: 10
     task_list: default
     workflow_decision_timeout: 2m
