@@ -9,6 +9,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq"
+	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/storage"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
@@ -37,6 +38,7 @@ func startManager(opts ...fx.Option) services.SystemManager {
 		config.Module,
 		dlq.Module,
 		fxparams.Module,
+		gateway.Module,
 		s3.Module,
 		storage.Module,
 		tally.Module,
