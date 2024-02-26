@@ -55,6 +55,21 @@ func (mr *MockBlobStorageMockRecorder) Download(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Download", reflect.TypeOf((*MockBlobStorage)(nil).Download), arg0, arg1)
 }
 
+// PreSign mocks base method.
+func (m *MockBlobStorage) PreSign(arg0 context.Context, arg1 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PreSign", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PreSign indicates an expected call of PreSign.
+func (mr *MockBlobStorageMockRecorder) PreSign(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PreSign", reflect.TypeOf((*MockBlobStorage)(nil).PreSign), arg0, arg1)
+}
+
 // Upload mocks base method.
 func (m *MockBlobStorage) Upload(arg0 context.Context, arg1 *chainstorage.Block, arg2 chainstorage.Compression) (string, error) {
 	m.ctrl.T.Helper()

@@ -2772,6 +2772,56 @@ func (mr *MockDynamoAPIMockRecorder) UpdateItemWithContext(arg0, arg1 any, arg2 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateItemWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).UpdateItemWithContext), varargs...)
 }
 
+// UpdateKinesisStreamingDestination mocks base method.
+func (m *MockDynamoAPI) UpdateKinesisStreamingDestination(arg0 *dynamodb.UpdateKinesisStreamingDestinationInput) (*dynamodb.UpdateKinesisStreamingDestinationOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKinesisStreamingDestination", arg0)
+	ret0, _ := ret[0].(*dynamodb.UpdateKinesisStreamingDestinationOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateKinesisStreamingDestination indicates an expected call of UpdateKinesisStreamingDestination.
+func (mr *MockDynamoAPIMockRecorder) UpdateKinesisStreamingDestination(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKinesisStreamingDestination", reflect.TypeOf((*MockDynamoAPI)(nil).UpdateKinesisStreamingDestination), arg0)
+}
+
+// UpdateKinesisStreamingDestinationRequest mocks base method.
+func (m *MockDynamoAPI) UpdateKinesisStreamingDestinationRequest(arg0 *dynamodb.UpdateKinesisStreamingDestinationInput) (*request.Request, *dynamodb.UpdateKinesisStreamingDestinationOutput) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKinesisStreamingDestinationRequest", arg0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*dynamodb.UpdateKinesisStreamingDestinationOutput)
+	return ret0, ret1
+}
+
+// UpdateKinesisStreamingDestinationRequest indicates an expected call of UpdateKinesisStreamingDestinationRequest.
+func (mr *MockDynamoAPIMockRecorder) UpdateKinesisStreamingDestinationRequest(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKinesisStreamingDestinationRequest", reflect.TypeOf((*MockDynamoAPI)(nil).UpdateKinesisStreamingDestinationRequest), arg0)
+}
+
+// UpdateKinesisStreamingDestinationWithContext mocks base method.
+func (m *MockDynamoAPI) UpdateKinesisStreamingDestinationWithContext(arg0 context.Context, arg1 *dynamodb.UpdateKinesisStreamingDestinationInput, arg2 ...request.Option) (*dynamodb.UpdateKinesisStreamingDestinationOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateKinesisStreamingDestinationWithContext", varargs...)
+	ret0, _ := ret[0].(*dynamodb.UpdateKinesisStreamingDestinationOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateKinesisStreamingDestinationWithContext indicates an expected call of UpdateKinesisStreamingDestinationWithContext.
+func (mr *MockDynamoAPIMockRecorder) UpdateKinesisStreamingDestinationWithContext(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKinesisStreamingDestinationWithContext", reflect.TypeOf((*MockDynamoAPI)(nil).UpdateKinesisStreamingDestinationWithContext), varargs...)
+}
+
 // UpdateTable mocks base method.
 func (m *MockDynamoAPI) UpdateTable(arg0 *dynamodb.UpdateTableInput) (*dynamodb.UpdateTableOutput, error) {
 	m.ctrl.T.Helper()

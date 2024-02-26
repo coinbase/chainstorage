@@ -12,10 +12,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	awsClient "github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/awstesting"
 	"github.com/aws/aws-sdk-go/awstesting/unit"
-	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	geth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/suite"
@@ -242,11 +240,10 @@ func (s *handlerTestSuite) TestGetBlockFile() {
 				}, nil
 			},
 		),
-		s.s3Client.EXPECT().GetObjectRequest(gomock.Any()).Times(1).DoAndReturn(
-			func(req *awss3.GetObjectInput) (*request.Request, *awss3.GetObjectOutput) {
-				require.Equal("example-chainstorage-ethereum-mainnet-dev", *req.Bucket)
-				require.Equal(objectKeyMain, *req.Key)
-				return s.newAwsPresignRequest("name", "GET", objectKeyMain), nil
+		s.blobStorage.EXPECT().PreSign(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(
+			func(_ context.Context, key string) (string, error) {
+				require.Equal(objectKeyMain, key)
+				return "http://endpoint/foo/bar", nil
 			},
 		),
 	)
@@ -293,11 +290,10 @@ func (s *handlerTestSuite) TestGetBlockFile_Gzip() {
 				}, nil
 			},
 		),
-		s.s3Client.EXPECT().GetObjectRequest(gomock.Any()).Times(1).DoAndReturn(
-			func(req *awss3.GetObjectInput) (*request.Request, *awss3.GetObjectOutput) {
-				require.Equal("example-chainstorage-ethereum-mainnet-dev", *req.Bucket)
-				require.Equal(objectKeyMain, *req.Key)
-				return s.newAwsPresignRequest("name", "GET", objectKeyMain), nil
+		s.blobStorage.EXPECT().PreSign(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(
+			func(_ context.Context, key string) (string, error) {
+				require.Equal(objectKeyMain, key)
+				return "http://endpoint/foo/bar.gzip", nil
 			},
 		),
 	)
@@ -434,22 +430,16 @@ func (s *handlerTestSuite) TestGetBlockFilesByRange_PresignErr() {
 				}, nil
 			},
 		),
-		s.s3Client.EXPECT().GetObjectRequest(gomock.Any()).Times(1).DoAndReturn(
-			func(req *awss3.GetObjectInput) (*request.Request, *awss3.GetObjectOutput) {
-				require.Equal("example-chainstorage-ethereum-mainnet-dev", *req.Bucket)
-				require.Equal("foo", *req.Key)
-				return s.awsClient.NewRequest(&request.Operation{
-					Name:       "name",
-					HTTPMethod: "GET",
-					HTTPPath:   "/foo",
-				}, &struct{}{}, &struct{}{}), nil
+		s.blobStorage.EXPECT().PreSign(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(
+			func(_ context.Context, key string) (string, error) {
+				require.Equal("foo", key)
+				return "http://endpoint/foo", nil
 			},
 		),
-		s.s3Client.EXPECT().GetObjectRequest(gomock.Any()).Times(1).DoAndReturn(
-			func(req *awss3.GetObjectInput) (*request.Request, *awss3.GetObjectOutput) {
-				require.Equal("example-chainstorage-ethereum-mainnet-dev", *req.Bucket)
-				require.Equal("bar", *req.Key)
-				return s.newAwsPresignFailedRequest(), nil
+		s.blobStorage.EXPECT().PreSign(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(
+			func(_ context.Context, key string) (string, error) {
+				require.Equal("bar", key)
+				return "", fmt.Errorf("failed")
 			},
 		),
 	)
@@ -489,18 +479,16 @@ func (s *handlerTestSuite) TestGetBlockFilesByRange() {
 				}, nil
 			},
 		),
-		s.s3Client.EXPECT().GetObjectRequest(gomock.Any()).Times(1).DoAndReturn(
-			func(req *awss3.GetObjectInput) (*request.Request, *awss3.GetObjectOutput) {
-				require.Equal("example-chainstorage-ethereum-mainnet-dev", *req.Bucket)
-				require.Equal("foo", *req.Key)
-				return s.newAwsPresignRequest("name", "GET", "/foo"), nil
+		s.blobStorage.EXPECT().PreSign(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(
+			func(_ context.Context, key string) (string, error) {
+				require.Equal("foo", key)
+				return "http://endpoint/foo", nil
 			},
 		),
-		s.s3Client.EXPECT().GetObjectRequest(gomock.Any()).Times(1).DoAndReturn(
-			func(req *awss3.GetObjectInput) (*request.Request, *awss3.GetObjectOutput) {
-				require.Equal("example-chainstorage-ethereum-mainnet-dev", *req.Bucket)
-				require.Equal("bar", *req.Key)
-				return s.newAwsPresignRequest("name", "GET", "/bar"), nil
+		s.blobStorage.EXPECT().PreSign(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(
+			func(_ context.Context, key string) (string, error) {
+				require.Equal("bar", key)
+				return "http://endpoint/bar", nil
 			},
 		),
 	)
@@ -1159,20 +1147,6 @@ func (s *handlerTestSuite) TestGetRosettaBlocksByRange_NotImplemented() {
 	})
 	require.Error(err)
 	s.verifyStatusCode(codes.Unimplemented, err)
-}
-
-func (s *handlerTestSuite) newAwsPresignFailedRequest() *request.Request {
-	return s.awsClient.NewRequest(&request.Operation{
-		BeforePresignFn: func(r *request.Request) error { return fmt.Errorf("fail") },
-	}, &struct{}{}, &struct{}{})
-}
-
-func (s *handlerTestSuite) newAwsPresignRequest(name, method, path string) *request.Request {
-	return s.awsClient.NewRequest(&request.Operation{
-		Name:       name,
-		HTTPMethod: method,
-		HTTPPath:   path,
-	}, &struct{}{}, &struct{}{})
 }
 
 func (s *handlerTestSuite) TestStreamChainEvents_WithSequence() {

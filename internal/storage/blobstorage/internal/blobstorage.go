@@ -15,6 +15,7 @@ type (
 	BlobStorage interface {
 		Upload(ctx context.Context, block *api.Block, compression api.Compression) (string, error)
 		Download(ctx context.Context, metadata *api.BlockMetadata) (*api.Block, error)
+		PreSign(ctx context.Context, objectKey string) (string, error)
 	}
 
 	BlobStorageFactory interface {

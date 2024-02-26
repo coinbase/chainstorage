@@ -34,6 +34,7 @@ type (
 	BlobStorageParams struct {
 		fx.In
 		fxparams.Params
+		Client     s3.Client
 		Downloader s3.Downloader
 		Uploader   s3.Uploader
 	}
@@ -46,6 +47,7 @@ type (
 		logger             *zap.Logger
 		config             *config.Config
 		bucket             string
+		client             s3.Client
 		downloader         s3.Downloader
 		uploader           s3.Uploader
 		blobStorageMetrics *blobStorageMetrics
@@ -87,6 +89,7 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 		logger:             log.WithPackage(params.Logger),
 		config:             params.Config,
 		bucket:             params.Config.AWS.Bucket,
+		client:             params.Client,
 		downloader:         params.Downloader,
 		uploader:           params.Uploader,
 		blobStorageMetrics: newBlobStorageMetrics(metrics),
@@ -214,6 +217,18 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 		block.Metadata = metadata
 		return &block, nil
 	})
+}
+
+func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string, error) {
+	getObjectReq, _ := s.client.GetObjectRequest(&awss3.GetObjectInput{
+		Bucket: aws.String(s.config.AWS.Bucket),
+		Key:    aws.String(objectKey),
+	})
+	fileUrl, err := getObjectReq.Presign(s.config.AWS.PresignedUrlExpiration)
+	if err != nil {
+		return "", xerrors.Errorf("failed to generate presigned url: %w", err)
+	}
+	return fileUrl, nil
 }
 
 func (s *blobStorageImpl) logDuration(method string, start time.Time) {

@@ -16,6 +16,7 @@ var Module = fx.Options(
 	fx.Provide(NewStreamer),
 	fx.Provide(NewCrossValidator),
 	fx.Provide(NewEventBackfiller),
+	fx.Provide(NewReplicator),
 )
 
 const (

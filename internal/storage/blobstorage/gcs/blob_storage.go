@@ -36,14 +36,15 @@ type (
 	}
 
 	blobStorageImpl struct {
-		logger             *zap.Logger
-		config             *config.Config
-		project            string
-		bucket             string
-		client             *storage.Client
-		blobStorageMetrics *blobStorageMetrics
-		instrumentUpload   instrument.InstrumentWithResult[string]
-		instrumentDownload instrument.InstrumentWithResult[*api.Block]
+		logger                 *zap.Logger
+		config                 *config.Config
+		project                string
+		bucket                 string
+		client                 *storage.Client
+		presignedUrlExpiration time.Duration
+		blobStorageMetrics     *blobStorageMetrics
+		instrumentUpload       instrument.InstrumentWithResult[string]
+		instrumentDownload     instrument.InstrumentWithResult[*api.Block]
 	}
 
 	blobStorageMetrics struct {
@@ -79,6 +80,9 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 	if len(params.Config.GCP.Bucket) == 0 {
 		return nil, xerrors.Errorf("GCP bucket not configure for blob storage")
 	}
+	if params.Config.GCP.PresignedUrlExpiration == 0 {
+		return nil, xerrors.Errorf("GCP presign url expiration not configure for blob storage")
+	}
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -89,14 +93,15 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 		blobUploadedSize:   metrics.SubScope(blobUploaderScopeName).Timer(blobSizeMetricName),
 	}
 	return &blobStorageImpl{
-		logger:             log.WithPackage(params.Logger),
-		config:             params.Config,
-		project:            params.Config.GCP.Project,
-		bucket:             params.Config.GCP.Bucket,
-		client:             client,
-		blobStorageMetrics: blobStorageMetrics,
-		instrumentUpload:   instrument.NewWithResult[string](metrics, "upload"),
-		instrumentDownload: instrument.NewWithResult[*api.Block](metrics, "download"),
+		logger:                 log.WithPackage(params.Logger),
+		config:                 params.Config,
+		project:                params.Config.GCP.Project,
+		bucket:                 params.Config.GCP.Bucket,
+		client:                 client,
+		presignedUrlExpiration: params.Config.GCP.PresignedUrlExpiration,
+		blobStorageMetrics:     blobStorageMetrics,
+		instrumentUpload:       instrument.NewWithResult[string](metrics, "upload"),
+		instrumentDownload:     instrument.NewWithResult[*api.Block](metrics, "download"),
 	}, nil
 }
 
@@ -224,6 +229,18 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 		block.Metadata = metadata
 		return &block, finalizer.Close()
 	})
+}
+
+// PreSign implements internal.BlobStorage.
+func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string, error) {
+	fileUrl, err := s.client.Bucket(s.bucket).SignedURL(objectKey, &storage.SignedURLOptions{
+		Expires: time.Now().Add(s.presignedUrlExpiration),
+		Method:  "GET",
+	})
+	if err != nil {
+		return "", xerrors.Errorf("failed to generate presigned url: %w", err)
+	}
+	return fileUrl, nil
 }
 
 func (s *blobStorageImpl) logDuration(method string, start time.Time) {

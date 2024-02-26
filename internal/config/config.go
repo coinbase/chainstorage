@@ -126,8 +126,9 @@ type (
 	}
 
 	GcpConfig struct {
-		Project string `mapstructure:"project" validate:"required"`
-		Bucket  string `mapstructure:"bucket"`
+		Project                string        `mapstructure:"project" validate:"required"`
+		Bucket                 string        `mapstructure:"bucket"`
+		PresignedUrlExpiration time.Duration `mapstructure:"presigned_url_expiration" validate:"required"`
 	}
 
 	DynamoDBConfig struct {
@@ -171,6 +172,7 @@ type (
 		Streamer        StreamerWorkflowConfig        `mapstructure:"streamer"`
 		CrossValidator  CrossValidatorWorkflowConfig  `mapstructure:"cross_validator"`
 		EventBackfiller EventBackfillerWorkflowConfig `mapstructure:"event_backfiller"`
+		Replicator      ReplicatorWorkflowConfig      `mapstructure:"replicator"`
 	}
 
 	WorkerConfig struct {
@@ -203,6 +205,14 @@ type (
 		CheckpointSize          uint64 `mapstructure:"checkpoint_size" validate:"required,gtfield=BatchSize"`
 		MaxReprocessedPerBatch  uint64 `mapstructure:"max_reprocessed_per_batch"`
 		NumConcurrentExtractors int    `mapstructure:"num_concurrent_extractors" validate:"required"`
+	}
+
+	ReplicatorWorkflowConfig struct {
+		WorkflowConfig `mapstructure:",squash"`
+		BatchSize      uint64 `mapstructure:"batch_size" validate:"required"`
+		MiniBatchSize  uint64 `mapstructure:"mini_batch_size" validate:"required"`
+		CheckpointSize uint64 `mapstructure:"checkpoint_size" validate:"required,gtfield=BatchSize"`
+		Parallelism    int    `mapstructure:"parallelism" validate:"required"`
 	}
 
 	EventBackfillerWorkflowConfig struct {
@@ -457,6 +467,7 @@ var (
 	DLQType_value = map[string]int32{
 		"UNSPECIFIED": 0,
 		"SQS":         1,
+		"FIRESTORE":   2,
 	}
 )
 
@@ -490,6 +501,7 @@ const (
 
 	DLQType_UNSPECIFIED DLQType = 0
 	DLQType_SQS         DLQType = 1
+	DLQType_FIRESTORE   DLQType = 2
 
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
