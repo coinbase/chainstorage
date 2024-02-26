@@ -9,8 +9,10 @@ import (
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq"
+	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/storage"
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	"github.com/coinbase/chainstorage/internal/tally"
 	"github.com/coinbase/chainstorage/internal/tracer"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -32,6 +34,7 @@ func startManager(opts ...fx.Option) services.SystemManager {
 		opts,
 		aws.Module,
 		blockchain.Module,
+		gateway.Module,
 		cadence.Module,
 		config.Module,
 		dlq.Module,
@@ -41,6 +44,7 @@ func startManager(opts ...fx.Option) services.SystemManager {
 		tally.Module,
 		tracer.Module,
 		workflow.Module,
+		downloader.Module,
 		fx.NopLogger,
 		fx.Provide(func() services.SystemManager { return manager }),
 		fx.Provide(func() *zap.Logger { return logger }),
