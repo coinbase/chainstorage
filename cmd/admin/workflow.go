@@ -234,6 +234,8 @@ func stopWorkflow() error {
 		err = executors.CrossValidator.StopWorkflow(ctx, workflowIdentityString, reason)
 	case workflow.EventBackfillerIdentity:
 		err = executors.EventBackfiller.StopWorkflow(ctx, workflowIdentityString, reason)
+	case workflow.ReplicatorIdentity:
+		err = executors.Replicator.StopWorkflow(ctx, workflowIdentityString, reason)
 	default:
 		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}
