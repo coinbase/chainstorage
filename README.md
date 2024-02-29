@@ -63,7 +63,7 @@ brew install go@1.20
 brew unlink go
 brew link go@1.20
 
-brew install protobuf@25.2
+brew install protobuf@25.3
 brew unlink protobuf
 brew link protobuf
 
