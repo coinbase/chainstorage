@@ -719,13 +719,14 @@ func (s *Server) newBlockFile(block *api.BlockMetadata) (*api.BlockFile, error) 
 	}
 
 	return &api.BlockFile{
-		Tag:          block.Tag,
-		Hash:         block.Hash,
-		ParentHash:   block.ParentHash,
-		Height:       block.Height,
-		ParentHeight: block.ParentHeight,
-		FileUrl:      fileUrl,
-		Compression:  compression,
+		Tag:            block.Tag,
+		Hash:           block.Hash,
+		ParentHash:     block.ParentHash,
+		Height:         block.Height,
+		ParentHeight:   block.ParentHeight,
+		FileUrl:        fileUrl,
+		Compression:    compression,
+		BlockTimestamp: block.Timestamp,
 	}, nil
 }
 

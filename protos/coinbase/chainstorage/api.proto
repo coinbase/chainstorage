@@ -28,6 +28,7 @@ message BlockFile {
   uint64 parent_height = 6;
   bool skipped = 7;
   Compression compression = 8;
+  google.protobuf.Timestamp block_timestamp = 9;
 }
 
 message BlockchainEvent {
