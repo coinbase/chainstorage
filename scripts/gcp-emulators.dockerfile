@@ -1,4 +1,4 @@
-FROM node:20.11.0-slim
+FROM node:20.11.1-slim
 ARG FIREBASE_CLI_VERSION
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && apt-get install -y openjdk-17-jre && \
