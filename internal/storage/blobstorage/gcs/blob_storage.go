@@ -22,6 +22,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/log"
+	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -105,77 +106,99 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 	}, nil
 }
 
+func (s *blobStorageImpl) getObjectKey(blockchain common.Blockchain, sidechain api.SideChain, network common.Network, metadata *api.BlockMetadata, compression api.Compression) (string, error) {
+	var key string
+	var err error
+	blockchainNetwork := fmt.Sprintf("%s/%s", blockchain, network)
+	tagHeightHash := fmt.Sprintf("%d/%d/%s", metadata.Tag, metadata.Height, metadata.Hash)
+	if s.config.Chain.Sidechain != api.SideChain_SIDECHAIN_NONE {
+		key = fmt.Sprintf(
+			"%s/%s/%s", blockchainNetwork, sidechain, tagHeightHash,
+		)
+	} else {
+		key = fmt.Sprintf(
+			"%s/%s", blockchainNetwork, tagHeightHash,
+		)
+	}
+	key, err = storage_utils.GetObjectKey(key, compression)
+	if err != nil {
+		return "", xerrors.Errorf("failed to get object key: %w", err)
+	}
+	return key, nil
+}
+
+func (s *blobStorageImpl) uploadRaw(ctx context.Context, blockchain common.Blockchain, sidechain api.SideChain, network common.Network, block *api.BlockMetadata, data []byte, compression api.Compression) (string, error) {
+	key, err := s.getObjectKey(blockchain, sidechain, network, block, compression)
+	if err != nil {
+		return "", err
+	}
+
+	// #nosec G401
+	h := md5.New()
+	size, err := h.Write(data)
+	if err != nil {
+		return "", xerrors.Errorf("failed to compute checksum: %w", err)
+	}
+
+	checksum := h.Sum(nil)
+
+	object := s.client.Bucket(s.bucket).Object(key)
+	w := object.NewWriter(ctx)
+	finalizer := finalizer.WithCloser(w)
+	defer finalizer.Finalize()
+
+	_, err = w.Write(data)
+	if err != nil {
+		return "", xerrors.Errorf("failed to upload block data: %w", err)
+	}
+	err = finalizer.Close()
+	if err != nil {
+		return "", xerrors.Errorf("failed to upload block data: %w", err)
+	}
+
+	attrs := w.Attrs()
+	if !bytes.Equal(checksum, attrs.MD5) {
+		return "", xerrors.Errorf("uploaded block md5 checksum %x is different from expected %x", attrs.MD5, checksum)
+	}
+
+	// a workaround to use timer
+	s.blobStorageMetrics.blobUploadedSize.Record(time.Duration(size) * time.Millisecond)
+
+	return key, nil
+}
+
+func (s *blobStorageImpl) UploadRaw(ctx context.Context, blockchain common.Blockchain, sidechain api.SideChain, network common.Network, block *api.BlockMetadata, data []byte, compression api.Compression) (string, error) {
+	return s.instrumentUpload.Instrument(ctx, func(ctx context.Context) (string, error) {
+		defer s.logDuration("upload", time.Now())
+
+		// Skip the upload if the block itself is skipped.
+		if block.Skipped {
+			return "", nil
+		}
+
+		return s.uploadRaw(ctx, blockchain, sidechain, network, block, data, compression)
+	})
+}
+
 func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 	return s.instrumentUpload.Instrument(ctx, func(ctx context.Context) (string, error) {
-		var key string
 		defer s.logDuration("upload", time.Now())
 
 		// Skip the upload if the block itself is skipped.
 		if block.Metadata.Skipped {
 			return "", nil
 		}
-
 		data, err := proto.Marshal(block)
 		if err != nil {
 			return "", xerrors.Errorf("failed to marshal block: %w", err)
-		}
-
-		blockchainNetwork := fmt.Sprintf("%s/%s", block.Blockchain, block.Network)
-		tagHeightHash := fmt.Sprintf("%d/%d/%s", block.Metadata.Tag, block.Metadata.Height, block.Metadata.Hash)
-		if s.config.Chain.Sidechain != api.SideChain_SIDECHAIN_NONE {
-			key = fmt.Sprintf(
-				"%s/%s/%s", blockchainNetwork, block.SideChain, tagHeightHash,
-			)
-		} else {
-			key = fmt.Sprintf(
-				"%s/%s", blockchainNetwork, tagHeightHash,
-			)
 		}
 
 		data, err = storage_utils.Compress(data, compression)
 		if err != nil {
 			return "", xerrors.Errorf("failed to compress data with type %v: %w", compression.String(), err)
 		}
-		key, err = storage_utils.GetObjectKey(key, compression)
-		if err != nil {
-			return "", xerrors.Errorf("failed to get object key: %w", err)
-		}
 
-		// #nosec G401
-		h := md5.New()
-		size, err := h.Write(data)
-		if err != nil {
-			return "", xerrors.Errorf("failed to compute checksum: %w", err)
-		}
-
-		checksum := h.Sum(nil)
-
-		object := s.client.Bucket(s.bucket).Object(key)
-		w := object.NewWriter(ctx)
-		finalizer := finalizer.WithCloser(w)
-		defer finalizer.Finalize()
-
-		_, err = w.Write(data)
-		if err != nil {
-			return "", xerrors.Errorf("failed to upload block data: %w", err)
-		}
-		err = finalizer.Close()
-		if err != nil {
-			return "", xerrors.Errorf("failed to upload block data: %w", err)
-		}
-
-		attrs := w.Attrs()
-		if err != nil {
-			return "", xerrors.Errorf("failed to load attributes for uploaded block data: %w", err)
-		}
-		if !bytes.Equal(checksum, attrs.MD5) {
-			return "", xerrors.Errorf("uploaded block md5 checksum %x is different from expected %x", attrs.MD5, checksum)
-		}
-
-		// a workaround to use timer
-		s.blobStorageMetrics.blobUploadedSize.Record(time.Duration(size) * time.Millisecond)
-
-		return key, nil
+		return s.uploadRaw(ctx, block.Blockchain, block.SideChain, block.Network, block.Metadata, data, compression)
 	})
 }
 

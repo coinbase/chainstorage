@@ -2,29 +2,50 @@ package activity
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"time"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/proto"
+	tracehttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
+	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage"
 	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
+	storage_utils "github.com/coinbase/chainstorage/internal/storage/utils"
+	"github.com/coinbase/chainstorage/internal/utils/finalizer"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
+	"github.com/coinbase/chainstorage/internal/utils/retry"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
+)
+
+const (
+	timeout = time.Second * 30
+)
+
+var (
+	ErrDownloadFailure = xerrors.New("download failure")
 )
 
 type (
 	Replicator struct {
 		baseActivity
+		config          *config.Config
+		logger          *zap.Logger
 		client          gateway.Client
 		blockDownloader downloader.BlockDownloader
 		metaStorage     metastorage.MetaStorage
 		blobStorage     blobstorage.BlobStorage
+		retry           retry.RetryWithResult[[]byte]
+		httpClient      *http.Client
 	}
 
 	ReplicatorParams struct {
@@ -52,12 +73,22 @@ type (
 )
 
 func NewReplicator(params ReplicatorParams) *Replicator {
+	httpClient := &http.Client{
+		Timeout: timeout,
+	}
+	httpClient = tracehttp.WrapClient(httpClient, tracehttp.RTWithResourceNamer(func(req *http.Request) string {
+		return "/workflow/activity/replicator"
+	}))
 	a := &Replicator{
 		baseActivity:    newBaseActivity(ActivityReplicator, params.Runtime),
+		config:          params.Config,
+		logger:          params.Logger,
 		client:          params.Client,
 		blockDownloader: params.BlockDownloader,
 		metaStorage:     params.MetaStorage,
 		blobStorage:     params.BlobStorage,
+		httpClient:      httpClient,
+		retry:           retry.NewWithResult[[]byte](retry.WithLogger(params.Logger)),
 	}
 	a.register(a.execute)
 	return a
@@ -99,12 +130,112 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 				zap.Uint64("height", blockFile.Height),
 				zap.String("hash", blockFile.Hash),
 			)
-			block, err := a.blockDownloader.Download(errgroupCtx, blockFile)
+			bodyBytes, err := a.retry.Retry(errgroupCtx, func(ctx context.Context) ([]byte, error) {
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, blockFile.FileUrl, nil)
+				if err != nil {
+					return nil, xerrors.Errorf("failed to create download request: %w", err)
+				}
+
+				httpResp, err := a.httpClient.Do(req)
+				if err != nil {
+					return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
+				}
+
+				finalizer := finalizer.WithCloser(httpResp.Body)
+				defer finalizer.Finalize()
+
+				if statusCode := httpResp.StatusCode; statusCode != http.StatusOK {
+					if statusCode == http.StatusRequestTimeout ||
+						statusCode == http.StatusTooManyRequests ||
+						statusCode >= http.StatusInternalServerError {
+						return nil, retry.Retryable(xerrors.Errorf("received %d status code: %w", statusCode, ErrDownloadFailure))
+					} else {
+						return nil, xerrors.Errorf("received non-retryable %d status code: %w", statusCode, ErrDownloadFailure)
+					}
+				}
+
+				bodyBytes, err := io.ReadAll(httpResp.Body)
+				if err != nil {
+					return nil, retry.Retryable(xerrors.Errorf("failed to read body: %w", err))
+				}
+				return bodyBytes, finalizer.Close()
+			})
 			if err != nil {
-				return xerrors.Errorf("failed download block file from %s: %w", blockFile.GetFileUrl(), err)
+				return err
 			}
-			_, err = a.blobStorage.Upload(errgroupCtx, block, request.Compression)
-			blockMetas[i] = block.Metadata
+			var rawBytes []byte
+			var compressedBytes []byte
+			switch blockFile.Compression {
+			case api.Compression_NONE:
+				rawBytes = bodyBytes
+				if request.Compression == api.Compression_GZIP {
+					compressedBytes, err = storage_utils.Compress(rawBytes, request.Compression)
+					if err != nil {
+						return xerrors.Errorf("failed to compress block data with type %v: %w", request.Compression.String(), err)
+					}
+				}
+			case api.Compression_GZIP:
+				compressedBytes = bodyBytes
+				if request.Compression == api.Compression_NONE {
+					rawBytes, err = storage_utils.Decompress(rawBytes, blockFile.Compression)
+					if err != nil {
+						return xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+					}
+				}
+			default:
+				return xerrors.Errorf("unknown block file compression type %v", blockFile.Compression.String())
+			}
+			// if block file is coming from old chainstorage api, the block timestamp is not set
+			// we need to extract it from the block data
+			// TODO remove this after the api upgrade
+			if blockFile.BlockTimestamp == nil || (blockFile.BlockTimestamp.Nanos == 0 && blockFile.BlockTimestamp.Seconds == 0) {
+				block := new(api.Block)
+				rawBytes := rawBytes
+				if len(rawBytes) == 0 {
+					rawBytes, err = storage_utils.Decompress(bodyBytes, blockFile.Compression)
+					if err != nil {
+						return xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+					}
+				}
+
+				if err := proto.Unmarshal(rawBytes, block); err != nil {
+					return xerrors.Errorf("failed to unmarshal file contents: %w", err)
+				}
+				blockFile.BlockTimestamp = block.Metadata.Timestamp
+			}
+			metadata := &api.BlockMetadata{
+				Tag:          blockFile.Tag,
+				Hash:         blockFile.Hash,
+				ParentHash:   blockFile.ParentHash,
+				Height:       blockFile.Height,
+				ParentHeight: blockFile.ParentHeight,
+				Skipped:      blockFile.Skipped,
+				Timestamp:    blockFile.BlockTimestamp,
+			}
+			var uploadBytes []byte
+			switch request.Compression {
+			case api.Compression_NONE:
+				uploadBytes = rawBytes
+				rawBytes = nil
+				compressedBytes = nil
+			case api.Compression_GZIP:
+				uploadBytes = compressedBytes
+				compressedBytes = nil
+				rawBytes = nil
+			default:
+				return xerrors.Errorf("unknown requested compression type %v", request.Compression.String())
+			}
+			bodyBytes = nil
+			objectKeyMain, err := a.blobStorage.UploadRaw(
+				errgroupCtx,
+				a.config.Chain.Blockchain, a.config.Chain.Sidechain, a.config.Chain.Network,
+				metadata, uploadBytes, request.Compression)
+			if err != nil {
+				return xerrors.Errorf("failed to upload raw block file: %w", err)
+			}
+			metadata.ObjectKeyMain = objectKeyMain
+
+			blockMetas[i] = metadata
 			return err
 		})
 	}
