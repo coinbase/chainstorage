@@ -34,6 +34,7 @@ func startManager(opts ...fx.Option) services.SystemManager {
 		opts,
 		aws.Module,
 		blockchain.Module,
+		gateway.Module,
 		cadence.Module,
 		config.Module,
 		dlq.Module,
