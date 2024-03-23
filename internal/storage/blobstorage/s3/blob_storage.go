@@ -45,15 +45,16 @@ type (
 	}
 
 	blobStorageImpl struct {
-		logger             *zap.Logger
-		config             *config.Config
-		bucket             string
-		client             s3.Client
-		downloader         s3.Downloader
-		uploader           s3.Uploader
-		blobStorageMetrics *blobStorageMetrics
-		instrumentUpload   instrument.InstrumentWithResult[string]
-		instrumentDownload instrument.InstrumentWithResult[*api.Block]
+		logger              *zap.Logger
+		config              *config.Config
+		bucket              string
+		client              s3.Client
+		downloader          s3.Downloader
+		uploader            s3.Uploader
+		blobStorageMetrics  *blobStorageMetrics
+		instrumentUpload    instrument.InstrumentWithResult[string]
+		instrumentUploadRaw instrument.InstrumentWithResult[string]
+		instrumentDownload  instrument.InstrumentWithResult[*api.Block]
 	}
 
 	blobStorageMetrics struct {
@@ -87,15 +88,16 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 		"storage_type": "s3",
 	})
 	return &blobStorageImpl{
-		logger:             log.WithPackage(params.Logger),
-		config:             params.Config,
-		bucket:             params.Config.AWS.Bucket,
-		client:             params.Client,
-		downloader:         params.Downloader,
-		uploader:           params.Uploader,
-		blobStorageMetrics: newBlobStorageMetrics(metrics),
-		instrumentUpload:   instrument.NewWithResult[string](metrics, "upload"),
-		instrumentDownload: instrument.NewWithResult[*api.Block](metrics, "download"),
+		logger:              log.WithPackage(params.Logger),
+		config:              params.Config,
+		bucket:              params.Config.AWS.Bucket,
+		client:              params.Client,
+		downloader:          params.Downloader,
+		uploader:            params.Uploader,
+		blobStorageMetrics:  newBlobStorageMetrics(metrics),
+		instrumentUpload:    instrument.NewWithResult[string](metrics, "upload"),
+		instrumentUploadRaw: instrument.NewWithResult[string](metrics, "upload_raw"),
+		instrumentDownload:  instrument.NewWithResult[*api.Block](metrics, "download"),
 	}, nil
 }
 
@@ -159,7 +161,7 @@ func (s *blobStorageImpl) uploadRaw(ctx context.Context, rawBlockData *internal.
 }
 
 func (s *blobStorageImpl) UploadRaw(ctx context.Context, rawBlockData *internal.RawBlockData) (string, error) {
-	return s.instrumentUpload.Instrument(ctx, func(ctx context.Context) (string, error) {
+	return s.instrumentUploadRaw.Instrument(ctx, func(ctx context.Context) (string, error) {
 		defer s.logDuration("upload", time.Now())
 
 		// Skip the upload if the block itself is skipped.

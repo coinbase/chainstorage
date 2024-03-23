@@ -45,6 +45,7 @@ type (
 		presignedUrlExpiration time.Duration
 		blobStorageMetrics     *blobStorageMetrics
 		instrumentUpload       instrument.InstrumentWithResult[string]
+		instrumentUploadRaw    instrument.InstrumentWithResult[string]
 		instrumentDownload     instrument.InstrumentWithResult[*api.Block]
 	}
 
@@ -102,6 +103,7 @@ func New(params BlobStorageParams) (internal.BlobStorage, error) {
 		presignedUrlExpiration: params.Config.GCP.PresignedUrlExpiration,
 		blobStorageMetrics:     blobStorageMetrics,
 		instrumentUpload:       instrument.NewWithResult[string](metrics, "upload"),
+		instrumentUploadRaw:    instrument.NewWithResult[string](metrics, "upload_raw"),
 		instrumentDownload:     instrument.NewWithResult[*api.Block](metrics, "download"),
 	}, nil
 }
@@ -168,7 +170,7 @@ func (s *blobStorageImpl) uploadRaw(ctx context.Context, rawBlockData *internal.
 }
 
 func (s *blobStorageImpl) UploadRaw(ctx context.Context, rawBlockData *internal.RawBlockData) (string, error) {
-	return s.instrumentUpload.Instrument(ctx, func(ctx context.Context) (string, error) {
+	return s.instrumentUploadRaw.Instrument(ctx, func(ctx context.Context) (string, error) {
 		defer s.logDuration("upload", time.Now())
 
 		// Skip the upload if the block itself is skipped.
