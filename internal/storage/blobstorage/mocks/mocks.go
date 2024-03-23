@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	common "github.com/coinbase/chainstorage/protos/coinbase/c3/common"
+	internal "github.com/coinbase/chainstorage/internal/storage/blobstorage/internal"
 	chainstorage "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -87,16 +87,16 @@ func (mr *MockBlobStorageMockRecorder) Upload(arg0, arg1, arg2 any) *gomock.Call
 }
 
 // UploadRaw mocks base method.
-func (m *MockBlobStorage) UploadRaw(arg0 context.Context, arg1 common.Blockchain, arg2 chainstorage.SideChain, arg3 common.Network, arg4 *chainstorage.BlockMetadata, arg5 []byte, arg6 chainstorage.Compression) (string, error) {
+func (m *MockBlobStorage) UploadRaw(arg0 context.Context, arg1 *internal.RawBlockData) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UploadRaw", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	ret := m.ctrl.Call(m, "UploadRaw", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UploadRaw indicates an expected call of UploadRaw.
-func (mr *MockBlobStorageMockRecorder) UploadRaw(arg0, arg1, arg2, arg3, arg4, arg5, arg6 any) *gomock.Call {
+func (mr *MockBlobStorageMockRecorder) UploadRaw(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadRaw", reflect.TypeOf((*MockBlobStorage)(nil).UploadRaw), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadRaw", reflect.TypeOf((*MockBlobStorage)(nil).UploadRaw), arg0, arg1)
 }

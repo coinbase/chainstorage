@@ -127,15 +127,15 @@ func (s *blobStorageImpl) getObjectKey(blockchain common.Blockchain, sidechain a
 	return key, nil
 }
 
-func (s *blobStorageImpl) uploadRaw(ctx context.Context, blockchain common.Blockchain, sidechain api.SideChain, network common.Network, block *api.BlockMetadata, data []byte, compression api.Compression) (string, error) {
-	key, err := s.getObjectKey(blockchain, sidechain, network, block, compression)
+func (s *blobStorageImpl) uploadRaw(ctx context.Context, rawBlockData *internal.RawBlockData) (string, error) {
+	key, err := s.getObjectKey(rawBlockData.Blockchain, rawBlockData.SideChain, rawBlockData.Network, rawBlockData.BlockMetadata, rawBlockData.BlockDataCompression)
 	if err != nil {
 		return "", err
 	}
 
 	// #nosec G401
 	h := md5.New()
-	size, err := h.Write(data)
+	size, err := h.Write(rawBlockData.BlockData)
 	if err != nil {
 		return "", xerrors.Errorf("failed to compute checksum: %w", err)
 	}
@@ -147,7 +147,7 @@ func (s *blobStorageImpl) uploadRaw(ctx context.Context, blockchain common.Block
 	finalizer := finalizer.WithCloser(w)
 	defer finalizer.Finalize()
 
-	_, err = w.Write(data)
+	_, err = w.Write(rawBlockData.BlockData)
 	if err != nil {
 		return "", xerrors.Errorf("failed to upload block data: %w", err)
 	}
@@ -167,16 +167,16 @@ func (s *blobStorageImpl) uploadRaw(ctx context.Context, blockchain common.Block
 	return key, nil
 }
 
-func (s *blobStorageImpl) UploadRaw(ctx context.Context, blockchain common.Blockchain, sidechain api.SideChain, network common.Network, block *api.BlockMetadata, data []byte, compression api.Compression) (string, error) {
+func (s *blobStorageImpl) UploadRaw(ctx context.Context, rawBlockData *internal.RawBlockData) (string, error) {
 	return s.instrumentUpload.Instrument(ctx, func(ctx context.Context) (string, error) {
 		defer s.logDuration("upload", time.Now())
 
 		// Skip the upload if the block itself is skipped.
-		if block.Skipped {
+		if rawBlockData.BlockMetadata.Skipped {
 			return "", nil
 		}
 
-		return s.uploadRaw(ctx, blockchain, sidechain, network, block, data, compression)
+		return s.uploadRaw(ctx, rawBlockData)
 	})
 }
 
@@ -198,7 +198,14 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 			return "", xerrors.Errorf("failed to compress data with type %v: %w", compression.String(), err)
 		}
 
-		return s.uploadRaw(ctx, block.Blockchain, block.SideChain, block.Network, block.Metadata, data, compression)
+		return s.uploadRaw(ctx, &internal.RawBlockData{
+			Blockchain:           block.Blockchain,
+			SideChain:            block.SideChain,
+			Network:              block.Network,
+			BlockMetadata:        block.Metadata,
+			BlockData:            data,
+			BlockDataCompression: compression,
+		})
 	})
 }
 

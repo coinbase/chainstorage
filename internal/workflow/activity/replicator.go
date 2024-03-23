@@ -228,8 +228,14 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 			bodyBytes = nil
 			objectKeyMain, err := a.blobStorage.UploadRaw(
 				errgroupCtx,
-				a.config.Chain.Blockchain, a.config.Chain.Sidechain, a.config.Chain.Network,
-				metadata, uploadBytes, request.Compression)
+				&blobstorage.RawBlockData{
+					Blockchain:           a.config.Chain.Blockchain,
+					SideChain:            a.config.Chain.Sidechain,
+					Network:              a.config.Chain.Network,
+					BlockMetadata:        metadata,
+					BlockData:            uploadBytes,
+					BlockDataCompression: request.Compression,
+				})
 			if err != nil {
 				return xerrors.Errorf("failed to upload raw block file: %w", err)
 			}
