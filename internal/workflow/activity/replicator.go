@@ -100,6 +100,111 @@ func (a *Replicator) Execute(ctx workflow.Context, request *ReplicatorRequest) (
 	return &response, err
 }
 
+func (a *Replicator) downloadBlockData(ctx context.Context, url string) ([]byte, error) {
+	return a.retry.Retry(ctx, func(ctx context.Context) ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to create download request: %w", err)
+		}
+
+		httpResp, err := a.httpClient.Do(req)
+		if err != nil {
+			return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
+		}
+
+		finalizer := finalizer.WithCloser(httpResp.Body)
+		defer finalizer.Finalize()
+
+		if statusCode := httpResp.StatusCode; statusCode != http.StatusOK {
+			if statusCode == http.StatusRequestTimeout ||
+				statusCode == http.StatusTooManyRequests ||
+				statusCode >= http.StatusInternalServerError {
+				return nil, retry.Retryable(xerrors.Errorf("received %d status code: %w", statusCode, ErrDownloadFailure))
+			} else {
+				return nil, xerrors.Errorf("received non-retryable %d status code: %w", statusCode, ErrDownloadFailure)
+			}
+		}
+
+		bodyBytes, err := io.ReadAll(httpResp.Body)
+		if err != nil {
+			return nil, retry.Retryable(xerrors.Errorf("failed to read body: %w", err))
+		}
+		return bodyBytes, finalizer.Close()
+	})
+}
+func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.BlockFile, compression api.Compression) (*blobstorage.RawBlockData, error) {
+	bodyBytes, err := a.downloadBlockData(ctx, blockFile.FileUrl)
+	if err != nil {
+		return nil, err
+	}
+	var rawBytes []byte
+	var compressedBytes []byte
+	switch blockFile.Compression {
+	case api.Compression_NONE:
+		rawBytes = bodyBytes
+		if compression == api.Compression_GZIP {
+			compressedBytes, err = storage_utils.Compress(rawBytes, compression)
+			if err != nil {
+				return nil, xerrors.Errorf("failed to compress block data with type %v: %w", compression.String(), err)
+			}
+		}
+	case api.Compression_GZIP:
+		compressedBytes = bodyBytes
+		if compression == api.Compression_NONE {
+			rawBytes, err = storage_utils.Decompress(rawBytes, blockFile.Compression)
+			if err != nil {
+				return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+			}
+		}
+	default:
+		return nil, xerrors.Errorf("unknown block file compression type %v", blockFile.Compression.String())
+	}
+	metadata := &api.BlockMetadata{
+		Tag:          blockFile.Tag,
+		Hash:         blockFile.Hash,
+		ParentHash:   blockFile.ParentHash,
+		Height:       blockFile.Height,
+		ParentHeight: blockFile.ParentHeight,
+		Skipped:      blockFile.Skipped,
+		Timestamp:    blockFile.BlockTimestamp,
+	}
+	// if block file is coming from old chainstorage api, the block timestamp is not set
+	// we need to extract it from the block data
+	// TODO remove this after the api upgrade
+	if metadata.Timestamp == nil || (metadata.Timestamp.Nanos == 0 && metadata.Timestamp.Seconds == 0) {
+		block := new(api.Block)
+		rawBytes := rawBytes
+		if len(rawBytes) == 0 {
+			rawBytes, err = storage_utils.Decompress(bodyBytes, blockFile.Compression)
+			if err != nil {
+				return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+			}
+		}
+
+		if err := proto.Unmarshal(rawBytes, block); err != nil {
+			return nil, xerrors.Errorf("failed to unmarshal file contents: %w", err)
+		}
+		blockFile.BlockTimestamp = block.Metadata.Timestamp
+	}
+	rawBlockData := &blobstorage.RawBlockData{
+		Blockchain:           a.config.Chain.Blockchain,
+		Network:              a.config.Chain.Network,
+		SideChain:            a.config.Chain.Sidechain,
+		BlockMetadata:        metadata,
+		BlockDataCompression: compression,
+	}
+	switch compression {
+	case api.Compression_NONE:
+		rawBlockData.BlockData = rawBytes
+		return rawBlockData, nil
+	case api.Compression_GZIP:
+		rawBlockData.BlockData = compressedBytes
+		return rawBlockData, nil
+	default:
+		return nil, xerrors.Errorf("unknown compression type %v", compression.String())
+	}
+}
+
 func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*ReplicatorResponse, error) {
 	if err := a.validateRequest(request); err != nil {
 		return nil, err
@@ -130,118 +235,16 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 				zap.Uint64("height", blockFile.Height),
 				zap.String("hash", blockFile.Hash),
 			)
-			bodyBytes, err := a.retry.Retry(errgroupCtx, func(ctx context.Context) ([]byte, error) {
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, blockFile.FileUrl, nil)
-				if err != nil {
-					return nil, xerrors.Errorf("failed to create download request: %w", err)
-				}
-
-				httpResp, err := a.httpClient.Do(req)
-				if err != nil {
-					return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
-				}
-
-				finalizer := finalizer.WithCloser(httpResp.Body)
-				defer finalizer.Finalize()
-
-				if statusCode := httpResp.StatusCode; statusCode != http.StatusOK {
-					if statusCode == http.StatusRequestTimeout ||
-						statusCode == http.StatusTooManyRequests ||
-						statusCode >= http.StatusInternalServerError {
-						return nil, retry.Retryable(xerrors.Errorf("received %d status code: %w", statusCode, ErrDownloadFailure))
-					} else {
-						return nil, xerrors.Errorf("received non-retryable %d status code: %w", statusCode, ErrDownloadFailure)
-					}
-				}
-
-				bodyBytes, err := io.ReadAll(httpResp.Body)
-				if err != nil {
-					return nil, retry.Retryable(xerrors.Errorf("failed to read body: %w", err))
-				}
-				return bodyBytes, finalizer.Close()
-			})
+			rawBlockData, err := a.prepareRawBlockData(errgroupCtx, blockFile, request.Compression)
 			if err != nil {
-				return err
+				return xerrors.Errorf("failed to prepare raw block data: %w", err)
 			}
-			var rawBytes []byte
-			var compressedBytes []byte
-			switch blockFile.Compression {
-			case api.Compression_NONE:
-				rawBytes = bodyBytes
-				if request.Compression == api.Compression_GZIP {
-					compressedBytes, err = storage_utils.Compress(rawBytes, request.Compression)
-					if err != nil {
-						return xerrors.Errorf("failed to compress block data with type %v: %w", request.Compression.String(), err)
-					}
-				}
-			case api.Compression_GZIP:
-				compressedBytes = bodyBytes
-				if request.Compression == api.Compression_NONE {
-					rawBytes, err = storage_utils.Decompress(rawBytes, blockFile.Compression)
-					if err != nil {
-						return xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
-					}
-				}
-			default:
-				return xerrors.Errorf("unknown block file compression type %v", blockFile.Compression.String())
-			}
-			// if block file is coming from old chainstorage api, the block timestamp is not set
-			// we need to extract it from the block data
-			// TODO remove this after the api upgrade
-			if blockFile.BlockTimestamp == nil || (blockFile.BlockTimestamp.Nanos == 0 && blockFile.BlockTimestamp.Seconds == 0) {
-				block := new(api.Block)
-				rawBytes := rawBytes
-				if len(rawBytes) == 0 {
-					rawBytes, err = storage_utils.Decompress(bodyBytes, blockFile.Compression)
-					if err != nil {
-						return xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
-					}
-				}
-
-				if err := proto.Unmarshal(rawBytes, block); err != nil {
-					return xerrors.Errorf("failed to unmarshal file contents: %w", err)
-				}
-				blockFile.BlockTimestamp = block.Metadata.Timestamp
-			}
-			metadata := &api.BlockMetadata{
-				Tag:          blockFile.Tag,
-				Hash:         blockFile.Hash,
-				ParentHash:   blockFile.ParentHash,
-				Height:       blockFile.Height,
-				ParentHeight: blockFile.ParentHeight,
-				Skipped:      blockFile.Skipped,
-				Timestamp:    blockFile.BlockTimestamp,
-			}
-			var uploadBytes []byte
-			switch request.Compression {
-			case api.Compression_NONE:
-				uploadBytes = rawBytes
-				rawBytes = nil
-				compressedBytes = nil
-			case api.Compression_GZIP:
-				uploadBytes = compressedBytes
-				compressedBytes = nil
-				rawBytes = nil
-			default:
-				return xerrors.Errorf("unknown requested compression type %v", request.Compression.String())
-			}
-			bodyBytes = nil
-			objectKeyMain, err := a.blobStorage.UploadRaw(
-				errgroupCtx,
-				&blobstorage.RawBlockData{
-					Blockchain:           a.config.Chain.Blockchain,
-					SideChain:            a.config.Chain.Sidechain,
-					Network:              a.config.Chain.Network,
-					BlockMetadata:        metadata,
-					BlockData:            uploadBytes,
-					BlockDataCompression: request.Compression,
-				})
+			objectKeyMain, err := a.blobStorage.UploadRaw(errgroupCtx, rawBlockData)
 			if err != nil {
 				return xerrors.Errorf("failed to upload raw block file: %w", err)
 			}
-			metadata.ObjectKeyMain = objectKeyMain
-
-			blockMetas[i] = metadata
+			blockMetas[i] = rawBlockData.BlockMetadata
+			blockMetas[i].ObjectKeyMain = objectKeyMain
 			return err
 		})
 	}
