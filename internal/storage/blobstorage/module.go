@@ -12,6 +12,7 @@ type (
 	BlobStorage              = internal.BlobStorage
 	BlobStorageFactory       = internal.BlobStorageFactory
 	BlobStorageFactoryParams = internal.BlobStorageFactoryParams
+	RawBlockData             = internal.RawBlockData
 )
 
 var Module = fx.Options(
