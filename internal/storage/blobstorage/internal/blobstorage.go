@@ -8,12 +8,23 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
+	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
 type (
+	RawBlockData struct {
+		Blockchain           common.Blockchain
+		SideChain            api.SideChain
+		Network              common.Network
+		BlockMetadata        *api.BlockMetadata
+		BlockData            []byte
+		BlockDataCompression api.Compression
+	}
+
 	BlobStorage interface {
 		Upload(ctx context.Context, block *api.Block, compression api.Compression) (string, error)
+		UploadRaw(ctx context.Context, rawBlockData *RawBlockData) (string, error)
 		Download(ctx context.Context, metadata *api.BlockMetadata) (*api.Block, error)
 		PreSign(ctx context.Context, objectKey string) (string, error)
 	}
