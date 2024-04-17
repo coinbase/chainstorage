@@ -128,7 +128,7 @@ worker:
 
 .PHONY: localstack
 localstack:
-	docker-compose -f docker-compose-local.yml down && docker-compose -f docker-compose-local.yml up
+	docker-compose -f docker-compose-local.yml down -v && docker-compose -f docker-compose-local.yml up -d
 
 .PHONY: docker-run
 docker-run:

@@ -26,6 +26,7 @@ message Block {
     RosettaBlobdata rosetta = 102;
     SolanaBlobdata solana = 103;
     AptosBlobdata aptos = 104;
+    XRPBlobdata xrp = 105;
   }
 }
 
@@ -91,6 +92,7 @@ message NativeBlock {
     SolanaBlock solana = 103;
     AptosBlock aptos = 104;
     SolanaBlockV2 solana_v2 = 105;
+    XRPBlock xrp = 106;
   }
 }
 
@@ -109,6 +111,7 @@ message NativeTransaction {
     coinbase.crypto.rosetta.types.Transaction rosetta = 102;
     SolanaTransaction solana = 103;
     AptosTransaction aptos = 104;
+    XRPTransaction xrp = 105;
   }
 }
 

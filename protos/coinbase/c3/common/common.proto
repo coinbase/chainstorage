@@ -20,6 +20,7 @@ enum Blockchain {
     BLOCKCHAIN_APTOS = 47;   // L1 network using the Move language (originally created for Libra/Diem)
     BLOCKCHAIN_FANTOM = 51;
     BLOCKCHAIN_BASE = 56; // Coinbase L2
+    BLOCKCHAIN_XRP = 60;
 }
 
 // Network defines an enumeration of supported networks.
@@ -65,4 +66,6 @@ enum Network {
     NETWORK_BASE_GOERLI = 125; // Coinbase L2 running on Ethereum Goerli
 
     NETWORK_ETHEREUM_HOLESKY = 136;
+
+    NETWORK_XRP_MAINNET = 150;
 }

@@ -388,7 +388,7 @@ URL: http://localhost:8088/namespaces/chainstorage-ethereum-mainnet/workflows
 
 Start the backfill workflow:
 ```shell
-go run ./cmd/admin workflow start --workflow backfiller --input '{"StartHeight": 11000000, "EndHeight": 11000100, "NumConcurrentExtractors": 24}' --blockchain ethereum --network mainnet --env local
+go run ./cmd/admin workflow start --workflow backfiller --input '{"StartHeight": 11000000, "EndHeight": 11000100, "NumConcurrentExtractors": 1}' --blockchain ethereum --network mainnet --env local
 ```
 
 Start the benchmarker workflow:

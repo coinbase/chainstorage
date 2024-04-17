@@ -1,0 +1,223 @@
+syntax = "proto3";
+
+package coinbase.chainstorage;
+
+option go_package = "github.com/coinbase/chainstorage/protos/coinbase/chainstorage";
+
+import "google/protobuf/timestamp.proto";
+
+
+message LedgerRequest {
+  // A 20-byte hex string for identifying the ledger version
+  string ledger_hash = 1;
+  // The index of the ledger to retrieve information
+  uint32 ledger_index = 2;
+  // A boolean flag indicating whether to include the information about transactions
+  // in the specified ledger version
+  bool expand = 3;
+  // A boolean flag indicating whether to provide full JSON-formatted
+  // information for transaction/account information instead of only hashes
+  bool full_json = 4;
+  // A boolean flag indicating whether to include owner_funds field in the
+  // metadata of OfferCreate transactions in the response
+  bool include_owner_funds = 5;
+  // If true, and transactions and expand are both also true, the response
+  // will contain transaction information in binary format represented as a
+  // hexadecimal string, instead of the default JSON format
+  bool binary_format = 6;
+  // Includes an array of queued transactions in the response results when the
+  // 'queued' parameter is set to true and the command is requesting the current ledger
+  bool queued = 7;
+  // Filters by a ledger entry type. The valid types are: account, amendments, amm,
+  // check, deposit_preauth, directory, escrow, fee, hashes, nft_offer, offer,
+  // payment_channel, signer_list, state (trust line), and ticket. If using
+  // request accounts (state data), ignore it
+  repeated string entry_types = 8;
+  // If true, returns all objects that were added, modified, or deleted as part
+  // of applying transactions in the specified ledger
+  bool transactions = 9;
+}
+
+message LedgerResponse {
+  // It indicates the status of the response
+  string status = 1;
+  // It indicates whether the ledger has been validated
+  bool validated = 2;
+  // An array of warning objects, each containing the following fields
+  repeated LedgerWarning warnings = 3;
+
+  // The header of the ledger
+  LedgerHeader ledger_header = 4;
+  // The transactions in the ledger
+  repeated LedgerTransactionHash transactions = 5;
+
+  // Messages for specific fields within the response.
+  message LedgerWarning {
+    // A warning message
+    string message = 1;
+  }
+}
+
+message LedgerHeader {
+  // A boolean flag indicating whether the ledger has been accepted
+  bool closed = 1;
+  // A hash value representing the state of all accounts in the ledger
+  string hash = 2;
+  // A flags indicating the additional information about the ledger close
+  uint32 close_flags = 3;
+  // The timestamp when the ledger was closed, represented in UNIX time format
+  uint32 close_time = 4;
+  // The time this ledger was closed, in human-readable format
+  string close_time_human = 5;
+  // close_time_resolution is deprecated, use close_time instead
+  //uint32 close_time_resolution = 6 [deprecated = true];
+  // A boolean flag indicating whether or not this ledger has been closed
+  //bool closed_deprecated = 7 [deprecated = true];
+  // The unique identifying hash of the entire ledger. This field is deprecated,
+  // use ledger_hash instead
+  //string ledger_hash_deprecated = 8 [deprecated = true];
+  // The unique identifying hash of the entire ledger
+  string ledger_hash = 9;
+  // The time at which the previous ledger was closed
+  uint32 previous_close_time = 10;
+  // The unique identifying hash of the ledger that came immediately before
+  // this one
+  string previous_ledger_hash = 11;
+  // The sequence number of the ledger
+  uint32 ledger_index = 12;
+  // The total number of coins in the ledger. This field is deprecated, use
+  // total_coins instead
+  //uint32 total_coins_deprecated = 13 [deprecated = true];
+  // The total number of coins in the ledger
+  uint32 total_coins = 14;
+  // The transactions applied in this ledger version
+  repeated LedgerTransactionHash transactions = 15;
+  // The unique identifying hash of the entire ledger
+  //string ledger_hash_16 = 16 [deprecated = true];
+  // The Ledger Index of this ledger
+  //uint32 ledger_index_17 = 17;
+}
+
+message LedgerTransactionHash {
+  // The unique identifying hash of the transaction
+  string hash = 1;
+}
+
+message LedgerTransactionRequest {
+  string transaction = 1; // The 256-bit hash of the transaction, as hex (REQUIRED)
+  bool binary = 2; // If true, return transaction data and metadata as binary serialized to hexadecimal strings
+  uint32 min_ledger = 3; // It is used with min_ledger to specify a range of up to 1000 ledger indexes, ending with this ledger (inclusive)
+  uint32 max_ledger = 4; // It is used with max_ledger to specify a range of up to 1000 ledger indexes, starting with this ledger (inclusive)
+}
+
+message TakerGets {
+  string currency = 1; // The currency value in hexadecimal format.
+  string issuer = 2;   // The issuer of the currency, if applicable.
+  string value = 3;    // The actual value of the currency.
+}
+
+// DeletedNode contains information about a deleted node.
+message DeletedNode {
+  message FinalFields {
+    string account = 1;       // The account related to the node.
+    string book_directory = 2; // The book directory of the node.
+    string book_node = 3;      // The book node of the node.
+    uint32 flags = 4;            // The flags associated with the node.
+    string owner_node = 5;     // The owner node of the node.
+    string previous_txn_id = 6; // The transaction ID of the previous transaction.
+    uint32 previous_txn_lgr_seq = 7; // The ledger sequence of the previous transaction.
+    uint32 sequence = 8;        // The sequence number of the node.
+    TakerGets taker_gets = 9;    // The taker gets value of the node.
+    string taker_pays = 10;    // The taker pays value of the node.
+  }
+  string ledger_entry_type = 11; // The type of ledger entry.
+  string ledger_index = 12;     // The ledger index of the node.
+  FinalFields final_fields = 13; // The final fields of the node.
+}
+
+// ModifiedNode contains information about a modified node.
+message ModifiedNode {
+  message FinalFields {
+    uint32 flags = 1;           // The flags associated with the node.
+    string index_next = 2;       // The next index of the node.
+    string index_previous = 3;   // The previous index of the node.
+    string owner = 4;            // The owner of the node.
+    string root_index = 5;       // The root index of the node.
+  }
+  string ledger_entry_type = 6; // The type of ledger entry.
+  string ledger_index = 7;     // The ledger index of the node.
+  FinalFields final_fields = 8; // The final fields of the node.
+  FinalFields previous_fields = 9; // The previous fields of the node.
+  string previous_txn_id = 10; // The transaction ID of the previous transaction.
+  uint32 previous_txn_lgr_seq = 11; // The ledger sequence of the previous transaction.
+}
+
+// CreatedNode contains information about a created node.
+message CreatedNode {
+  string ledger_entry_type = 1; // The type of ledger entry.
+  string ledger_index = 2;       // The ledger index of the node.
+  message NewFields {
+    string exchange_rate = 1; // The exchange rate of the node.
+    string root_index = 2;      // The root index of the node.
+    string taker_gets_currency = 3; // The currency that the taker gets.
+    string taker_gets_issuer = 4;  // The issuer of the currency that the taker gets.
+    string taker_pays_currency = 5;  // The currency that the taker pays.
+    string taker_pays_issuer = 6;   // The issuer of the currency that the taker pays.
+  }
+  NewFields new_fields = 3; // The new fields of the node.
+}
+
+// TxResult represents the result of a transaction query.
+message LedgerTransaction {
+  string account = 1;            // The unique address of the account that initiated the transaction.
+  string fee = 2;                 // The amount of XRP, in drops, to be destroyed as a cost for distributing this transaction to the network.
+  uint32 flags = 3;                // The set of bit-flags for this transaction.
+  uint32 last_ledger_sequence = 4; // The highest ledger index this transaction can appear in.
+  uint32 offer_sequence = 5;      // The offer sequence number.
+  uint32 sequence = 6;            // The sequence number of the account sending the transaction.
+  string signing_pub_key = 7;     // The hex representation of the public key that corresponds to the private key used to sign this transaction.
+  TakerGets taker_gets = 8;        // The amount that the taker gets, specified in the offer.
+  string taker_pays = 9;         // The amount that the taker pays, specified in the offer.
+  string transaction_type = 10;   // The type of transaction, e.g., "OfferCreate".
+  string txn_signature = 11;      // The signature that verifies this transaction as originating from the account it says it is from.
+  string hash = 12;               // The hash of the transaction.
+  string ctid = 13;               // The currency transaction ID.
+  Meta meta = 14;                // The metadata associated with the transaction.
+  bool validated = 15;            // Indicates whether the transaction is validated.
+  int64 date = 16;                // The timestamp of the transaction, represented as the number of seconds since the Unix epoch.
+  uint32 ledger_index = 17;         // The index of the ledger that contains this transaction.
+  uint32 in_ledger = 18;          // The ledger index where this transaction was included.
+  string status = 19;             // The status of the transaction.
+  repeated Warning warnings = 20;   // An array of warning objects.
+}
+
+// Meta contains the metadata information related to a transaction.
+message Meta {
+  repeated AffectedNode affected_nodes = 1; // The list of nodes affected by the transaction.
+  uint32 transaction_index = 2;         // The index of the transaction within the ledger.
+  string transaction_result = 3;       // The result of the transaction.
+}
+
+// AffectedNode represents a node that was affected by the transaction.
+message AffectedNode {
+  oneof node {
+    DeletedNode deleted_node = 1;
+    ModifiedNode modified_node = 2;
+    CreatedNode created_node = 3;
+  }
+}
+
+// Warning represents a warning message associated with the transaction result.
+message Warning {
+  string id = 1;    // The ID of the warning.
+  string message = 2; // The warning message.
+}
+
+message XrpBlobdata {
+  bytes header = 1;
+  repeated RepeatedBytes ledgerTransactions = 2;
+}
+
+message RepeatedBytes {
+  repeated bytes data = 1;
+}
