@@ -39,7 +39,6 @@ func startManager(opts ...fx.Option) services.SystemManager {
 		config.Module,
 		dlq.Module,
 		fxparams.Module,
-		gateway.Module,
 		s3.Module,
 		storage.Module,
 		tally.Module,
