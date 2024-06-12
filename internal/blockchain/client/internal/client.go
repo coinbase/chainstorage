@@ -113,6 +113,10 @@ func NewClient(params Params) (Result, error) {
 		switch blockchain {
 		case common.Blockchain_BLOCKCHAIN_BITCOIN:
 			factory = params.Bitcoin
+		case common.Blockchain_BLOCKCHAIN_BITCOINCASH:
+			factory = params.Bitcoin
+		case common.Blockchain_BLOCKCHAIN_LITECOIN:
+			factory = params.Bitcoin
 		case common.Blockchain_BLOCKCHAIN_BSC:
 			factory = params.Bsc
 		case common.Blockchain_BLOCKCHAIN_ETHEREUM:
