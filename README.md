@@ -111,7 +111,7 @@ Flags:
       --meta                output metadata only
       --network string      network name (e.g. mainnet)
       --out string          output filepath: default format is json; use a .pb extension for protobuf format
-      --parser string       parser type: one of native, rosetta, or raw (default "native")
+      --parser string       parser type: one of native, mesh, or raw (default "native")
 
 Use "admin [command] --help" for more information about a command.
 ```
