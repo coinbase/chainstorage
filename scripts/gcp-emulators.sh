@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-FIREBASE_CLI_VERSION=13.1.0
+FIREBASE_CLI_VERSION=13.4.0
 
 SCRIPTS_DIR=$(dirname "${BASH_SOURCE[0]}")
 IMAGE_NAME=firebase-emulators:v${FIREBASE_CLI_VERSION}
