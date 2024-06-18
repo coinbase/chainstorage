@@ -111,11 +111,7 @@ func NewClient(params Params) (Result, error) {
 	sidechain := params.Config.Chain.Sidechain
 	if sidechain == api.SideChain_SIDECHAIN_NONE {
 		switch blockchain {
-		case common.Blockchain_BLOCKCHAIN_BITCOIN:
-			factory = params.Bitcoin
-		case common.Blockchain_BLOCKCHAIN_BITCOINCASH:
-			factory = params.Bitcoin
-		case common.Blockchain_BLOCKCHAIN_LITECOIN:
+		case common.Blockchain_BLOCKCHAIN_BITCOIN, common.Blockchain_BLOCKCHAIN_BITCOINCASH, common.Blockchain_BLOCKCHAIN_LITECOIN:
 			factory = params.Bitcoin
 		case common.Blockchain_BLOCKCHAIN_BSC:
 			factory = params.Bsc
