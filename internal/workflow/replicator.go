@@ -2,13 +2,13 @@ package workflow
 
 import (
 	"context"
-	"strconv"
-
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"sort"
+	"strconv"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -158,6 +158,8 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			reprocessChannel := workflow.NewNamedBufferedChannel(ctx, "replicator.reprocess", miniBatchCount)
 			defer reprocessChannel.Close()
 
+			var responses []activity.ReplicatorResponse
+
 			// Phase 1: running mini batches in parallel.
 			for i := 0; i < parallelism; i++ {
 				workflow.Go(ctx, func(ctx workflow.Context) {
@@ -186,11 +188,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 								zap.Error(err),
 							)
 						}
-						metrics.Gauge(replicatorHeightGauge).Update(float64(replicatorResponse.EndHeight))
-						metrics.Gauge(replicatorGapGauge).Update(float64(replicatorResponse.Gap))
-						if replicatorResponse.TimeSinceLastBlock > 0 {
-							metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(replicatorResponse.TimeSinceLastBlock.Seconds())
-						}
+						responses = append(responses, *replicatorResponse)
 					}
 				})
 			}
@@ -207,7 +205,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				if batchEnd > endHeight {
 					batchEnd = endHeight
 				}
-				_, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
+				retryResponse, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
 					Tag:         tag,
 					StartHeight: batchStart,
 					EndHeight:   batchEnd,
@@ -217,6 +215,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				if err != nil {
 					return xerrors.Errorf("failed to replicate block from %d to %d: %w", batchStart, batchEnd, err)
 				}
+				responses = append(responses, *retryResponse)
 			}
 
 			// Phase 3: update watermark
@@ -229,6 +228,16 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				if err != nil {
 					return xerrors.Errorf("failed to update watermark: %w", err)
 				}
+			}
+
+			if len(responses) > 0 {
+				sort.Slice(responses, func(i, j int) bool {
+					return responses[i].LatestBlockHeight < responses[j].LatestBlockHeight
+				})
+
+				metrics.Gauge(replicatorHeightGauge).Update(float64(responses[len(responses)-1].LatestBlockHeight))
+				metrics.Gauge(replicatorGapGauge).Update(float64(request.EndHeight - responses[len(responses)-1].LatestBlockHeight + 1))
+				metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(utils.SinceTimestamp(responses[len(responses)-1].LatestBlockTimestamp).Seconds())
 			}
 		}
 
