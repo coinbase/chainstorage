@@ -89,6 +89,11 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			return xerrors.Errorf("failed to read config: %w", err)
 		}
 
+		if !request.UpdateWatermark {
+			// Set the default
+			request.UpdateWatermark = true
+		}
+
 		batchSize := cfg.BatchSize
 		if request.BatchSize > 0 {
 			batchSize = request.BatchSize
@@ -218,6 +223,10 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				responses = append(responses, *retryResponse)
 			}
 
+			sort.Slice(responses, func(i, j int) bool {
+				return responses[i].LatestBlockHeight < responses[j].LatestBlockHeight
+			})
+
 			// Phase 3: update watermark
 			if request.UpdateWatermark {
 				_, err := w.updateWatermark.Execute(ctx, &activity.UpdateWatermarkRequest{
@@ -231,10 +240,6 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			}
 
 			if len(responses) > 0 {
-				sort.Slice(responses, func(i, j int) bool {
-					return responses[i].LatestBlockHeight < responses[j].LatestBlockHeight
-				})
-
 				metrics.Gauge(replicatorHeightGauge).Update(float64(responses[len(responses)-1].LatestBlockHeight))
 				metrics.Gauge(replicatorGapGauge).Update(float64(request.EndHeight - responses[len(responses)-1].LatestBlockHeight + 1))
 				metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(utils.SinceTimestamp(responses[len(responses)-1].LatestBlockTimestamp).Seconds())

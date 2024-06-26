@@ -255,7 +255,7 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 		return nil, xerrors.Errorf("failed to replicate block files: %w", err)
 	}
 	logger.Info("Persisting block metadata")
-	err = a.metaStorage.PersistBlockMetas(ctx, true, blockMetas, nil)
+	err = a.metaStorage.PersistBlockMetas(ctx, false, blockMetas, nil)
 	if err != nil {
 		return nil, err
 	}
