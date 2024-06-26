@@ -46,6 +46,13 @@ type (
 	}
 )
 
+const (
+	// Replicator metrics. need to have `workflow.replicator` as prefix
+	replicatorHeightGauge             = "workflow.replicator.height"
+	replicatorGapGauge                = "workflow.replicator.gap"
+	replicatorTimeSinceLastBlockGauge = "workflow.replicator.time_since_last_block"
+)
+
 // GetTags implements InstrumentedRequest.
 func (r *ReplicatorRequest) GetTags() map[string]string {
 	return map[string]string{
@@ -121,6 +128,9 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 		logger.Info("workflow started", zap.Uint64("batchSize", batchSize))
 		ctx = w.withActivityOptions(ctx)
 
+		metrics := w.runtime.GetMetricsHandler(ctx).WithTags(map[string]string{
+			tagBlockTag: strconv.Itoa(int(request.Tag)),
+		})
 		for startHeight := request.StartHeight; startHeight < request.EndHeight; startHeight = startHeight + batchSize {
 			if startHeight >= request.StartHeight+checkpointSize {
 				newRequest := *request
@@ -161,7 +171,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 						if batchEnd > endHeight {
 							batchEnd = endHeight
 						}
-						_, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
+						replicatorResponse, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
 							Tag:         tag,
 							StartHeight: batchStart,
 							EndHeight:   batchEnd,
@@ -175,6 +185,11 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 								zap.Uint64("batchStart", batchStart),
 								zap.Error(err),
 							)
+						}
+						metrics.Gauge(replicatorHeightGauge).Update(float64(replicatorResponse.EndHeight))
+						metrics.Gauge(replicatorGapGauge).Update(float64(replicatorResponse.Gap))
+						if replicatorResponse.TimeSinceLastBlock > 0 {
+							metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(replicatorResponse.TimeSinceLastBlock.Seconds())
 						}
 					}
 				})

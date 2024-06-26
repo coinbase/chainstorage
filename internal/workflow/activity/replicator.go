@@ -67,8 +67,10 @@ type (
 	}
 
 	ReplicatorResponse struct {
-		StartHeight uint64
-		EndHeight   uint64
+		StartHeight        uint64
+		EndHeight          uint64
+		Gap                uint64
+		TimeSinceLastBlock time.Duration
 	}
 )
 
@@ -252,13 +254,15 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 		return nil, xerrors.Errorf("failed to replicate block files: %w", err)
 	}
 	logger.Info("Persisting block metadata")
-	err = a.metaStorage.PersistBlockMetas(ctx, false, blockMetas, nil)
+	err = a.metaStorage.PersistBlockMetas(ctx, true, blockMetas, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ReplicatorResponse{
-		StartHeight: request.StartHeight,
-		EndHeight:   request.EndHeight,
+		StartHeight:        request.StartHeight,
+		EndHeight:          request.EndHeight,
+		Gap:                request.EndHeight - blockMetas[len(blockMetas)-1].Height + 1,
+		TimeSinceLastBlock: blockMetas[len(blockMetas)-1].Timestamp.AsTime().Sub(time.Now()),
 	}, nil
 }
