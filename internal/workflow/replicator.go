@@ -7,7 +7,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
-	"sort"
 	"strconv"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
@@ -89,11 +88,6 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			return xerrors.Errorf("failed to read config: %w", err)
 		}
 
-		if !request.UpdateWatermark {
-			// Set the default
-			request.UpdateWatermark = true
-		}
-
 		batchSize := cfg.BatchSize
 		if request.BatchSize > 0 {
 			batchSize = request.BatchSize
@@ -163,7 +157,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			reprocessChannel := workflow.NewNamedBufferedChannel(ctx, "replicator.reprocess", miniBatchCount)
 			defer reprocessChannel.Close()
 
-			var responses []activity.ReplicatorResponse
+			responsesChannel := workflow.NewNamedBufferedChannel(ctx, "replicator.mini-batches.response", parallelism+miniBatchCount)
 
 			// Phase 1: running mini batches in parallel.
 			for i := 0; i < parallelism; i++ {
@@ -193,7 +187,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 								zap.Error(err),
 							)
 						}
-						responses = append(responses, *replicatorResponse)
+						responsesChannel.Send(ctx, *replicatorResponse)
 					}
 				})
 			}
@@ -220,12 +214,8 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				if err != nil {
 					return xerrors.Errorf("failed to replicate block from %d to %d: %w", batchStart, batchEnd, err)
 				}
-				responses = append(responses, *retryResponse)
+				responsesChannel.Send(ctx, *retryResponse)
 			}
-
-			sort.Slice(responses, func(i, j int) bool {
-				return responses[i].LatestBlockHeight < responses[j].LatestBlockHeight
-			})
 
 			// Phase 3: update watermark
 			if request.UpdateWatermark {
@@ -239,11 +229,21 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				}
 			}
 
-			if len(responses) > 0 {
-				metrics.Gauge(replicatorHeightGauge).Update(float64(responses[len(responses)-1].LatestBlockHeight))
-				metrics.Gauge(replicatorGapGauge).Update(float64(request.EndHeight - responses[len(responses)-1].LatestBlockHeight + 1))
-				metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(utils.SinceTimestamp(responses[len(responses)-1].LatestBlockTimestamp).Seconds())
+			var resp, latestResp activity.ReplicatorResponse
+			for {
+				if ok := responsesChannel.ReceiveAsync(&resp); !ok {
+					break
+				}
+				if resp.LatestBlockHeight > latestResp.LatestBlockHeight {
+					latestResp = resp
+				}
 			}
+			if latestResp != (activity.ReplicatorResponse{}) {
+				metrics.Gauge(replicatorHeightGauge).Update(float64(latestResp.LatestBlockHeight))
+				metrics.Gauge(replicatorGapGauge).Update(float64(request.EndHeight - latestResp.LatestBlockHeight + 1))
+				metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(utils.SinceTimestamp(latestResp.LatestBlockTimestamp).Seconds())
+			}
+			responsesChannel.Close()
 		}
 
 		logger.Info("workflow finished")
