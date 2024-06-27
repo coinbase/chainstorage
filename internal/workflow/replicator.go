@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
@@ -36,15 +37,19 @@ type (
 	ReplicatorRequest struct {
 		Tag             uint32
 		StartHeight     uint64
-		EndHeight       uint64 `validate:"gt=0,gtfield=StartHeight"`
+		EndHeight       uint64 `validate:"eq=0|gtfield=StartHeight"`
 		UpdateWatermark bool
 		DataCompression string // Optional. If not specified, it is read from the workflow config.
 		BatchSize       uint64 // Optional. If not specified, it is read from the workflow config.
 		MiniBatchSize   uint64 // Optional. If not specified, it is read from the workflow config.
 		CheckpointSize  uint64 // Optional. If not specified, it is read from the workflow config.
 		Parallelism     int    // Optional. If not specified, it is read from the workflow config.
+		ContinuousSync  bool   // Optional. Whether to continuously sync data
+		SyncInterval    string // Optional. Interval for continuous sync
 	}
 )
+
+const defaultSyncInterval = 1 * time.Minute
 
 // GetTags implements InstrumentedRequest.
 func (r *ReplicatorRequest) GetTags() map[string]string {
@@ -120,6 +125,24 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 
 		logger.Info("workflow started", zap.Uint64("batchSize", batchSize))
 		ctx = w.withActivityOptions(ctx)
+
+		syncInterval := defaultSyncInterval
+		if request.SyncInterval != "" {
+			interval, err := time.ParseDuration(request.SyncInterval)
+			if err == nil {
+				syncInterval = interval
+			}
+		}
+
+		if request.ContinuousSync && request.EndHeight == 0 {
+			replicatorResponse, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
+				SyncToTips: true,
+			})
+			if err != nil {
+				return xerrors.Errorf("failed to get latest block through activity: %w", err)
+			}
+			request.EndHeight = replicatorResponse.LatestHeight
+		}
 
 		for startHeight := request.StartHeight; startHeight < request.EndHeight; startHeight = startHeight + batchSize {
 			if startHeight >= request.StartHeight+checkpointSize {
@@ -215,6 +238,21 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 					return xerrors.Errorf("failed to update watermark: %w", err)
 				}
 			}
+		}
+
+		if request.ContinuousSync {
+			logger.Info("new continuous sync workflow")
+			newRequest := *request
+			newRequest.StartHeight = request.EndHeight
+			newRequest.EndHeight = 0
+			newRequest.UpdateWatermark = true
+			// Wait for syncInterval minutes before starting a new continuous sync workflow.
+			err := workflow.Sleep(ctx, syncInterval)
+			if err != nil {
+				return xerrors.Errorf("workflow await failed: %w", err)
+			}
+			logger.Info("start new continuous sync workflow")
+			return workflow.NewContinueAsNewError(ctx, w.name, &newRequest)
 		}
 
 		logger.Info("workflow finished")

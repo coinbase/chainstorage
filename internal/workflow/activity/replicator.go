@@ -64,11 +64,13 @@ type (
 		EndHeight   uint64
 		Parallelism int
 		Compression api.Compression
+		SyncToTips  bool
 	}
 
 	ReplicatorResponse struct {
-		StartHeight uint64
-		EndHeight   uint64
+		StartHeight  uint64
+		EndHeight    uint64
+		LatestHeight uint64
 	}
 )
 
@@ -210,6 +212,16 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 		return nil, err
 	}
 	logger := a.getLogger(ctx).With(zap.Reflect("request", request))
+	if request.SyncToTips {
+		latestBlock, err := a.client.GetLatestBlock(ctx, &api.GetLatestBlockRequest{})
+		if err != nil {
+			return nil, xerrors.Errorf("failed to get latest block when syncToTips: %w", err)
+		}
+		var cfg config.ChainConfig
+		return &ReplicatorResponse{
+			LatestHeight: latestBlock.GetHeight() - cfg.IrreversibleDistance,
+		}, nil
+	}
 	logger.Info("Fetching block range",
 		zap.Uint64("startHeight", request.StartHeight),
 		zap.Uint64("endHeight", request.EndHeight))
