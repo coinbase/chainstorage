@@ -158,6 +158,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			defer reprocessChannel.Close()
 
 			responsesChannel := workflow.NewNamedBufferedChannel(ctx, "replicator.mini-batches.response", parallelism+miniBatchCount)
+			defer responsesChannel.Close()
 
 			// Phase 1: running mini batches in parallel.
 			for i := 0; i < parallelism; i++ {
@@ -219,9 +220,15 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 
 			// Phase 3: update watermark
 			if request.UpdateWatermark {
+				var validateStart uint64
+				if startHeight == 0 {
+					validateStart = startHeight
+				} else {
+					validateStart = startHeight - 1
+				}
 				_, err := w.updateWatermark.Execute(ctx, &activity.UpdateWatermarkRequest{
 					Tag:           request.Tag,
-					ValidateStart: startHeight - 1,
+					ValidateStart: validateStart,
 					BlockHeight:   endHeight - 1,
 				})
 				if err != nil {
@@ -229,8 +236,9 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				}
 			}
 
-			var resp, latestResp activity.ReplicatorResponse
+			var latestResp activity.ReplicatorResponse
 			for {
+				var resp activity.ReplicatorResponse
 				if ok := responsesChannel.ReceiveAsync(&resp); !ok {
 					break
 				}
@@ -243,7 +251,6 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				metrics.Gauge(replicatorGapGauge).Update(float64(request.EndHeight - latestResp.LatestBlockHeight + 1))
 				metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(utils.SinceTimestamp(latestResp.LatestBlockTimestamp).Seconds())
 			}
-			responsesChannel.Close()
 		}
 
 		logger.Info("workflow finished")
