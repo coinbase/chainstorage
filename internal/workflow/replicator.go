@@ -23,6 +23,7 @@ type (
 	Replicator struct {
 		baseWorkflow
 		replicator      *activity.Replicator
+		latestBLock     *activity.LatestBlock
 		updateWatermark *activity.UpdateWatermark
 	}
 
@@ -31,6 +32,7 @@ type (
 		fxparams.Params
 		Runtime         cadence.Runtime
 		Replicator      *activity.Replicator
+		LatestBLock     *activity.LatestBlock
 		UpdateWatermark *activity.UpdateWatermark
 	}
 
@@ -135,13 +137,11 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 		}
 
 		if request.ContinuousSync && request.EndHeight == 0 {
-			replicatorResponse, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
-				SyncToTips: true,
-			})
+			latestBlockResponse, err := w.latestBLock.Execute(ctx, &activity.LatestBlockRequest{})
 			if err != nil {
 				return xerrors.Errorf("failed to get latest block through activity: %w", err)
 			}
-			request.EndHeight = replicatorResponse.LatestHeight
+			request.EndHeight = latestBlockResponse.Height
 		}
 
 		for startHeight := request.StartHeight; startHeight < request.EndHeight; startHeight = startHeight + batchSize {
@@ -245,7 +245,6 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			newRequest := *request
 			newRequest.StartHeight = request.EndHeight
 			newRequest.EndHeight = 0
-			newRequest.UpdateWatermark = true
 			// Wait for syncInterval minutes before starting a new continuous sync workflow.
 			err := workflow.Sleep(ctx, syncInterval)
 			if err != nil {

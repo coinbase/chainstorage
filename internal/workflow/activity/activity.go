@@ -28,6 +28,7 @@ const (
 	ActivityEventLoader     = "activity.event_loader"
 	ActivityReplicator      = "activity.replicator"
 	ActivityUpdateWatermark = "activity.update_watermark"
+	ActivityLatestBlock     = "activity.latest_block"
 
 	loggerMsg = "activity.request"
 
