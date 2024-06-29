@@ -40,6 +40,7 @@ func NewLatestBlock(params LatestBlockParams) *LatestBlock {
 	r := &LatestBlock{
 		baseActivity: newBaseActivity(ActivityLatestBlock, params.Runtime),
 		config:       params.Config,
+		logger:       params.Logger,
 		client:       params.Client,
 	}
 	r.register(r.execute)
@@ -57,10 +58,17 @@ func (r *LatestBlock) execute(ctx context.Context, request *LatestBlockRequest) 
 		return nil, err
 	}
 
+	logger := r.getLogger(ctx).With(zap.Reflect("request", request))
+
 	latestBlock, err := r.client.GetLatestBlock(ctx, &api.GetLatestBlockRequest{})
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get chainstorage latest block: %w", err)
 	}
+
+	logger.Debug("GetLatestBlock",
+		zap.Uint64("height", latestBlock.GetHeight()),
+		zap.String("hash", latestBlock.GetHash()),
+	)
 
 	var cfg config.ChainConfig
 	return &LatestBlockResponse{
