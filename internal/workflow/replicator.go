@@ -68,6 +68,7 @@ func NewReplicator(params ReplicatorParams) *Replicator {
 	w := &Replicator{
 		baseWorkflow:    newBaseWorkflow(&params.Config.Workflows.Replicator, params.Runtime),
 		replicator:      params.Replicator,
+		latestBLock:     params.LatestBLock,
 		updateWatermark: params.UpdateWatermark,
 	}
 	w.registerWorkflow(w.execute)
