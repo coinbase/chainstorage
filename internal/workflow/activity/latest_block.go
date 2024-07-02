@@ -70,8 +70,7 @@ func (r *LatestBlock) execute(ctx context.Context, request *LatestBlockRequest) 
 		zap.String("hash", latestBlock.GetHash()),
 	)
 
-	var cfg config.ChainConfig
 	return &LatestBlockResponse{
-		Height: latestBlock.GetHeight() - cfg.IrreversibleDistance,
+		Height: latestBlock.GetHeight(),
 	}, nil
 }

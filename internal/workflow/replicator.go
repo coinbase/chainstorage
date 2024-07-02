@@ -142,7 +142,8 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			if err != nil {
 				return xerrors.Errorf("failed to get latest block through activity: %w", err)
 			}
-			request.EndHeight = latestBlockResponse.Height
+			var chainConfig config.ChainConfig
+			request.EndHeight = latestBlockResponse.Height - chainConfig.IrreversibleDistance
 		}
 
 		for startHeight := request.StartHeight; startHeight < request.EndHeight; startHeight = startHeight + batchSize {
