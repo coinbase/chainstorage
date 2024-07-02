@@ -1,0 +1,43 @@
+api:
+  max_num_blocks: 5
+  streaming_max_no_event_time: 30m
+aws:
+  dynamodb:
+    event_table: example_chainstorage_block_events_{{blockchain}}_{{network}}
+    event_table_height_index: example_chainstorage_block_events_by_height_{{blockchain}}_{{network}}
+chain:
+  block_tag:
+    latest: 2
+    stable: 2
+  event_tag:
+    latest: 0
+    stable: 0
+  block_time: 10m
+  irreversible_distance: 2
+  feature:
+    rosetta_parser: true
+cron:
+  block_range_size: 2
+  disable_dlq_processor: true
+sla:
+  block_height_delta: 5
+  block_time_delta: 1h
+  out_of_sync_node_distance: 10
+  tier: 2
+  time_since_last_block: 1h15m
+  event_height_delta: 5
+  event_time_delta: 1h
+  time_since_last_event: 1h15m
+workflows:
+  backfiller:
+    num_concurrent_extractors: 21
+  monitor:
+    checkpoint_size: 250
+  poller:
+    activity_heartbeat_timeout: 15m
+    activity_start_to_close_timeout: 30m
+    backoff_interval: 10s
+    max_blocks_to_sync_per_cycle: 5
+    parallelism: 10
+  streamer:
+    backoff_interval: 10s

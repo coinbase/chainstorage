@@ -2,14 +2,13 @@ package workflow
 
 import (
 	"context"
-	"strconv"
 	"time"
-
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"strconv"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -52,6 +51,13 @@ type (
 )
 
 const defaultSyncInterval = 1 * time.Minute
+
+const (
+	// Replicator metrics. need to have `workflow.replicator` as prefix
+	replicatorHeightGauge             = "workflow.replicator.height"
+	replicatorGapGauge                = "workflow.replicator.gap"
+	replicatorTimeSinceLastBlockGauge = "workflow.replicator.time_since_last_block"
+)
 
 // GetTags implements InstrumentedRequest.
 func (r *ReplicatorRequest) GetTags() map[string]string {
@@ -129,6 +135,10 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 		logger.Info("workflow started", zap.Uint64("batchSize", batchSize))
 		ctx = w.withActivityOptions(ctx)
 
+		metrics := w.runtime.GetMetricsHandler(ctx).WithTags(map[string]string{
+			tagBlockTag: strconv.Itoa(int(request.Tag)),
+		})
+
 		syncInterval := defaultSyncInterval
 		if request.SyncInterval != "" {
 			interval, err := time.ParseDuration(request.SyncInterval)
@@ -173,6 +183,9 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 			reprocessChannel := workflow.NewNamedBufferedChannel(ctx, "replicator.reprocess", miniBatchCount)
 			defer reprocessChannel.Close()
 
+			responsesChannel := workflow.NewNamedBufferedChannel(ctx, "replicator.mini-batches.response", parallelism+miniBatchCount)
+			defer responsesChannel.Close()
+
 			// Phase 1: running mini batches in parallel.
 			for i := 0; i < parallelism; i++ {
 				workflow.Go(ctx, func(ctx workflow.Context) {
@@ -186,7 +199,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 						if batchEnd > endHeight {
 							batchEnd = endHeight
 						}
-						_, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
+						replicatorResponse, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
 							Tag:         tag,
 							StartHeight: batchStart,
 							EndHeight:   batchEnd,
@@ -201,6 +214,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 								zap.Error(err),
 							)
 						}
+						responsesChannel.Send(ctx, *replicatorResponse)
 					}
 				})
 			}
@@ -217,7 +231,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				if batchEnd > endHeight {
 					batchEnd = endHeight
 				}
-				_, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
+				retryResponse, err := w.replicator.Execute(ctx, &activity.ReplicatorRequest{
 					Tag:         tag,
 					StartHeight: batchStart,
 					EndHeight:   batchEnd,
@@ -227,18 +241,41 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				if err != nil {
 					return xerrors.Errorf("failed to replicate block from %d to %d: %w", batchStart, batchEnd, err)
 				}
+				responsesChannel.Send(ctx, *retryResponse)
 			}
 
 			// Phase 3: update watermark
 			if request.UpdateWatermark {
+				var validateStart uint64
+				if startHeight == 0 {
+					validateStart = startHeight
+				} else {
+					validateStart = startHeight - 1
+				}
 				_, err := w.updateWatermark.Execute(ctx, &activity.UpdateWatermarkRequest{
 					Tag:           request.Tag,
-					ValidateStart: startHeight - 1,
+					ValidateStart: validateStart,
 					BlockHeight:   endHeight - 1,
 				})
 				if err != nil {
 					return xerrors.Errorf("failed to update watermark: %w", err)
 				}
+			}
+
+			var latestResp activity.ReplicatorResponse
+			for {
+				var resp activity.ReplicatorResponse
+				if ok := responsesChannel.ReceiveAsync(&resp); !ok {
+					break
+				}
+				if resp.LatestBlockHeight > latestResp.LatestBlockHeight {
+					latestResp = resp
+				}
+			}
+			if latestResp != (activity.ReplicatorResponse{}) {
+				metrics.Gauge(replicatorHeightGauge).Update(float64(latestResp.LatestBlockHeight))
+				metrics.Gauge(replicatorGapGauge).Update(float64(request.EndHeight - latestResp.LatestBlockHeight + 1))
+				metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(utils.SinceTimestamp(latestResp.LatestBlockTimestamp).Seconds())
 			}
 		}
 
