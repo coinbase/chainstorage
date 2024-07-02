@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"net/http"
 	"time"
@@ -67,8 +68,10 @@ type (
 	}
 
 	ReplicatorResponse struct {
-		StartHeight uint64
-		EndHeight   uint64
+		StartHeight          uint64
+		EndHeight            uint64
+		LatestBlockHeight    uint64
+		LatestBlockTimestamp *timestamppb.Timestamp
 	}
 )
 
@@ -258,7 +261,9 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 	}
 
 	return &ReplicatorResponse{
-		StartHeight: request.StartHeight,
-		EndHeight:   request.EndHeight,
+		StartHeight:          request.StartHeight,
+		EndHeight:            request.EndHeight,
+		LatestBlockHeight:    blockMetas[len(blockMetas)-1].Height,
+		LatestBlockTimestamp: blockMetas[len(blockMetas)-1].Timestamp,
 	}, nil
 }
