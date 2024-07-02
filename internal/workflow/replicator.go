@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"strconv"
+	"time"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -21,6 +22,7 @@ type (
 	Replicator struct {
 		baseWorkflow
 		replicator      *activity.Replicator
+		latestBLock     *activity.LatestBlock
 		updateWatermark *activity.UpdateWatermark
 	}
 
@@ -29,21 +31,26 @@ type (
 		fxparams.Params
 		Runtime         cadence.Runtime
 		Replicator      *activity.Replicator
+		LatestBLock     *activity.LatestBlock
 		UpdateWatermark *activity.UpdateWatermark
 	}
 
 	ReplicatorRequest struct {
 		Tag             uint32
 		StartHeight     uint64
-		EndHeight       uint64 `validate:"gt=0,gtfield=StartHeight"`
+		EndHeight       uint64 `validate:"eq=0|gtfield=StartHeight"`
 		UpdateWatermark bool
 		DataCompression string // Optional. If not specified, it is read from the workflow config.
 		BatchSize       uint64 // Optional. If not specified, it is read from the workflow config.
 		MiniBatchSize   uint64 // Optional. If not specified, it is read from the workflow config.
 		CheckpointSize  uint64 // Optional. If not specified, it is read from the workflow config.
 		Parallelism     int    // Optional. If not specified, it is read from the workflow config.
+		ContinuousSync  bool   // Optional. Whether to continuously sync data
+		SyncInterval    string // Optional. Interval for continuous sync
 	}
 )
+
+const defaultSyncInterval = 1 * time.Minute
 
 const (
 	// Replicator metrics. need to have `workflow.replicator` as prefix
@@ -67,6 +74,7 @@ func NewReplicator(params ReplicatorParams) *Replicator {
 	w := &Replicator{
 		baseWorkflow:    newBaseWorkflow(&params.Config.Workflows.Replicator, params.Runtime),
 		replicator:      params.Replicator,
+		latestBLock:     params.LatestBLock,
 		updateWatermark: params.UpdateWatermark,
 	}
 	w.registerWorkflow(w.execute)
@@ -130,6 +138,24 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 		metrics := w.runtime.GetMetricsHandler(ctx).WithTags(map[string]string{
 			tagBlockTag: strconv.Itoa(int(request.Tag)),
 		})
+
+		syncInterval := defaultSyncInterval
+		if request.SyncInterval != "" {
+			interval, err := time.ParseDuration(request.SyncInterval)
+			if err == nil {
+				syncInterval = interval
+			}
+		}
+
+		if request.ContinuousSync && request.EndHeight == 0 {
+			latestBlockResponse, err := w.latestBLock.Execute(ctx, &activity.LatestBlockRequest{})
+			if err != nil {
+				return xerrors.Errorf("failed to get latest block through activity: %w", err)
+			}
+			var chainConfig config.ChainConfig
+			request.EndHeight = latestBlockResponse.Height - chainConfig.IrreversibleDistance
+		}
+
 		for startHeight := request.StartHeight; startHeight < request.EndHeight; startHeight = startHeight + batchSize {
 			if startHeight >= request.StartHeight+checkpointSize {
 				newRequest := *request
@@ -251,6 +277,20 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 				metrics.Gauge(replicatorGapGauge).Update(float64(request.EndHeight - latestResp.LatestBlockHeight + 1))
 				metrics.Gauge(replicatorTimeSinceLastBlockGauge).Update(utils.SinceTimestamp(latestResp.LatestBlockTimestamp).Seconds())
 			}
+		}
+
+		if request.ContinuousSync {
+			logger.Info("new continuous sync workflow")
+			newRequest := *request
+			newRequest.StartHeight = request.EndHeight
+			newRequest.EndHeight = 0
+			// Wait for syncInterval minutes before starting a new continuous sync workflow.
+			err := workflow.Sleep(ctx, syncInterval)
+			if err != nil {
+				return xerrors.Errorf("workflow await failed: %w", err)
+			}
+			logger.Info("start new continuous sync workflow")
+			return workflow.NewContinueAsNewError(ctx, w.name, &newRequest)
 		}
 
 		logger.Info("workflow finished")
