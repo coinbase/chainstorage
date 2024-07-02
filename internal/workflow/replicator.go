@@ -2,13 +2,13 @@ package workflow
 
 import (
 	"context"
-	"time"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 	"strconv"
+	"time"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
