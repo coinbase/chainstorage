@@ -1,0 +1,29 @@
+aws:
+  dlq:
+    name: example_chainstorage_blocks_{{blockchain}}_{{network}}_{{sidechain}}_dlq
+  dynamodb:
+    block_table: example_chainstorage_blocks_{{blockchain}}_{{network}}_{{sidechain}}
+    versioned_event_table: example_chainstorage_versioned_block_events_{{blockchain}}_{{network}}_{{sidechain}}
+    versioned_event_table_block_index: example_chainstorage_versioned_block_events_by_block_id_{{blockchain}}_{{network}}_{{sidechain}}
+    transaction_table: example_chainstorage_transactions_table_{{blockchain}}_{{network}}_{{sidechain}}
+cadence:
+  domain: chainstorage-{{blockchain}}-{{network}}-{{sidechain}}
+chain:
+  block_time: 12s
+  irreversible_distance: 5
+  sidechain: SIDECHAIN_ETHEREUM_HOLESKY_BEACON
+config_name: ethereum_holesky_beacon
+sla:
+  tier: 2
+  block_height_delta: 30
+  block_time_delta: 5m
+  out_of_sync_node_distance: 30
+  time_since_last_block: 5m
+  event_height_delta: 30
+  event_time_delta: 5m
+  time_since_last_event: 5m
+workflows:
+  poller:
+    session_enabled: true
+  monitor:
+    irreversible_distance: 10

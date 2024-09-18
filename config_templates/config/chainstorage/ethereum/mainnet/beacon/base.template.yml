@@ -1,0 +1,32 @@
+aws:
+  dlq:
+    name: example_chainstorage_blocks_{{blockchain}}_{{network}}_{{sidechain}}_dlq
+  dynamodb:
+    block_table: example_chainstorage_blocks_{{blockchain}}_{{network}}_{{sidechain}}
+    versioned_event_table: example_chainstorage_versioned_block_events_{{blockchain}}_{{network}}_{{sidechain}}
+    versioned_event_table_block_index: example_chainstorage_versioned_block_events_by_block_id_{{blockchain}}_{{network}}_{{sidechain}}
+    transaction_table: example_chainstorage_transactions_table_{{blockchain}}_{{network}}_{{sidechain}}
+cadence:
+  domain: chainstorage-{{blockchain}}-{{network}}-{{sidechain}}
+chain:
+  block_time: 12s
+  irreversible_distance: 5
+  sidechain: SIDECHAIN_ETHEREUM_MAINNET_BEACON
+config_name: ethereum_mainnet_beacon
+sdk:
+  chainstorage_address: ""
+sla:
+  block_height_delta: 20
+  block_time_delta: 2m
+  out_of_sync_node_distance: 20
+  time_since_last_block: 2m
+  event_height_delta: 20
+  event_time_delta: 2m
+  time_since_last_event: 2m
+  tier: 2
+workflows:
+  poller:
+    session_enabled: true
+    failover_enabled: true
+  monitor:
+    failover_enabled: true

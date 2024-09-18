@@ -1,0 +1,4 @@
+aws:
+  bucket: example-chainstorage-{{blockchain}}-{{network}}-{{sidechain}}-{{short_env}}
+sdk:
+  chainstorage_address: ""

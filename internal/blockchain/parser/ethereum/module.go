@@ -3,6 +3,7 @@ package ethereum
 import (
 	"go.uber.org/fx"
 
+	"github.com/coinbase/chainstorage/internal/blockchain/parser/ethereum/beacon"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 )
 
@@ -35,4 +36,5 @@ var Module = fx.Options(
 		Build(),
 	internal.NewParserBuilder("fantom", NewFantomNativeParser).
 		Build(),
+	beacon.Module,
 )
