@@ -13,6 +13,8 @@ chain:
   irreversible_distance: 5
   sidechain: SIDECHAIN_ETHEREUM_HOLESKY_BEACON
 config_name: ethereum_holesky_beacon
+sdk:
+  chainstorage_address: ""
 sla:
   tier: 2
   block_height_delta: 30
