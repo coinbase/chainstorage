@@ -6,8 +6,6 @@ cadence:
   address: temporal-dev.example.com:7233
 chain:
   block_start_height: 51500000
-sdk:
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/aptos/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
 workflows:

@@ -68,7 +68,7 @@ gcp:
 sdk:
   auth_header: ""
   auth_token: ""
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/holesky/v1
+  chainstorage_address: ""
   num_workers: 10
   restful: true
 server:

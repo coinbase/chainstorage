@@ -8,8 +8,6 @@ chain:
   event_tag:
     latest: 3
     stable: 3
-sdk:
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/polygon/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
 workflows:
