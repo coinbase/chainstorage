@@ -37,7 +37,6 @@
   - [Batch](#batch)
   - [Stream](#stream)
   - [Unified](#unified)
-- [Public APIs](#public-apis)
 - [Contact Us](#contact-us)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->

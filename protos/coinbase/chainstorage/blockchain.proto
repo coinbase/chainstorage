@@ -13,6 +13,7 @@ import "coinbase/chainstorage/blockchain_aptos.proto";
 import "coinbase/chainstorage/blockchain_solana.proto";
 import "coinbase/chainstorage/blockchain_rosetta.proto";
 import "coinbase/chainstorage/blockchain_ethereum.proto";
+import "coinbase/chainstorage/blockchain_ethereum_beacon.proto";
 
 message Block {
   coinbase.c3.common.Blockchain blockchain = 1;
@@ -26,6 +27,7 @@ message Block {
     RosettaBlobdata rosetta = 102;
     SolanaBlobdata solana = 103;
     AptosBlobdata aptos = 104;
+    EthereumBeaconBlobdata ethereum_beacon = 105;
   }
 }
 
@@ -91,6 +93,7 @@ message NativeBlock {
     SolanaBlock solana = 103;
     AptosBlock aptos = 104;
     SolanaBlockV2 solana_v2 = 105;
+    EthereumBeaconBlock ethereum_beacon = 106;
   }
 }
 

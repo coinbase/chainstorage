@@ -1,0 +1,2 @@
+aws:
+  bucket: example-chainstorage-{{blockchain}}-{{network}}-{{sidechain}}-{{short_env}}

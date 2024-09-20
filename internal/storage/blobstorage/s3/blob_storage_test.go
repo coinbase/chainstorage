@@ -93,7 +93,77 @@ func TestBlobStorage_NoCompression(t *testing.T) {
 	require.NotNil(block)
 }
 
-//TODO: add TestBlobStorage_NoCompression_WithSidechain
+func TestBlobStorage_NoCompression_WithSidechain(t *testing.T) {
+	const expectedObjectKey = "BLOCKCHAIN_ETHEREUM/NETWORK_ETHEREUM_MAINNET/SIDECHAIN_ETHEREUM_MAINNET_BEACON/1/12345/12345"
+	const expectedObjectSize = int64(12432)
+
+	require := testutil.Require(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	downloader := s3mocks.NewMockDownloader(ctrl)
+	downloader.EXPECT().DownloadWithContext(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, writer io.WriterAt, input *awss3.GetObjectInput, opts ...jsonrpc.Option) (int64, error) {
+			require.NotNil(input.Bucket)
+			require.NotEmpty(*input.Bucket)
+			require.NotNil(input.Key)
+			require.Equal(expectedObjectKey, *input.Key)
+
+			return expectedObjectSize, nil
+		})
+
+	uploader := s3mocks.NewMockUploader(ctrl)
+	uploader.EXPECT().UploadWithContext(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, input *s3manager.UploadInput, opts ...jsonrpc.Option) (*s3manager.UploadOutput, error) {
+			require.NotNil(input.Bucket)
+			require.NotEmpty(*input.Bucket)
+			require.NotNil(input.Key)
+			require.Equal(expectedObjectKey, *input.Key)
+			require.NotNil(input.ContentMD5)
+			require.NotEmpty(*input.ContentMD5)
+			require.Equal(*input.ACL, bucketOwnerFullControl)
+
+			return &s3manager.UploadOutput{}, nil
+		})
+	client := s3mocks.NewMockClient(ctrl)
+
+	var storage internal.BlobStorage
+	app := testapp.New(
+		t,
+		testapp.WithBlockchainNetworkSidechain(common.Blockchain_BLOCKCHAIN_ETHEREUM, common.Network_NETWORK_ETHEREUM_MAINNET, api.SideChain_SIDECHAIN_ETHEREUM_MAINNET_BEACON),
+		fx.Provide(New),
+		fx.Provide(func() s3.Downloader { return downloader }),
+		fx.Provide(func() s3.Uploader { return uploader }),
+		fx.Provide(func() s3.Client { return client }),
+		fx.Populate(&storage),
+	)
+	defer app.Close()
+
+	require.NotNil(storage)
+	objectKey, err := storage.Upload(context.Background(), &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		SideChain:  api.SideChain_SIDECHAIN_ETHEREUM_MAINNET_BEACON,
+		Metadata: &api.BlockMetadata{
+			Tag:    1,
+			Height: 12345,
+			Hash:   "12345",
+		},
+	}, api.Compression_NONE)
+	require.NoError(err)
+	require.Equal(expectedObjectKey, objectKey)
+
+	metadata := &api.BlockMetadata{
+		Tag:           1,
+		Height:        12345,
+		Hash:          "12345",
+		ObjectKeyMain: objectKey,
+	}
+	block, err := storage.Download(context.Background(), metadata)
+	require.NoError(err)
+	require.NotNil(block)
+}
 
 func TestBlobStorage_NoCompression_SkippedBlock(t *testing.T) {
 	require := testutil.Require(t)
