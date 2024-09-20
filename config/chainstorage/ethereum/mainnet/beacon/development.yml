@@ -4,8 +4,6 @@ aws:
   bucket: example-chainstorage-ethereum-mainnet-beacon-dev
 cadence:
   address: temporal-dev.example.com:7233
-sdk:
-  chainstorage_address: ""
 server:
   bind_address: 0.0.0.0:9090
 workflows:

@@ -14,7 +14,7 @@ chain:
   sidechain: SIDECHAIN_ETHEREUM_MAINNET_BEACON
 config_name: ethereum_mainnet_beacon
 sdk:
-  chainstorage_address: ""
+  chainstorage_address: https://example-chainstorage-{{blockchain}}-{{network}}-{{sidechain}}
 sla:
   block_height_delta: 20
   block_time_delta: 2m

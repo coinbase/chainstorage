@@ -14,7 +14,7 @@ chain:
   sidechain: SIDECHAIN_ETHEREUM_HOLESKY_BEACON
 config_name: ethereum_holesky_beacon
 sdk:
-  chainstorage_address: ""
+  chainstorage_address: https://example-chainstorage-{{blockchain}}-{{network}}-{{sidechain}}
 sla:
   tier: 2
   block_height_delta: 30
