@@ -65,7 +65,7 @@ functional_test: ""
 sdk:
   auth_header: ""
   auth_token: ""
-  chainstorage_address: ""
+  chainstorage_address: "https://example-chainstorage-{{blockchain}}-{{network}}"
   num_workers: 10
   restful: true
 server:

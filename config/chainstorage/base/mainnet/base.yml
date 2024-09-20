@@ -70,7 +70,7 @@ gcp:
 sdk:
   auth_header: ""
   auth_token: ""
-  chainstorage_address: ""
+  chainstorage_address: https://example-chainstorage-base-mainnet
   num_workers: 10
   restful: true
 server:
