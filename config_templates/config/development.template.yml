@@ -3,9 +3,6 @@ aws:
   bucket: example-chainstorage-{{blockchain}}-{{network}}-{{short_env}}
 cadence:
   address: temporal-dev.example.com:7233
-sdk:
-  #  TODO: check this address
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/{{blockchain}}/{{network}}/v1
 workflows:
   poller:
     activity_retry_maximum_attempts: 6

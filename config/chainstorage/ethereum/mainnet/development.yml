@@ -10,8 +10,6 @@ chain:
     stable: 0
   feature:
     default_stable_event: false
-sdk:
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/ethereum/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
 sla:

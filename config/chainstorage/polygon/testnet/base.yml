@@ -70,7 +70,7 @@ gcp:
 sdk:
   auth_header: ""
   auth_token: ""
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/polygon/testnet/v1
+  chainstorage_address: https://example-chainstorage-polygon-testnet
   num_workers: 10
   restful: true
 server:

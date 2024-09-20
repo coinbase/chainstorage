@@ -75,7 +75,7 @@ gcp:
 sdk:
   auth_header: ""
   auth_token: ""
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/dogecoin/mainnet/v1
+  chainstorage_address: https://example-chainstorage-dogecoin-mainnet
   num_workers: 10
   restful: true
 server:
