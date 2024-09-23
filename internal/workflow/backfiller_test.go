@@ -473,7 +473,7 @@ func (s *backfillerTestSuite) TestBackfiller_Reprocess() {
 	require := testutil.Require(s.T())
 
 	const blockNumber = 12000067
-	maximumAttempts := s.app.Config().Workflows.Backfiller.ActivityRetryMaximumAttempts
+	maximumAttempts := s.app.Config().Workflows.Backfiller.ActivityRetry.MaximumAttempts
 
 	s.env.OnActivity(activity.ActivityReader, mock.Anything, mock.Anything).Return(&activity.ReaderResponse{}, nil)
 

@@ -199,7 +199,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 		if cfg.SessionEnabled {
 			so := &workflow.SessionOptions{
 				CreationTimeout:  cfg.SessionCreationTimeout,
-				ExecutionTimeout: cfg.WorkflowExecutionTimeout,
+				ExecutionTimeout: cfg.WorkflowRunTimeout,
 				HeartbeatTimeout: cfg.ActivityHeartbeatTimeout,
 			}
 			sessionCtx, err = workflow.CreateSession(ctx, so)
@@ -262,7 +262,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 
 					// Fail the workflow if getting too retryable errors too many times
 					if request.RetryableErrorCount <= RetryableErrorLimit {
-						return workflow.NewContinueAsNewError(ctx, w.name, request)
+						return w.continueAsNew(ctx, request)
 					}
 					return xerrors.Errorf("retryable errors exceeded threshold: %w", err)
 				}
@@ -274,14 +274,14 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 					// 3. using primary endpoints of consensus client right now
 					if cfg.ConsensusFailoverEnabled && !consensusFailover {
 						request.ConsensusFailover = true
-						return workflow.NewContinueAsNewError(ctx, w.name, request)
+						return w.continueAsNew(ctx, request)
 					}
 
 					// If the error is caused by consensus clients, we do not want to pause the poller workflow
 					// For this case, we will mute consensus validation failures
 					request.ConsensusValidationMuted = pointer.Ref(true)
 					metrics.Gauge(pollerConsensusValidationMutedGauge).Update(1)
-					return workflow.NewContinueAsNewError(ctx, w.name, request)
+					return w.continueAsNew(ctx, request)
 				}
 
 				// Switch over to failover cluster when
@@ -336,7 +336,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 		}
 
 		request.RetryableErrorCount = 0
-		return workflow.NewContinueAsNewError(ctx, w.name, request)
+		return w.continueAsNew(ctx, request)
 	})
 }
 
@@ -378,5 +378,5 @@ func (w *Poller) calculateLivenessCheckViolation(violation bool, violationCount 
 func (w *Poller) triggerFailover(ctx workflow.Context, request *PollerRequest) error {
 	request.Failover = true
 	request.State = &PollerState{}
-	return workflow.NewContinueAsNewError(ctx, w.name, request)
+	return w.continueAsNew(ctx, request)
 }

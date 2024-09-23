@@ -150,7 +150,7 @@ func (w *Streamer) execute(ctx workflow.Context, request *StreamerRequest) error
 				}
 			}
 		}
-		return workflow.NewContinueAsNewError(ctx, w.name, request)
+		return w.continueAsNew(ctx, request)
 	})
 }
 

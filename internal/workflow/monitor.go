@@ -181,7 +181,7 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 				// in validator, since monitor could error out with various reasons and we don't want to failover in those situations.
 				if cfg.FailoverEnabled && !failover && IsNodeProviderFailed(err) {
 					request.Failover = true
-					return workflow.NewContinueAsNewError(ctx, w.name, request)
+					return w.continueAsNew(ctx, request)
 				}
 
 				return xerrors.Errorf("failed to execute validator: %w", err)
@@ -228,7 +228,7 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 
 		request.StartHeight = startHeight
 		request.StartEventId = startEventId
-		return workflow.NewContinueAsNewError(ctx, w.name, request)
+		return w.continueAsNew(ctx, request)
 	})
 }
 
