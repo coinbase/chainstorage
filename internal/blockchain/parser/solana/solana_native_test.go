@@ -600,6 +600,31 @@ func (s *solanaNativeParserTestSuite) TestParseBlockV2() {
 	}, transaction.GetPayload())
 }
 
+// This block had a failed transaction (Instruction Error - ProgramFailedToComplete). Test that we can parse it
+// without error.
+func (s *solanaNativeParserTestSuite) TestParseBlockV2_Slot_241043141() {
+	require := testutil.Require(s.T())
+
+	block := &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_SOLANA,
+		Network:    common.Network_NETWORK_SOLANA_MAINNET,
+		Metadata: &api.BlockMetadata{
+			Tag:          2,
+			Hash:         "7UVhKXDoFXfQWHRRMNaXiEXiQsabDvU7oz4TRLHFuzd8",
+			ParentHash:   "8KrXYfWrGMBJg6owJ5U5X1c6rxh3iVxbybvSK5hbTZtA",
+			Height:       241043141,
+			ParentHeight: 241043140,
+		},
+		Blobdata: &api.Block_Solana{
+			Solana: &api.SolanaBlobdata{
+				Header: fixtures.MustReadFile("parser/solana/block_241043141_v2.json"),
+			},
+		},
+	}
+	_, err := s.parser.ParseBlock(context.Background(), block)
+	require.NoError(err)
+}
+
 func (s *solanaNativeParserTestSuite) TestParseBlockV2_Slot_217003034() {
 	require := testutil.Require(s.T())
 

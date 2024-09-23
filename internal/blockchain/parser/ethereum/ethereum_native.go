@@ -61,6 +61,15 @@ type (
 		// Note that the unit of withdrawal `amount` is in Gwei (1e9 wei).
 		Withdrawals     []*EthereumWithdrawal `json:"withdrawals"`
 		WithdrawalsRoot EthereumHexString     `json:"withdrawalsRoot"`
+
+		//  EIP-4788 introduces the parent beacon block root in the execution payload.
+		// 	https://eips.ethereum.org/EIPS/eip-4788
+		ParentBeaconBlockRoot EthereumHexString `json:"parentBeaconBlockRoot"`
+
+		// EIP-4844 introduces blob gas fields in the execution payload.
+		// https://eips.ethereum.org/EIPS/eip-4844
+		BlobGasUsed   *EthereumQuantity `json:"blobGasUsed"`
+		ExcessBlobGas *EthereumQuantity `json:"excessBlobGas"`
 	}
 
 	PolygonHeader struct {
@@ -116,6 +125,9 @@ type (
 		MaxPriorityFeePerGas *EthereumQuantity             `json:"maxPriorityFeePerGas"`
 		AccessList           *[]*EthereumTransactionAccess `json:"accessList"`
 		Mint                 *EthereumBigQuantity          `json:"mint"`
+		// The EIP-4844 related fields
+		MaxFeePerBlobGas    *EthereumBigQuantity `json:"maxFeePerBlobGas"`
+		BlobVersionedHashes *[]EthereumHexString `json:"blobVersionedHashes"`
 
 		// Deposit transaction fields for Optimism and Base.
 		SourceHash EthereumHexString `json:"sourceHash"`
@@ -162,6 +174,10 @@ type (
 		// Base/Optimism specific fields.
 		DepositNonce          *EthereumQuantity `json:"depositNonce"`
 		DepositReceiptVersion *EthereumQuantity `json:"depositReceiptVersion"`
+
+		// The EIP-4844 related fields
+		BlobGasPrice *EthereumQuantity `json:"blobGasPrice"`
+		BlobGasUsed  *EthereumQuantity `json:"blobGasUsed"`
 	}
 
 	EthereumTransactionReceiptLit struct {
@@ -665,6 +681,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 			SourceHash:     transaction.SourceHash.Value(),
 			IsSystemTx:     transaction.IsSystemTx,
 		}
+		outTransaction := transactions[i]
 		gasPrice, err := transaction.GasPrice.Uint64()
 		if err != nil {
 			// Ignore parse error for ethereum testnets and arbitrum
@@ -681,21 +698,21 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 				return nil, nil, xerrors.Errorf("failed to parse transaction GasPrice to uint64 %v", transaction.GasPrice.Value())
 			}
 		}
-		transactions[i].GasPrice = gasPrice
+		outTransaction.GasPrice = gasPrice
 
 		if transaction.MaxFeePerGas != nil {
-			transactions[i].OptionalMaxFeePerGas = &api.EthereumTransaction_MaxFeePerGas{
+			outTransaction.OptionalMaxFeePerGas = &api.EthereumTransaction_MaxFeePerGas{
 				MaxFeePerGas: transaction.MaxFeePerGas.Value(),
 			}
 		}
 		if transaction.MaxPriorityFeePerGas != nil {
-			transactions[i].OptionalMaxPriorityFeePerGas = &api.EthereumTransaction_MaxPriorityFeePerGas{
+			outTransaction.OptionalMaxPriorityFeePerGas = &api.EthereumTransaction_MaxPriorityFeePerGas{
 				MaxPriorityFeePerGas: transaction.MaxPriorityFeePerGas.Value(),
 			}
 		}
 
 		if transaction.Mint != nil && transaction.Mint.Value() != "0" {
-			transactions[i].OptionalMint = &api.EthereumTransaction_Mint{
+			outTransaction.OptionalMint = &api.EthereumTransaction_Mint{
 				Mint: transaction.Mint.Value(),
 			}
 		}
@@ -715,13 +732,13 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 				// Legacy transaction where effectiveGasPrice = gasPrice
 				priorityFeePerGas = gasPrice - block.BaseFeePerGas.Value()
 			}
-			transactions[i].OptionalPriorityFeePerGas = &api.EthereumTransaction_PriorityFeePerGas{
+			outTransaction.OptionalPriorityFeePerGas = &api.EthereumTransaction_PriorityFeePerGas{
 				PriorityFeePerGas: priorityFeePerGas,
 			}
 		}
 
 		if transaction.AccessList != nil {
-			transactions[i].OptionalTransactionAccessList = &api.EthereumTransaction_TransactionAccessList{
+			outTransaction.OptionalTransactionAccessList = &api.EthereumTransaction_TransactionAccessList{
 				TransactionAccessList: &api.EthereumTransactionAccessList{
 					AccessList: p.parseTransactionAccessList(transaction),
 				},
@@ -730,36 +747,61 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 
 		// EIP-155 related filed.
 		if transaction.ChainId != nil {
-			transactions[i].OptionalChainId = &api.EthereumTransaction_ChainId{
+			outTransaction.OptionalChainId = &api.EthereumTransaction_ChainId{
 				ChainId: transaction.ChainId.Value(),
 			}
+		}
+
+		if transaction.MaxFeePerBlobGas != nil {
+			outTransaction.OptionalMaxFeePerBlobGas = &api.EthereumTransaction_MaxFeePerBlobGas{
+				MaxFeePerBlobGas: transaction.MaxFeePerBlobGas.Value(),
+			}
+		}
+
+		if transaction.BlobVersionedHashes != nil {
+			hashes := make([]string, len(*transaction.BlobVersionedHashes))
+			for j, h := range *transaction.BlobVersionedHashes {
+				hashes[j] = h.Value()
+			}
+			outTransaction.BlobVersionedHashes = hashes
 		}
 	}
 	uncles := p.copyEthereumHexStrings(block.Uncles)
 	withdrawals := p.parseWithdrawals(block.Withdrawals)
 	header := &api.EthereumHeader{
-		Hash:             block.Hash.Value(),
-		ParentHash:       block.ParentHash.Value(),
-		Number:           block.Number.Value(),
-		Timestamp:        &timestamp.Timestamp{Seconds: int64(block.Timestamp.Value())},
-		Transactions:     transactionHashes,
-		Nonce:            block.Nonce.Value(),
-		Sha3Uncles:       block.Sha3Uncles.Value(),
-		LogsBloom:        block.LogsBloom.Value(),
-		TransactionsRoot: block.TransactionsRoot.Value(),
-		StateRoot:        block.StateRoot.Value(),
-		ReceiptsRoot:     block.ReceiptsRoot.Value(),
-		Miner:            block.Miner.Value(),
-		Difficulty:       block.Difficulty.Value(),
-		TotalDifficulty:  block.TotalDifficulty.Value(),
-		ExtraData:        block.ExtraData.Value(),
-		Size:             block.Size.Value(),
-		GasLimit:         block.GasLimit.Value(),
-		GasUsed:          block.GasUsed.Value(),
-		Uncles:           uncles,
-		MixHash:          block.MixHash.Value(),
-		Withdrawals:      withdrawals,
-		WithdrawalsRoot:  block.WithdrawalsRoot.Value(),
+		Hash:                  block.Hash.Value(),
+		ParentHash:            block.ParentHash.Value(),
+		Number:                block.Number.Value(),
+		Timestamp:             &timestamp.Timestamp{Seconds: int64(block.Timestamp.Value())},
+		Transactions:          transactionHashes,
+		Nonce:                 block.Nonce.Value(),
+		Sha3Uncles:            block.Sha3Uncles.Value(),
+		LogsBloom:             block.LogsBloom.Value(),
+		TransactionsRoot:      block.TransactionsRoot.Value(),
+		StateRoot:             block.StateRoot.Value(),
+		ReceiptsRoot:          block.ReceiptsRoot.Value(),
+		Miner:                 block.Miner.Value(),
+		Difficulty:            block.Difficulty.Value(),
+		TotalDifficulty:       block.TotalDifficulty.Value(),
+		ExtraData:             block.ExtraData.Value(),
+		Size:                  block.Size.Value(),
+		GasLimit:              block.GasLimit.Value(),
+		GasUsed:               block.GasUsed.Value(),
+		Uncles:                uncles,
+		MixHash:               block.MixHash.Value(),
+		Withdrawals:           withdrawals,
+		WithdrawalsRoot:       block.WithdrawalsRoot.Value(),
+		ParentBeaconBlockRoot: block.ParentBeaconBlockRoot.Value(),
+	}
+	if block.BlobGasUsed != nil {
+		header.OptionalBlobGasUsed = &api.EthereumHeader_BlobGasUsed{
+			BlobGasUsed: block.BlobGasUsed.Value(),
+		}
+	}
+	if block.ExcessBlobGas != nil {
+		header.OptionalExcessBlobGas = &api.EthereumHeader_ExcessBlobGas{
+			ExcessBlobGas: block.ExcessBlobGas.Value(),
+		}
 	}
 	if block.BaseFeePerGas != nil {
 		header.OptionalBaseFeePerGas = &api.EthereumHeader_BaseFeePerGas{
@@ -875,6 +917,18 @@ func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.Ethere
 		if receipt.DepositReceiptVersion != nil {
 			receipts[i].OptionalDepositReceiptVersion = &api.EthereumTransactionReceipt_DepositReceiptVersion{
 				DepositReceiptVersion: receipt.DepositReceiptVersion.Value(),
+			}
+		}
+
+		if receipt.BlobGasPrice != nil {
+			receipts[i].OptionalBlobGasPrice = &api.EthereumTransactionReceipt_BlobGasPrice{
+				BlobGasPrice: receipt.BlobGasPrice.Value(),
+			}
+		}
+
+		if receipt.BlobGasUsed != nil {
+			receipts[i].OptionalBlobGasUsed = &api.EthereumTransactionReceipt_BlobGasUsed{
+				BlobGasUsed: receipt.BlobGasUsed.Value(),
 			}
 		}
 	}
