@@ -122,12 +122,12 @@ func (c *aptosClientImpl) GetLatestHeight(ctx context.Context) (uint64, error) {
 		return 0, xerrors.Errorf("failed to unmarshal ledger info: %w", err)
 	}
 
-	block_height, err := strconv.ParseUint(ledgerInfo.LatestBlockHeight, 10, 64)
+	blockHeight, err := strconv.ParseUint(ledgerInfo.LatestBlockHeight, 10, 64)
 	if err != nil {
 		return 0, xerrors.Errorf("failed to parse ledgerInfo's block_height=%v: %w", ledgerInfo.LatestBlockHeight, err)
 	}
 
-	return block_height, nil
+	return blockHeight, nil
 }
 
 func (c *aptosClientImpl) UpgradeBlock(_ context.Context, _ *api.Block, _ uint32) (*api.Block, error) {

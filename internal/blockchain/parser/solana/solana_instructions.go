@@ -110,7 +110,7 @@ type (
 		Source     string `json:"source" validate:"required"`
 		NewAccount string `json:"newAccount" validate:"required"`
 		Base       string `json:"base" validate:"required"`
-		Seed       string `json:"seed" validate:"required"`
+		Seed       string `json:"seed"`
 		Lamports   uint64 `json:"lamports"`
 		Space      uint64 `json:"space"`
 		Owner      string `json:"owner" validate:"required"`

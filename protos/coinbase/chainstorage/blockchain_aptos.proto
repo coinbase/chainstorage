@@ -51,6 +51,7 @@ message AptosTransaction {
     BLOCK_METADATA = 2;
     STATE_CHECKPOINT = 3;
     USER = 4;
+    VALIDATOR = 5;
   }
   TransactionType type = 5;
 
@@ -59,6 +60,7 @@ message AptosTransaction {
     AptosGenesisTransaction genesis = 101;
     AptosStateCheckpointTransaction state_checkpoint = 102;
     AptosUserTransaction user = 103;
+    AptosValidatorTransaction validator = 104;
   }
 }
 
@@ -357,6 +359,7 @@ message AptosSignature {
     MULTI_ED25519 = 2;
     MULTI_AGENT = 3;
     FEE_PAYER = 4;
+    SINGLE_SENDER = 5;
   }
 
   Type type = 1;
@@ -365,6 +368,7 @@ message AptosSignature {
     AptosMultiEd25519Signature multi_ed25519 = 3;
     AptosMultiAgentSignature multi_agent = 4;
     AptosFeePayerSignature fee_payer = 5;
+    AptosSingleSenderSignature single_sender = 6;
   }
 }
 
@@ -394,18 +398,41 @@ message AptosFeePayerSignature {
   string fee_payer_address = 5;
 }
 
+message AptosSingleSenderSignature {
+  string public_key = 1;
+  string signature = 2;
+}
+
+message AptosSingleKeySignature {
+  string public_key = 1;
+  string signature = 2;
+}
+
+message AptosMultiKeySignature {
+  repeated string public_keys = 1;
+  repeated string signatures = 2;
+  uint32 signatures_required = 3;
+}
+
 message AptosAccountSignature {
   enum Type {
     UNSPECIFIED = 0;
     ED25519 = 1;
     MULTI_ED25519 = 2;
-    FEE_PAYER = 3;
+    reserved 3;
+    SINGLE_KEY = 4;
+    MULTI_KEY = 5;
   }
 
   Type type = 1;
   oneof signature {
     AptosEd25519Signature ed25519 = 2;
     AptosMultiEd25519Signature multi_ed25519 = 3;
-    AptosFeePayerSignature  fee_payer = 4;
+    AptosSingleKeySignature single_key = 5;
+    AptosMultiKeySignature multi_key = 6;
   }
+}
+
+message AptosValidatorTransaction {
+  repeated AptosEvent events = 1;
 }

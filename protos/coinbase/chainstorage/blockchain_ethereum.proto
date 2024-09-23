@@ -62,6 +62,14 @@ message EthereumHeader {
   oneof optional_polygon_author {
     string author = 24;
   }
+  oneof optional_blob_gas_used {
+    uint64 blob_gas_used = 25;
+  }
+  oneof optional_excess_blob_gas {
+    uint64 excess_blob_gas = 26;
+  }
+  string parent_beacon_block_root = 27;
+  string block_extra_data = 28;
 }
 
 message EthereumTransactionAccess {
@@ -114,6 +122,10 @@ message EthereumTransaction {
   }
   string source_hash = 27;
   bool is_system_tx = 28;
+  oneof optional_max_fee_per_blob_gas {
+    string max_fee_per_blob_gas = 29;
+  }
+  repeated string blob_versioned_hashes = 30;
 }
 
 message EthereumTransactionReceipt {
@@ -149,6 +161,12 @@ message EthereumTransactionReceipt {
   }
   oneof optional_deposit_receipt_version {
     uint64 deposit_receipt_version = 19;
+  }
+  oneof optional_blob_gas_price {
+    uint64 blob_gas_price = 20;
+  }
+  oneof optional_blob_gas_used {
+    uint64 blob_gas_used = 21;
   }
 }
 
