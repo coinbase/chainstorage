@@ -12,8 +12,4 @@ server:
   bind_address: 0.0.0.0:9090
 workflows:
   poller:
-    activity_retry_maximum_attempts: 6
-    activity_schedule_to_start_timeout: 5m
     num_blocks_to_skip: 10
-  streamer:
-    activity_schedule_to_start_timeout: 5m

@@ -383,7 +383,7 @@ aws sqs --no-sign-request --region local --endpoint-url http://localhost:4566/00
 ### Temporal Workflow
 
 Open Temporal UI in a browser by entering the
-URL: http://localhost:8088/namespaces/chainstorage-ethereum-mainnet/workflows
+URL: http://localhost:8080/namespaces/chainstorage-ethereum-mainnet/workflows
 
 Start the backfill workflow:
 ```shell
@@ -421,6 +421,13 @@ Stop a versioned streamer workflow:
 ```shell
 go run ./cmd/admin workflow stop --workflow streamer --blockchain ethereum --network mainnet --env local --workflowID {workflowID}
 ```
+
+Using Temporal CLI to check the status of the workflow: 
+```shell
+brew install tctl
+
+tctl --address localhost:7233 --namespace chainstorage-ethereum-mainnet workflow show --workflow_id workflow.backfiller
+````
 
 ## Failover
 

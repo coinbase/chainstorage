@@ -12,8 +12,4 @@ workflows:
   cross_validator:
     validation_percentage: 10
   poller:
-    activity_retry_maximum_attempts: 6
-    activity_schedule_to_start_timeout: 5m
     session_enabled: true
-  streamer:
-    activity_schedule_to_start_timeout: 5m

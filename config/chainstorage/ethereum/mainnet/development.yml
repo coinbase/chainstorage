@@ -31,8 +31,4 @@ workflows:
   monitor:
     failover_enabled: false
   poller:
-    activity_retry_maximum_attempts: 6
-    activity_schedule_to_start_timeout: 5m
     failover_enabled: false
-  streamer:
-    activity_schedule_to_start_timeout: 5m

@@ -11,8 +11,3 @@ server:
 workflows:
   cross_validator:
     validation_start_height: 16000000
-  poller:
-    activity_retry_maximum_attempts: 6
-    activity_schedule_to_start_timeout: 5m
-  streamer:
-    activity_schedule_to_start_timeout: 5m

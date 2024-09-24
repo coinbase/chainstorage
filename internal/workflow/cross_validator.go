@@ -150,7 +150,7 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 		}
 
 		request.StartHeight = startHeight
-		return workflow.NewContinueAsNewError(ctx, w.name, request)
+		return w.continueAsNew(ctx, request)
 	})
 }
 
