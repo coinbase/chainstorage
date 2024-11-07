@@ -2,18 +2,18 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 )
 
 type (
 	// Retry is a simple wrapper on top of "cenkalti/backoff" to provide retry functionalities.
 	// Main differences with "cenkalti/backoff":
 	// * By default, only RetryableError and RateLimitError are retried. In "cenkalti/backoff", all errors except for PermanentError are retried.
-	// * It is compatible with xerrors, i.e. you may wrap a RetryableError and the default Filter uses xerrors.As to determine if the error is a RetryableError.
+	// * It is compatible with errors, i.e. you may wrap a RetryableError and the default Filter uses errors.As to determine if the error is a RetryableError.
 	// * Retry is aborted if either MaxElapsedTime or MaxAttempts is exceeded.
 	Retry interface {
 		Retry(ctx context.Context, operation OperationFn) error
@@ -181,7 +181,7 @@ func (r *retryWithResult[T]) Retry(ctx context.Context, operation OperationWithR
 
 	onError := func(err error, duration time.Duration) {
 		var rateLimitErr *RateLimitError
-		if xerrors.As(err, &rateLimitErr) {
+		if errors.As(err, &rateLimitErr) {
 			// In case of a RateLimitError, introduce an extra backoff.
 			select {
 			case <-backoffContext.Context().Done():
@@ -197,7 +197,7 @@ func (r *retryWithResult[T]) Retry(ctx context.Context, operation OperationWithR
 func filter(err error) bool {
 	var retryableErr *RetryableError
 	var rateLimitErr *RateLimitError
-	return xerrors.As(err, &retryableErr) || xerrors.As(err, &rateLimitErr)
+	return errors.As(err, &retryableErr) || errors.As(err, &rateLimitErr)
 }
 
 // defaultBackoffFactory creates an exponential backoff policy.

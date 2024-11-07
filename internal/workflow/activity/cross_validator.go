@@ -2,12 +2,13 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
@@ -135,18 +136,18 @@ func (v *CrossValidator) execute(ctx context.Context, request *CrossValidatorReq
 
 	latestBlock, err := v.metaStorage.GetLatestBlock(ctx, tag)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get latest block: %w", err)
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
 	latestBlockHeight := latestBlock.Height
 
 	tipOfChain, err := v.validatorClient.GetLatestHeight(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get tipOfChain from validator client: %w", err)
+		return nil, fmt.Errorf("failed to get tipOfChain from validator client: %w", err)
 	}
 
 	endHeight, err := v.getValidationEndHeight(startHeight, latestBlockHeight, tipOfChain, request, logger)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to calculate validation end height: %w", err)
+		return nil, fmt.Errorf("failed to calculate validation end height: %w", err)
 	}
 
 	logger.Info(
@@ -159,7 +160,7 @@ func (v *CrossValidator) execute(ctx context.Context, request *CrossValidatorReq
 
 	err = v.validateRange(ctx, logger, tag, startHeight, endHeight, request.Parallelism)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to validate range tag=%d, range=[%d, %d): %w", tag, startHeight, endHeight, err)
+		return nil, fmt.Errorf("failed to validate range tag=%d, range=[%d, %d): %w", tag, startHeight, endHeight, err)
 	}
 
 	blockGap := tipOfChain - endHeight
@@ -220,13 +221,13 @@ func (v *CrossValidator) validateRange(ctx context.Context, logger *zap.Logger, 
 		group.Go(func() error {
 			err := v.validateHeight(ctx, logger, height, tag)
 			if err != nil {
-				return xerrors.Errorf("failed to validate block=%d: %w", height, err)
+				return fmt.Errorf("failed to validate block=%d: %w", height, err)
 			}
 			return nil
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return xerrors.Errorf("failed to validate blocks: %w", err)
+		return fmt.Errorf("failed to validate blocks: %w", err)
 	}
 	return nil
 }
@@ -236,11 +237,11 @@ func (v *CrossValidator) validateHeight(ctx context.Context, logger *zap.Logger,
 	return v.metrics.instrumentValidateHeight.Instrument(ctx, func(ctx context.Context) error {
 		persistedBlockMetaData, err := v.metaStorage.GetBlockByHeight(ctx, tag, height)
 		if err != nil {
-			return xerrors.Errorf("failed to get block meta data from meta storage (height=%d): %w", height, err)
+			return fmt.Errorf("failed to get block meta data from meta storage (height=%d): %w", height, err)
 		}
 		persistedRawBlock, err := v.blobStorage.Download(ctx, persistedBlockMetaData)
 		if err != nil {
-			return xerrors.Errorf("failed to get block from blobStorage (key=%s): %w", persistedBlockMetaData.ObjectKeyMain, err)
+			return fmt.Errorf("failed to get block from blobStorage (key=%s): %w", persistedBlockMetaData.ObjectKeyMain, err)
 		}
 
 		hash := persistedBlockMetaData.Hash
@@ -250,23 +251,23 @@ func (v *CrossValidator) validateHeight(ctx context.Context, logger *zap.Logger,
 				zap.String("hash", hash),
 				zap.Error(err),
 			)
-			return xerrors.Errorf("failed to fetch block: %w", err)
+			return fmt.Errorf("failed to fetch block: %w", err)
 		}
 
 		persistedNativeBlock, err := v.parser.ParseNativeBlock(ctx, persistedRawBlock)
 		if err != nil {
-			return xerrors.Errorf("failed to parse actual raw block using native parser for block {%+v}: %w", persistedRawBlock.Metadata, err)
+			return fmt.Errorf("failed to parse actual raw block using native parser for block {%+v}: %w", persistedRawBlock.Metadata, err)
 		}
 
 		expectedNativeBlock, err := v.parser.ParseNativeBlock(ctx, expectedRawBlock)
 		if err != nil {
-			return xerrors.Errorf("failed to parse expected raw block using native parser for block {%+v}: %w", expectedRawBlock.Metadata, err)
+			return fmt.Errorf("failed to parse expected raw block using native parser for block {%+v}: %w", expectedRawBlock.Metadata, err)
 		}
 
 		if err := v.parser.CompareNativeBlocks(ctx, height, expectedNativeBlock, persistedNativeBlock); err != nil {
 			var diff string
 			var checkerErr *parser.ParityCheckFailedError
-			if xerrors.As(err, &checkerErr) {
+			if errors.As(err, &checkerErr) {
 				diff = checkerErr.Diff
 				if len(diff) > diffMaxLength {
 					diff = diff[0:diffMaxLength]

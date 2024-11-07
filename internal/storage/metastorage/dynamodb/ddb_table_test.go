@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -10,9 +11,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"golang.org/x/xerrors"
 
-	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	storage_errors "github.com/coinbase/chainstorage/internal/storage/internal/errors"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -186,7 +186,7 @@ func (s *DDBTableTestSuite) TestQueryItem_RequestCanceledFailure() {
 	queryResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
 
 	require.Error(err)
-	require.True(xerrors.Is(err, errors.ErrRequestCanceled))
+	require.True(errors.Is(err, storage_errors.ErrRequestCanceled))
 	require.Nil(queryResult)
 }
 
@@ -213,7 +213,7 @@ func (s *DDBTableTestSuite) TestQueryItem_ItemNotFoundErr() {
 	updateResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
 
 	require.Error(err)
-	require.ErrorIs(err, errors.ErrItemNotFound)
+	require.ErrorIs(err, storage_errors.ErrItemNotFound)
 	require.Nil(updateResult)
 }
 

@@ -1,12 +1,10 @@
 package internal
 
-import (
-	"golang.org/x/xerrors"
-)
+import "errors"
 
 var (
-	ErrInvalidChain      = xerrors.New("invalid chain")
-	ErrNotImplemented    = xerrors.New("not implemented")
-	ErrNotFound          = xerrors.New("not found")
-	ErrInvalidParameters = xerrors.New("invalid input parameters")
+	ErrInvalidChain      = errors.New("invalid chain")
+	ErrNotImplemented    = errors.New("not implemented")
+	ErrNotFound          = errors.New("not found")
+	ErrInvalidParameters = errors.New("invalid input parameters")
 )

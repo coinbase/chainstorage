@@ -2,6 +2,7 @@ package aptos_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -10,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -213,7 +213,7 @@ func (s *aptosTestSuite) TestGetBlockByHeight_NotFound() {
 	// Query the block height which is uint64_max.
 	_, err := s.client.GetBlockByHeight(ctx, aptosTag, math.MaxUint64)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 }
 
 func (s *aptosTestSuite) TestGetBlockByHash_Success() {

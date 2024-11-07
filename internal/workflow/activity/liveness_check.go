@@ -2,12 +2,12 @@ package activity
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
@@ -67,14 +67,14 @@ func (a *LivenessCheck) execute(ctx context.Context, request *LivenessCheckReque
 	if request.Failover {
 		failoverCtx, err := a.failoverManager.WithFailoverContext(ctx, endpoints.MasterCluster)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create failover context for master client: %w", err)
+			return nil, fmt.Errorf("failed to create failover context for master client: %w", err)
 		}
 		ctx = failoverCtx
 	}
 
 	violation, err := a.checkLiveness(ctx, logger, request.Tag, request.LivenessCheckThreshold)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to check node liveness: %w", err)
+		return nil, fmt.Errorf("failed to check node liveness: %w", err)
 	}
 
 	return &LivenessCheckResponse{
@@ -90,16 +90,16 @@ func (a *LivenessCheck) checkLiveness(
 ) (bool, error) {
 	canonicalChainTipHeight, err := a.masterBlockchainClient.GetLatestHeight(ctx)
 	if err != nil {
-		return false, xerrors.Errorf("failed to get canonical chain tip height: %w", err)
+		return false, fmt.Errorf("failed to get canonical chain tip height: %w", err)
 	}
 
 	blocks, err := a.masterBlockchainClient.BatchGetBlockMetadata(ctx, tag, canonicalChainTipHeight, canonicalChainTipHeight+1)
 	if err != nil {
-		return false, xerrors.Errorf("failed to get latest block metadata for block=%d: %w", canonicalChainTipHeight, err)
+		return false, fmt.Errorf("failed to get latest block metadata for block=%d: %w", canonicalChainTipHeight, err)
 	}
 
 	if len(blocks) != 1 {
-		return false, xerrors.Errorf("unexpected block metadata length, actual=%d: %w", len(blocks), err)
+		return false, fmt.Errorf("unexpected block metadata length, actual=%d: %w", len(blocks), err)
 	}
 
 	violation := false

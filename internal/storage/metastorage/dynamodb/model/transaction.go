@@ -3,8 +3,6 @@ package model
 import (
 	"fmt"
 
-	"golang.org/x/xerrors"
-
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 )
 
@@ -42,10 +40,10 @@ func MakeTransactionPartitionKey(tag uint32, txnHash string) string {
 
 func TransformToTransaction(entry *TransactionDDBEntry) (*model.Transaction, error) {
 	if entry.Hash == "" {
-		return nil, xerrors.Errorf("transaction hash is empty for returned ddb item(%+v)", entry)
+		return nil, fmt.Errorf("transaction hash is empty for returned ddb item(%+v)", entry)
 	}
 	if entry.BlockHash == "" {
-		return nil, xerrors.Errorf("block hash is empty for returned ddb item(%+v)", entry)
+		return nil, fmt.Errorf("block hash is empty for returned ddb item(%+v)", entry)
 	}
 
 	return &model.Transaction{

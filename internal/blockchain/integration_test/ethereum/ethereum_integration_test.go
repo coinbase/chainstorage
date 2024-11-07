@@ -2,6 +2,7 @@ package ethereum_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync/atomic"
@@ -13,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
@@ -332,11 +332,11 @@ func TestIntegrationEthereumGetBlock_NotFound(t *testing.T) {
 
 	_, err := deps.Client.GetBlockByHeight(context.Background(), ethereumTag, heightNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 
 	_, err = deps.Client.GetBlockByHash(context.Background(), ethereumTag, heightNotFound, hashNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 }
 
 func TestIntegrationEthereumGetBlock_Goerli(t *testing.T) {

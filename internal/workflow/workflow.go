@@ -15,7 +15,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -111,7 +110,7 @@ func (m *Manager) onStart(ctx context.Context) error {
 	)
 
 	if err := m.runtime.OnStart(ctx); err != nil {
-		return xerrors.Errorf("failed to start runtime: %w", err)
+		return fmt.Errorf("failed to start runtime: %w", err)
 	}
 
 	return nil
@@ -121,7 +120,7 @@ func (m *Manager) onStop(ctx context.Context) error {
 	m.logger.Info("stopping workflow manager")
 
 	if err := m.runtime.OnStop(ctx); err != nil {
-		return xerrors.Errorf("failed to stop runtime: %w", err)
+		return fmt.Errorf("failed to stop runtime: %w", err)
 	}
 
 	return nil
@@ -151,7 +150,7 @@ func (w *baseWorkflow) validateRequest(request any) error {
 
 func (w *baseWorkflow) validateRequestCtx(ctx context.Context, request any) error {
 	if err := w.validate.StructCtx(ctx, request); err != nil {
-		return xerrors.Errorf("invalid workflow request (name=%v, request=%+v): %w", w.name, request, err)
+		return fmt.Errorf("invalid workflow request (name=%v, request=%+v): %w", w.name, request, err)
 	}
 
 	return nil
@@ -174,7 +173,7 @@ func (w *baseWorkflow) startWorkflow(ctx context.Context, workflowID string, req
 
 	execution, err := w.runtime.ExecuteWorkflow(ctx, workflowOptions, w.name, request)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to execute workflow: %w", err)
+		return nil, fmt.Errorf("failed to execute workflow: %w", err)
 	}
 
 	return execution, nil
@@ -210,7 +209,7 @@ func (w *baseWorkflow) executeWorkflow(ctx workflow.Context, request any, fn ins
 		}
 
 		if err := fn(); err != nil {
-			return xerrors.Errorf("failed to execute workflow (name=%v): %w", w.name, err)
+			return fmt.Errorf("failed to execute workflow (name=%v): %w", w.name, err)
 		}
 
 		return nil
@@ -219,7 +218,7 @@ func (w *baseWorkflow) executeWorkflow(ctx workflow.Context, request any, fn ins
 
 func (w *baseWorkflow) StopWorkflow(ctx context.Context, workflowID string, reason string) error {
 	if err := w.runtime.TerminateWorkflow(ctx, workflowID, "", reason); err != nil {
-		return xerrors.Errorf("failed to terminate workflowID=%s: %w", workflowID, err)
+		return fmt.Errorf("failed to terminate workflowID=%s: %w", workflowID, err)
 	}
 
 	return nil
@@ -233,7 +232,7 @@ func (w *baseWorkflow) readConfig(ctx workflow.Context, output any) error {
 	})
 
 	if err := val.Get(output); err != nil {
-		return xerrors.Errorf("failed to retrieve config: %w", err)
+		return fmt.Errorf("failed to retrieve config: %w", err)
 	}
 
 	return nil

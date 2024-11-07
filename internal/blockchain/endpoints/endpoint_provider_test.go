@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http/cookiejar"
@@ -14,7 +15,6 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -212,7 +212,7 @@ func TestEndpointProvider_EmptyEndpoints(t *testing.T) {
 	_, err = ep.WithFailoverContext(ctx)
 	require.Equal([]string{"foo"}, getActiveEndpoints(ctx, ep))
 	require.Error(err)
-	require.True(xerrors.Is(err, ErrFailoverUnavailable))
+	require.True(errors.Is(err, ErrFailoverUnavailable))
 }
 
 func TestEndpointProvider_StickySessionCookieHash(t *testing.T) {

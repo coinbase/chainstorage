@@ -3,12 +3,13 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -125,7 +126,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight() {
 					}, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 			}
 
 			if method == ethBorGetAuthorMethod {
@@ -139,7 +140,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight() {
 				}, nil
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{
@@ -195,7 +196,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight_TransactionWit
 					}, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 			}
 
 			if method == ethBorGetAuthorMethod {
@@ -204,7 +205,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight_TransactionWit
 				}, nil
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{
@@ -254,7 +255,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight_TransactionWit
 					}, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 			}
 
 			if method == ethBorGetAuthorMethod {
@@ -263,7 +264,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_GetBlockByHeight_TransactionWit
 				}, nil
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{
@@ -367,7 +368,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_RetryBorAuthor_ServerErr() {
 					}, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 
 			case ethBorGetAuthorMethod:
 				retryAttempts += 1
@@ -383,7 +384,7 @@ func (s *polygonClientTestSuite) TestPolygonTest_RetryBorAuthor_ServerErr() {
 				}, nil
 
 			default:
-				return nil, xerrors.Errorf("unknown method: %v", method)
+				return nil, fmt.Errorf("unknown method: %v", method)
 			}
 		})
 
@@ -444,7 +445,7 @@ func (s *polygonClientTestSuite) TestRetryTraceBlock_NotFound() {
 				}
 
 			default:
-				return nil, xerrors.Errorf("unknown method: %v", method)
+				return nil, fmt.Errorf("unknown method: %v", method)
 			}
 		})
 
@@ -494,7 +495,7 @@ func (s *polygonClientTestSuite) TestRetryTraceBlock_ExecutionAborted() {
 				}
 
 			default:
-				return nil, xerrors.Errorf("unknown method: %v", method)
+				return nil, fmt.Errorf("unknown method: %v", method)
 			}
 		})
 
@@ -536,7 +537,7 @@ func (s *polygonClientTestSuite) TestRetryTraceBlock_RetryLimitExceeded() {
 				}
 
 			default:
-				return nil, xerrors.Errorf("unknown method: %v", method)
+				return nil, fmt.Errorf("unknown method: %v", method)
 			}
 		})
 
@@ -550,7 +551,7 @@ func (s *polygonClientTestSuite) TestRetryTraceBlock_RetryLimitExceeded() {
 
 	_, err := s.client.GetBlockByHash(context.Background(), tag, ethereumHeight, ethereumHash)
 	require.Error(err)
-	require.True(xerrors.Is(err, internal.ErrBlockNotFound))
+	require.True(errors.Is(err, internal.ErrBlockNotFound))
 }
 
 func (s *polygonClientTestSuite) TestRetryTraceTransaction() {
@@ -596,10 +597,10 @@ func (s *polygonClientTestSuite) TestRetryTraceTransaction() {
 					}, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 
 			default:
-				return nil, xerrors.Errorf("unknown method: %v", method)
+				return nil, fmt.Errorf("unknown method: %v", method)
 			}
 		})
 
@@ -660,10 +661,10 @@ func (s *polygonClientTestSuite) TestRetryTraceTransaction_RetryLimitExceeded() 
 					}
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 
 			default:
-				return nil, xerrors.Errorf("unknown method: %v", method)
+				return nil, fmt.Errorf("unknown method: %v", method)
 			}
 		})
 
@@ -677,7 +678,7 @@ func (s *polygonClientTestSuite) TestRetryTraceTransaction_RetryLimitExceeded() 
 
 	_, err := s.client.GetBlockByHeight(context.Background(), tag, 11322000, internal.WithBestEffort())
 	require.Error(err)
-	require.True(xerrors.Is(err, internal.ErrBlockNotFound))
+	require.True(errors.Is(err, internal.ErrBlockNotFound))
 }
 
 func (s *polygonClientTestSuite) TestRetryBatchGetBlockMetadata() {

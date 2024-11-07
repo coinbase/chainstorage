@@ -2,6 +2,8 @@ package cron
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -10,7 +12,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
@@ -191,7 +192,7 @@ func newNodeCanaryMetrics(rootScope tally.Scope, logger *zap.Logger) *nodeCanary
 			instrument.WithFilter(func(err error) bool {
 				// ErrSkipped is returned from one of the goroutines when there is potentially a chain reorg.
 				// As a result, the health check would be cancelled by syncgroup.
-				return xerrors.Is(err, context.Canceled)
+				return errors.Is(err, context.Canceled)
 			}),
 		)
 	}
@@ -277,15 +278,15 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	group.Go(func() error {
 		eventId, err := t.eventStorage.GetMaxEventId(ctx, eventTag)
 		if err != nil {
-			if xerrors.Is(err, storage.ErrNoMaxEventIdFound) {
+			if errors.Is(err, storage.ErrNoMaxEventIdFound) {
 				return nil
 			}
 
-			return xerrors.Errorf("failed to get max event id from storage: %w", err)
+			return fmt.Errorf("failed to get max event id from storage: %w", err)
 		}
 		event, err := t.eventStorage.GetEventByEventId(ctx, eventTag, eventId)
 		if err != nil {
-			return xerrors.Errorf("failed to get event by id from storage: %w", err)
+			return fmt.Errorf("failed to get event by id from storage: %w", err)
 		}
 		lastEvent = model.NewBlockEventFromEventEntry(event.EventType, event)
 		return nil
@@ -298,7 +299,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 		height, err := t.metrics.masterPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
 			height, err := t.master.GetLatestHeight(ctx)
 			if err != nil {
-				return 0, xerrors.Errorf("failed to ping master: %w", err)
+				return 0, fmt.Errorf("failed to ping master: %w", err)
 			}
 
 			return height, nil
@@ -316,7 +317,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 		}
 
 		if len(blocks) != 1 {
-			return xerrors.Errorf("unexpected number of blocks: %v", len(blocks))
+			return fmt.Errorf("unexpected number of blocks: %v", len(blocks))
 		}
 
 		masterBlock = blocks[0]
@@ -355,7 +356,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 		height, err := t.metrics.slavePrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
 			height, err := t.slave.GetLatestHeight(ctx)
 			if err != nil {
-				return 0, xerrors.Errorf("failed to ping slave: %w", err)
+				return 0, fmt.Errorf("failed to ping slave: %w", err)
 			}
 
 			return height, nil
@@ -399,7 +400,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 			height, err := t.metrics.validatorPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
 				height, err := t.validator.GetLatestHeight(ctx)
 				if err != nil {
-					return 0, xerrors.Errorf("failed to ping validator: %w", err)
+					return 0, fmt.Errorf("failed to ping validator: %w", err)
 				}
 
 				return height, nil
@@ -447,7 +448,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 		height, err := t.metrics.consensusPrimaryHealthCheck.Instrument(ctx, func(ctx context.Context) (uint64, error) {
 			height, err := t.consensus.GetLatestHeight(ctx)
 			if err != nil {
-				return 0, xerrors.Errorf("failed to ping consensus: %w", err)
+				return 0, fmt.Errorf("failed to ping consensus: %w", err)
 			}
 
 			return height, nil
@@ -485,8 +486,8 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	// Note that masterSlaveFailoverCtx is set to nil if failover is unavailable.
 	masterSlaveFailoverCtx, err := t.failoverManager.WithFailoverContext(ctx, endpoints.MasterSlaveClusters)
 	if err != nil {
-		if !xerrors.Is(err, endpoints.ErrFailoverUnavailable) {
-			return xerrors.Errorf("failed to create failover context for MasterSlaveClusters: %w", err)
+		if !errors.Is(err, endpoints.ErrFailoverUnavailable) {
+			return fmt.Errorf("failed to create failover context for MasterSlaveClusters: %w", err)
 		}
 	}
 
@@ -496,7 +497,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 			_, _ = t.metrics.masterSecondaryHealthCheck.Instrument(masterSlaveFailoverCtx, func(ctx context.Context) (uint64, error) {
 				height, err := t.master.GetLatestHeight(ctx)
 				if err != nil {
-					return 0, xerrors.Errorf("failed to ping master with failover context: %w", err)
+					return 0, fmt.Errorf("failed to ping master with failover context: %w", err)
 				}
 
 				return height, nil
@@ -509,7 +510,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 			_, _ = t.metrics.slaveSecondaryHealthCheck.Instrument(masterSlaveFailoverCtx, func(ctx context.Context) (uint64, error) {
 				height, err := t.slave.GetLatestHeight(ctx)
 				if err != nil {
-					return 0, xerrors.Errorf("failed to ping slave with failover context: %w", err)
+					return 0, fmt.Errorf("failed to ping slave with failover context: %w", err)
 				}
 
 				return height, nil
@@ -522,8 +523,8 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	// Note that validatorFailoverCtx is set to nil if failover is unavailable.
 	validatorFailoverCtx, err := t.failoverManager.WithFailoverContext(ctx, endpoints.ValidatorCluster)
 	if err != nil {
-		if !xerrors.Is(err, endpoints.ErrFailoverUnavailable) {
-			return xerrors.Errorf("failed to create failover context for ValidatorCluster: %w", err)
+		if !errors.Is(err, endpoints.ErrFailoverUnavailable) {
+			return fmt.Errorf("failed to create failover context for ValidatorCluster: %w", err)
 		}
 	}
 
@@ -533,7 +534,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 			_, _ = t.metrics.validatorSecondaryHealthCheck.Instrument(validatorFailoverCtx, func(ctx context.Context) (uint64, error) {
 				height, err := t.validator.GetLatestHeight(ctx)
 				if err != nil {
-					return 0, xerrors.Errorf("failed to ping validator with failover context: %w", err)
+					return 0, fmt.Errorf("failed to ping validator with failover context: %w", err)
 				}
 
 				return height, nil
@@ -546,8 +547,8 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	// Note that consensusFailoverCtx is set to nil if failover is unavailable.
 	consensusFailoverCtx, err := t.failoverManager.WithFailoverContext(ctx, endpoints.ConsensusCluster)
 	if err != nil {
-		if !xerrors.Is(err, endpoints.ErrFailoverUnavailable) {
-			return xerrors.Errorf("failed to create failover context for ConsensusCluster: %w", err)
+		if !errors.Is(err, endpoints.ErrFailoverUnavailable) {
+			return fmt.Errorf("failed to create failover context for ConsensusCluster: %w", err)
 		}
 	}
 
@@ -557,7 +558,7 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 			_, _ = t.metrics.consensusSecondaryHealthCheck.Instrument(consensusFailoverCtx, func(ctx context.Context) (uint64, error) {
 				height, err := t.consensus.GetLatestHeight(ctx)
 				if err != nil {
-					return 0, xerrors.Errorf("failed to ping consensus with failover context: %w", err)
+					return 0, fmt.Errorf("failed to ping consensus with failover context: %w", err)
 				}
 
 				return height, nil
@@ -571,11 +572,11 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	group.Go(func() error {
 		block, err := t.blockStorage.GetLatestBlock(ctx, blockTag)
 		if err != nil {
-			if xerrors.Is(err, storage.ErrItemNotFound) {
+			if errors.Is(err, storage.ErrItemNotFound) {
 				// Note that persistedBlock is nil when no block is available.
 				return nil
 			}
-			return xerrors.Errorf("failed to get latest block from storage: %w", err)
+			return fmt.Errorf("failed to get latest block from storage: %w", err)
 		}
 
 		persistedBlock = block
@@ -583,11 +584,11 @@ func (t *nodeCanaryTask) Run(ctx context.Context) error {
 	})
 
 	if err := group.Wait(); err != nil {
-		if xerrors.Is(err, ErrSkipped) {
+		if errors.Is(err, ErrSkipped) {
 			return nil
 		}
 
-		return xerrors.Errorf("failed to finish node canary task: %w", err)
+		return fmt.Errorf("failed to finish node canary task: %w", err)
 	}
 
 	// Distance between master and slave.

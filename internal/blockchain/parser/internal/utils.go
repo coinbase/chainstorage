@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
+	"github.com/cockroachdb/errors"
 	geth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"golang.org/x/xerrors"
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
@@ -66,7 +66,7 @@ func ValidateChain(blocks []*api.BlockMetadata, lastBlock *api.BlockMetadata) er
 		// Check block height continuous only when its parent height is available.
 		if lastBlock != nil && !lastBlock.Skipped && currBlock.ParentHash != "" {
 			if lastBlock.Hash != currBlock.ParentHash || (currBlock.ParentHeight != 0 && lastBlock.Height != currBlock.ParentHeight) {
-				return xerrors.Errorf("chain is not continuous (last={%+v}, curr={%+v}): %w", lastBlock, currBlock, ErrInvalidChain)
+				return fmt.Errorf("chain is not continuous (last={%+v}, curr={%+v}): %w", lastBlock, currBlock, ErrInvalidChain)
 			}
 		}
 
@@ -80,12 +80,12 @@ func ValidateChain(blocks []*api.BlockMetadata, lastBlock *api.BlockMetadata) er
 func HexToBig(hex string) (*big.Int, error) {
 	cleanedHex, err := CleanHexString(hex)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to clean hex string %v: %w", hex, err)
+		return nil, fmt.Errorf("failed to clean hex string %v: %w", hex, err)
 	}
 
 	val, err := hexutil.DecodeBig(cleanedHex)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode big number %v: %w", hex, err)
+		return nil, fmt.Errorf("failed to decode big number %v: %w", hex, err)
 	}
 
 	return val, nil
@@ -96,7 +96,7 @@ func CleanHexString(hex string) (string, error) {
 	var cleaned string
 
 	if !Has0xPrefix(hex) {
-		return "", xerrors.Errorf("string missing 0x prefix: %v", hex)
+		return "", fmt.Errorf("string missing 0x prefix: %v", hex)
 	}
 
 	cleaned = hex[2:]
@@ -118,7 +118,7 @@ func CleanAddress(address string) (string, error) {
 	var cleaned string
 
 	if len(address) < ethHexAddressLength {
-		return "", xerrors.Errorf("address too short: %v", address)
+		return "", fmt.Errorf("address too short: %v", address)
 	}
 
 	cleaned = address[len(address)-ethHexAddressLength:]
@@ -138,8 +138,8 @@ type truncatedError struct {
 }
 
 var (
-	_ error           = (*truncatedError)(nil)
-	_ xerrors.Wrapper = (*truncatedError)(nil)
+	_ error          = (*truncatedError)(nil)
+	_ errors.Wrapper = (*truncatedError)(nil)
 )
 
 func NewTruncatedError(err error) error {
@@ -177,7 +177,7 @@ func DecodeBase58(s string) []byte {
 func BigInt(value string) (*big.Int, error) {
 	parsedVal, ok := new(big.Int).SetString(value, 10)
 	if !ok {
-		return nil, xerrors.Errorf("%s is not an integer", value)
+		return nil, fmt.Errorf("%s is not an integer", value)
 	}
 	return parsedVal, nil
 }
@@ -185,7 +185,7 @@ func BigInt(value string) (*big.Int, error) {
 func ChecksumAddress(address string) (string, error) {
 	mixedCaseAddress, err := geth.NewMixedcaseAddressFromString(address)
 	if err != nil {
-		return "", xerrors.Errorf("fail to normalize address=%s: %w", address, err)
+		return "", fmt.Errorf("fail to normalize address=%s: %w", address, err)
 	}
 	return mixedCaseAddress.Address().Hex(), nil
 }

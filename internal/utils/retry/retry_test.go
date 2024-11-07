@@ -2,16 +2,17 @@ package retry
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/cenkalti/backoff/v4"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 )
 
-var errMock = xerrors.New("mock error")
+var errMock = errors.New("mock error")
 
 func TestRetry_Success(t *testing.T) {
 	require := testutil.Require(t)
@@ -50,7 +51,7 @@ func TestRetry_NonRetryable(t *testing.T) {
 	err := r.Retry(context.Background(), func(ctx context.Context) error {
 		numCalls += 1
 		if numCalls < 4 {
-			return xerrors.New("mock")
+			return errors.New("mock")
 		}
 
 		return nil
@@ -101,7 +102,7 @@ func TestRetry_RetryableWrapped(t *testing.T) {
 	err := r.Retry(context.Background(), func(ctx context.Context) error {
 		numCalls += 1
 		if numCalls < DefaultMaxAttempts {
-			return xerrors.Errorf("wrapped error: %w", Retryable(errMock))
+			return fmt.Errorf("wrapped error: %w", Retryable(errMock))
 		}
 
 		return nil
@@ -125,7 +126,7 @@ func TestRetry_Permanent(t *testing.T) {
 	})
 	require.Error(err)
 	require.Equal(DefaultMaxAttempts, numCalls)
-	require.True(xerrors.Is(err, errMock))
+	require.True(errors.Is(err, errMock))
 }
 
 func TestRetry_MaxAttemptsExceeded(t *testing.T) {
@@ -143,7 +144,7 @@ func TestRetry_MaxAttemptsExceeded(t *testing.T) {
 	})
 	require.Error(err)
 	require.Equal(DefaultMaxAttempts, numCalls)
-	require.True(xerrors.Is(err, errMock))
+	require.True(errors.Is(err, errMock))
 }
 
 func TestRetry_WithOptions(t *testing.T) {
@@ -165,7 +166,7 @@ func TestRetry_WithOptions(t *testing.T) {
 	})
 	require.Error(err)
 	require.Equal(5, numCalls)
-	require.True(xerrors.Is(err, errMock))
+	require.True(errors.Is(err, errMock))
 }
 
 func TestRetryWithResult(t *testing.T) {
@@ -207,7 +208,7 @@ func TestRetryWithResult_NonRetryable(t *testing.T) {
 	res, err := r.Retry(context.Background(), func(ctx context.Context) (string, error) {
 		numCalls += 1
 		if numCalls < 4 {
-			return "failure", xerrors.New("mock")
+			return "failure", errors.New("mock")
 		}
 
 		return "success", nil

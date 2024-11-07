@@ -2,11 +2,11 @@ package bitcoin_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -167,11 +167,11 @@ func (s *bitcoinIntegrationTestSuite) TestBitcoinGetBlock_NotFound() {
 
 	_, err := s.client.GetBlockByHeight(context.Background(), btcTag, btcHeightNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 
 	_, err = s.client.GetBlockByHash(context.Background(), btcTag, btcHeightNotFound, btcHashNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 }
 
 func (s *bitcoinIntegrationTestSuite) TestBitcoinGetLatestHeight() {

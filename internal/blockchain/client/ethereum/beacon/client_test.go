@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
@@ -112,7 +112,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetLatestBlock() {
 func (s *clientTestSuite) TestEthereumBeacon_GetLatestBlock_Failure() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("received http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("received http error: %w", &restapi.HTTPError{
 		Code:     http.StatusInternalServerError,
 		Response: "fake http error",
 	})
@@ -129,7 +129,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetLatestBlock_Failure() {
 	require.Error(err)
 
 	var errHTTP *restapi.HTTPError
-	require.True(xerrors.As(err, &errHTTP))
+	require.True(errors.As(err, &errHTTP))
 	require.Equal(http.StatusInternalServerError, errHTTP.Code)
 }
 
@@ -184,7 +184,7 @@ func (s *clientTestSuite) TestEthereumBeacon_BatchGetBlockMetadata() {
 func (s *clientTestSuite) TestEthereumBeacon_BatchGetBlockMetadata_SkippedBlock() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -293,7 +293,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHeight() {
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHeight_SkippedBlock() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -330,7 +330,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHeight_SkippedBlock() {
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHeight_BlockNotFound() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -362,7 +362,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHeight_BlockNotFound() {
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHeight_BlobsNotFound() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -518,7 +518,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_SkippedBlock() {
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_HeaderNotFound() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -575,7 +575,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_MismatchBlockHash() 
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_BlockNotFound() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -606,7 +606,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_BlockNotFound() {
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_BlobsNotFound() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -646,7 +646,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_BlobsNotFound() {
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_GetBlockRetry() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -712,7 +712,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_GetBlockRetry() {
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockByHash_GetBlobsRetry() {
 	require := testutil.Require(s.T())
 
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})
@@ -864,7 +864,7 @@ func (s *clientTestSuite) TestEthereumBeacon_GetBlockTimestamp() {
 }
 
 func (s *clientTestSuite) TestEthereumBeacon_GetBlockTimestamp_Failure() {
-	fakeErr := xerrors.Errorf("fake http error: %w", &restapi.HTTPError{
+	fakeErr := fmt.Errorf("fake http error: %w", &restapi.HTTPError{
 		Code:     http.StatusNotFound,
 		Response: "fake http error",
 	})

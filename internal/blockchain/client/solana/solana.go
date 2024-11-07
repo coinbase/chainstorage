@@ -3,10 +3,11 @@ package solana
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -117,7 +118,7 @@ func NewSolanaClientFactory(params internal.JsonrpcClientParams) internal.Client
 
 func (c *solanaClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint32, from uint64, to uint64) ([]*api.BlockMetadata, error) {
 	if from >= to {
-		return nil, xerrors.Errorf("invalid height range of [%d, %d)", from, to)
+		return nil, fmt.Errorf("invalid height range of [%d, %d)", from, to)
 	}
 
 	result := make([]*api.BlockMetadata, to-from)
@@ -132,7 +133,7 @@ func (c *solanaClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint32
 		group.Go(func() error {
 			batch, err := c.batchGetBlockMetadata(ctx, tag, batchStart, batchEnd)
 			if err != nil {
-				return xerrors.Errorf("failed to get block metadata in batch (batchStart=%v, batchEnd=%v): %w", batchStart, batchEnd, err)
+				return fmt.Errorf("failed to get block metadata in batch (batchStart=%v, batchEnd=%v): %w", batchStart, batchEnd, err)
 			}
 
 			for j := range batch {
@@ -143,7 +144,7 @@ func (c *solanaClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint32
 	}
 
 	if err := group.Wait(); err != nil {
-		return nil, xerrors.Errorf("failed to finish group: %w", err)
+		return nil, fmt.Errorf("failed to finish group: %w", err)
 	}
 
 	return result, nil
@@ -162,7 +163,7 @@ func (c *solanaClientImpl) batchGetBlockMetadata(ctx context.Context, tag uint32
 
 	responses, err := c.client.BatchCall(ctx, solanaMethodGetBlockBatchCall, batchParams, jsonrpc.WithAllowsRPCError())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to call jsonrpc (from=%v, to=%v): %w", from, to, err)
+		return nil, fmt.Errorf("failed to call jsonrpc (from=%v, to=%v): %w", from, to, err)
 	}
 
 	blockMetadatas := make([]*api.BlockMetadata, len(responses))
@@ -170,7 +171,7 @@ func (c *solanaClientImpl) batchGetBlockMetadata(ctx context.Context, tag uint32
 		height := from + uint64(i)
 		if response.Error != nil {
 			if !c.isSlotSkippedError(response.Error) {
-				return nil, xerrors.Errorf("received rpc error (from=%v, to=%v): %+v", from, to, response.Error)
+				return nil, fmt.Errorf("received rpc error (from=%v, to=%v): %+v", from, to, response.Error)
 			}
 
 			blockMetadatas[i] = &api.BlockMetadata{
@@ -183,7 +184,7 @@ func (c *solanaClientImpl) batchGetBlockMetadata(ctx context.Context, tag uint32
 
 		header, _, err := c.parseHeader(response)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse header (height=%v): %w", height, err)
+			return nil, fmt.Errorf("failed to parse header (height=%v): %w", height, err)
 		}
 
 		blockMetadatas[i] = &api.BlockMetadata{
@@ -202,7 +203,7 @@ func (c *solanaClientImpl) batchGetBlockMetadata(ctx context.Context, tag uint32
 func (c *solanaClientImpl) GetBlockByHeight(ctx context.Context, tag uint32, height uint64, _ ...internal.ClientOption) (*api.Block, error) {
 	getBlockResponse, err := c.getBlock(ctx, tag, height)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block (height=%v): %w", height, err)
+		return nil, fmt.Errorf("failed to get block (height=%v): %w", height, err)
 	}
 
 	block := &api.Block{
@@ -220,12 +221,12 @@ func (c *solanaClientImpl) GetBlockByHash(ctx context.Context, tag uint32, heigh
 	// Since orphaned blocks are marked as skipped slots, we can simply query the block by height.
 	block, err := c.GetBlockByHeight(ctx, tag, height, opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block by hash: %w", err)
+		return nil, fmt.Errorf("failed to get block by hash: %w", err)
 	}
 
 	// Double check if the above assumption is correct.
 	if hash != block.Metadata.Hash {
-		return nil, xerrors.Errorf("failed to get block by hash: got unexpected hash (expected=%v, actual=%v)", hash, block.Metadata.Hash)
+		return nil, fmt.Errorf("failed to get block by hash: got unexpected hash (expected=%v, actual=%v)", hash, block.Metadata.Hash)
 	}
 
 	return block, nil
@@ -238,12 +239,12 @@ func (c *solanaClientImpl) GetLatestHeight(ctx context.Context) (uint64, error) 
 
 	response, err := c.client.Call(ctx, solanaMethodGetSlot, params)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to call jsonprc: %w", err)
+		return 0, fmt.Errorf("failed to call jsonprc: %w", err)
 	}
 
 	var slot uint64
 	if err := response.Unmarshal(&slot); err != nil {
-		return 0, xerrors.Errorf("failed to unmarshal slot: %w", err)
+		return 0, fmt.Errorf("failed to unmarshal slot: %w", err)
 	}
 
 	return slot, nil
@@ -267,7 +268,7 @@ func (c *solanaClientImpl) isNotFoundError(err error) bool {
 	}
 
 	var rpcerr *jsonrpc.RPCError
-	if !xerrors.As(err, &rpcerr) {
+	if !errors.As(err, &rpcerr) {
 		return false
 	}
 
@@ -280,7 +281,7 @@ func (c *solanaClientImpl) isSlotSkippedError(err error) bool {
 	}
 
 	var rpcerr *jsonrpc.RPCError
-	if !xerrors.As(err, &rpcerr) {
+	if !errors.As(err, &rpcerr) {
 		return false
 	}
 
@@ -330,12 +331,12 @@ func (c *solanaClientImpl) getBlock(ctx context.Context, tag uint32, height uint
 			}, nil
 		}
 
-		return nil, xerrors.Errorf("failed to call jsonrpc: %w", err)
+		return nil, fmt.Errorf("failed to call jsonrpc: %w", err)
 	}
 
 	header, txnList, err := c.parseHeader(response)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse header: %w", err)
+		return nil, fmt.Errorf("failed to parse header: %w", err)
 	}
 
 	blockMetadata := &api.BlockMetadata{
@@ -361,11 +362,11 @@ func (c *solanaClientImpl) getBlock(ctx context.Context, tag uint32, height uint
 func (c *solanaClientImpl) parseHeader(response *jsonrpc.Response) (*solana.SolanaBlockLit, []string, error) {
 	var header solana.SolanaBlockLit
 	if err := response.Unmarshal(&header); err != nil {
-		return nil, nil, xerrors.Errorf("failed to unmarshal block: %w", err)
+		return nil, nil, fmt.Errorf("failed to unmarshal block: %w", err)
 	}
 
 	if header.BlockHash == "" {
-		return nil, nil, xerrors.Errorf("block hash is empty: {%+v}", header)
+		return nil, nil, fmt.Errorf("block hash is empty: {%+v}", header)
 	}
 
 	if header.PreviousBlockHash == solanaUnavailableParentHash {

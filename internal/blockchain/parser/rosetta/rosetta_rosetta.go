@@ -2,9 +2,10 @@ package rosetta
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -40,13 +41,13 @@ func (p *rosettaRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 func (p *rosettaRosettaParserImpl) parseBlockFromNative(ctx context.Context, rawBlock *api.Block) (*api.RosettaBlock, error) {
 	nativeBlock, err := p.nativeParser.ParseBlock(ctx, rawBlock)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block into native format: %w", err)
+		return nil, fmt.Errorf("failed to parse block into native format: %w", err)
 	}
 
 	rosettaBlock := nativeBlock.GetRosetta()
 
 	if rosettaBlock == nil {
-		return nil, xerrors.Errorf("the rosetta block is not found")
+		return nil, fmt.Errorf("the rosetta block is not found")
 	}
 
 	return &api.RosettaBlock{
@@ -57,27 +58,27 @@ func (p *rosettaRosettaParserImpl) parseBlockFromNative(ctx context.Context, raw
 func (p *rosettaRosettaParserImpl) parseBlockFromRosetta(ctx context.Context, rawBlock *api.Block) (*api.RosettaBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
-		return nil, xerrors.New("metadata not found")
+		return nil, errors.New("metadata not found")
 	}
 
 	blobdata := rawBlock.GetRosetta()
 	if blobdata == nil {
-		return nil, xerrors.New("blobData not found for rosetta")
+		return nil, errors.New("blobData not found for rosetta")
 	}
 
 	rosettaBlock, err := ParseRosettaBlock(blobdata.Header)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse rosetta block: %w", err)
+		return nil, fmt.Errorf("failed to parse rosetta block: %w", err)
 	}
 
 	otherTransactions, err := ParseOtherTransactions(blobdata.OtherTransactions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse rosetta other transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse rosetta other transactions: %w", err)
 	}
 
 	if len(otherTransactions) > 0 {
 		if rosettaBlock == nil {
-			return nil, xerrors.Errorf("rosetta block is nil while having other transactions")
+			return nil, fmt.Errorf("rosetta block is nil while having other transactions")
 		}
 		rosettaBlock.Transactions = append(rosettaBlock.Transactions, otherTransactions...)
 	}

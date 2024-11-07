@@ -3,12 +3,12 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -114,7 +114,7 @@ func (s *fantomClientTestSuite) TestFantomTest_GetBlockByHeight() {
 				return transactionResponse, nil
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{
@@ -163,7 +163,7 @@ func (s *fantomClientTestSuite) TestFantomTest_GetBlockByHash_WithoutBestEffort(
 				return transactionResponse, nil
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{
@@ -210,7 +210,7 @@ func (s *fantomClientTestSuite) TestFantomTest_GetBlockByHeight_ServerError() {
 				return &jsonrpc.Response{}, rpcErr
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{

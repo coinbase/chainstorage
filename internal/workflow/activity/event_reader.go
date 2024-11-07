@@ -2,10 +2,11 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/storage"
@@ -60,12 +61,12 @@ func (a *EventReader) execute(ctx context.Context, request *EventReaderRequest) 
 
 	eventData, err := a.metaStorage.GetEventsByEventIdRange(ctx, request.EventTag, int64(request.StartSequence), int64(request.EndSequence))
 	if err != nil {
-		if xerrors.Is(err, storage.ErrItemNotFound) {
+		if errors.Is(err, storage.ErrItemNotFound) {
 			// Convert not-found error into an empty response.
 			return &EventReaderResponse{}, nil
 		}
 
-		return nil, xerrors.Errorf("failed to read event from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to read event from meta storage: %w", err)
 	}
 
 	return &EventReaderResponse{

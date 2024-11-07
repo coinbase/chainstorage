@@ -1,7 +1,7 @@
 package types
 
 import (
-	"golang.org/x/xerrors"
+	"fmt"
 
 	sdk "github.com/coinbase/rosetta-sdk-go/types"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -36,11 +36,11 @@ var (
 // FromSDKBlock converts Block from rosetta sdk type to proto type
 func FromSDKBlock(block *sdk.Block) (*Block, error) {
 	if block == nil {
-		return nil, xerrors.Errorf("block is nil")
+		return nil, fmt.Errorf("block is nil")
 	}
 
 	if block.BlockIdentifier == nil || block.ParentBlockIdentifier == nil {
-		return nil, xerrors.Errorf("missing required fields BlockIdentifier or ParentBlockIdentifier")
+		return nil, fmt.Errorf("missing required fields BlockIdentifier or ParentBlockIdentifier")
 	}
 
 	blockIdentifier := FromSDKBlockIdentifier(block.BlockIdentifier)
@@ -50,12 +50,12 @@ func FromSDKBlock(block *sdk.Block) (*Block, error) {
 
 	transactions, err := FromSDKTransactions(block.Transactions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transactions for block %v: %w", blockIndex, err)
+		return nil, fmt.Errorf("failed to parse transactions for block %v: %w", blockIndex, err)
 	}
 
 	blockMetadata, err := FromSDKMetadata(block.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block metadata for block %v: %w", blockIndex, err)
+		return nil, fmt.Errorf("failed to parse block metadata for block %v: %w", blockIndex, err)
 	}
 
 	return &Block{
@@ -73,7 +73,7 @@ func FromSDKBlocks(blocks []*sdk.Block) ([]*Block, error) {
 	for _, block := range blocks {
 		protoBlock, err := FromSDKBlock(block)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse block: %w", err)
+			return nil, fmt.Errorf("failed to parse block: %w", err)
 		}
 		result = append(result, protoBlock)
 	}
@@ -99,24 +99,24 @@ func FromSDKTransaction(transaction *sdk.Transaction) (*Transaction, error) {
 	}
 
 	if transaction.TransactionIdentifier == nil {
-		return nil, xerrors.Errorf("missing transaction identifier")
+		return nil, fmt.Errorf("missing transaction identifier")
 	}
 
 	transactionHash := transaction.TransactionIdentifier.Hash
 
 	operations, err := FromSDKOperations(transaction.Operations)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction operations transactionHash=%v: %w", transactionHash, err)
+		return nil, fmt.Errorf("failed to parse transaction operations transactionHash=%v: %w", transactionHash, err)
 	}
 
 	relatedTransactions, err := FromSDKRelatedTransactions(transaction.RelatedTransactions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction relatedTransactions transactionHash=%v: %w", transactionHash, err)
+		return nil, fmt.Errorf("failed to parse transaction relatedTransactions transactionHash=%v: %w", transactionHash, err)
 	}
 
 	metadata, err := FromSDKMetadata(transaction.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction metadata transactionHash=%v: %w", transactionHash, err)
+		return nil, fmt.Errorf("failed to parse transaction metadata transactionHash=%v: %w", transactionHash, err)
 	}
 
 	return &Transaction{
@@ -135,7 +135,7 @@ func FromSDKTransactions(transactions []*sdk.Transaction) ([]*Transaction, error
 	for i, transaction := range transactions {
 		tx, err := FromSDKTransaction(transaction)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction: %w", err)
+			return nil, fmt.Errorf("failed to parse transaction: %w", err)
 		}
 		result[i] = tx
 	}
@@ -149,12 +149,12 @@ func FromSDKRelatedTransaction(relatedTransaction *sdk.RelatedTransaction) (*Rel
 	}
 
 	if relatedTransaction.TransactionIdentifier == nil {
-		return nil, xerrors.Errorf("missing TransactionIdentifier of related transaction")
+		return nil, fmt.Errorf("missing TransactionIdentifier of related transaction")
 	}
 
 	networkIdentifier, err := FromSDKNetworkIdentifier(relatedTransaction.NetworkIdentifier)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse networkIdentifier: %w", err)
+		return nil, fmt.Errorf("failed to parse networkIdentifier: %w", err)
 	}
 
 	return &RelatedTransaction{
@@ -172,7 +172,7 @@ func FromSDKRelatedTransactions(relatedTransactions []*sdk.RelatedTransaction) (
 	for i, transaction := range relatedTransactions {
 		tx, err := FromSDKRelatedTransaction(transaction)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse related transaction: %w", err)
+			return nil, fmt.Errorf("failed to parse related transaction: %w", err)
 		}
 		result[i] = tx
 	}
@@ -188,7 +188,7 @@ func FromSDKSubNetworkIdentifier(subNetworkIdentifier *sdk.SubNetworkIdentifier)
 
 	subNetworkMetadata, err := FromSDKMetadata(subNetworkIdentifier.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse subNetworkIdentifier metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse subNetworkIdentifier metadata: %w", err)
 	}
 
 	return &SubNetworkIdentifier{
@@ -205,7 +205,7 @@ func FromSDKNetworkIdentifier(networkIdentifier *sdk.NetworkIdentifier) (*Networ
 
 	subNetworkIdentifier, err := FromSDKSubNetworkIdentifier(networkIdentifier.SubNetworkIdentifier)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse subNetworkIdentifier: %w", err)
+		return nil, fmt.Errorf("failed to parse subNetworkIdentifier: %w", err)
 	}
 
 	return &NetworkIdentifier{
@@ -226,19 +226,19 @@ func FromSDKOperation(operation *sdk.Operation) (*Operation, error) {
 
 	account, err := FromSDKAccountIdentifier(operation.Account)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse operation account: %w", err)
+		return nil, fmt.Errorf("failed to parse operation account: %w", err)
 	}
 
 	amount, err := FromSDKAmount(operation.Amount)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse operation amount: %w", err)
+		return nil, fmt.Errorf("failed to parse operation amount: %w", err)
 	}
 
 	coinChange := FromSDKCoinChange(operation.CoinChange)
 
 	metadata, err := FromSDKMetadata(operation.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse operation metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse operation metadata: %w", err)
 	}
 
 	return &Operation{
@@ -259,7 +259,7 @@ func FromSDKOperations(operations []*sdk.Operation) ([]*Operation, error) {
 	for i, operation := range operations {
 		op, err := FromSDKOperation(operation)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse operation: %w", err)
+			return nil, fmt.Errorf("failed to parse operation: %w", err)
 		}
 		result[i] = op
 	}
@@ -295,12 +295,12 @@ func FromSDKAccountIdentifier(accountIdentifier *sdk.AccountIdentifier) (*Accoun
 
 	accountMetadata, err := FromSDKMetadata(accountIdentifier.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse account metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse account metadata: %w", err)
 	}
 
 	subAccount, err := FromSDKSubAccountIdentifier(accountIdentifier.SubAccount)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse subAccount: %w", err)
+		return nil, fmt.Errorf("failed to parse subAccount: %w", err)
 	}
 
 	return &AccountIdentifier{
@@ -318,7 +318,7 @@ func FromSDKSubAccountIdentifier(subAccountIdentifier *sdk.SubAccountIdentifier)
 
 	subAccountMetadata, err := FromSDKMetadata(subAccountIdentifier.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse subAccount metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse subAccount metadata: %w", err)
 	}
 	return &SubAccountIdentifier{
 		Address:  subAccountIdentifier.Address,
@@ -334,12 +334,12 @@ func FromSDKAmount(amount *sdk.Amount) (*Amount, error) {
 
 	amountMetadata, err := FromSDKMetadata(amount.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse amount metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse amount metadata: %w", err)
 	}
 
 	currency, err := FromSDKCurrency(amount.Currency)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse amount currency: %w", err)
+		return nil, fmt.Errorf("failed to parse amount currency: %w", err)
 	}
 
 	return &Amount{
@@ -357,7 +357,7 @@ func FromSDKCurrency(currency *sdk.Currency) (*Currency, error) {
 
 	metadata, err := FromSDKMetadata(currency.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse currency metadata: %w", err)
+		return nil, fmt.Errorf("failed to parse currency metadata: %w", err)
 	}
 
 	return &Currency{
@@ -398,7 +398,7 @@ func FromSDKMetadata(metadata map[string]interface{}) (map[string]*anypb.Any, er
 	for k, v := range metadata {
 		value, err := MarshalToAny(v)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to marshal %v to Any: %w", v, err)
+			return nil, fmt.Errorf("failed to marshal %v to Any: %w", v, err)
 		}
 		result[k] = value
 	}
@@ -412,23 +412,23 @@ func ToSDKTransaction(transaction *Transaction) (*sdk.Transaction, error) {
 	}
 
 	if transaction.TransactionIdentifier == nil {
-		return nil, xerrors.Errorf("missing transaction identifier")
+		return nil, fmt.Errorf("missing transaction identifier")
 	}
 
 	transactionHash := transaction.GetTransactionIdentifier().GetHash()
 	operations, err := ToSDKOperations(transaction.Operations)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction operations to sdk type transactionHash=%v: %w", transactionHash, err)
+		return nil, fmt.Errorf("failed to parse transaction operations to sdk type transactionHash=%v: %w", transactionHash, err)
 	}
 
 	relatedTransactions, err := ToSDKRelatedTransactions(transaction.RelatedTransactions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse related transactions to sdk type transactionHash=%v: %w", transactionHash, err)
+		return nil, fmt.Errorf("failed to parse related transactions to sdk type transactionHash=%v: %w", transactionHash, err)
 	}
 
 	metadata, err := ToSDKMetadata(transaction.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction metadata to sdk type transactionHash=%v: %w", transactionHash, err)
+		return nil, fmt.Errorf("failed to parse transaction metadata to sdk type transactionHash=%v: %w", transactionHash, err)
 	}
 
 	return &sdk.Transaction{
@@ -447,7 +447,7 @@ func ToSDKOperations(operations []*Operation) ([]*sdk.Operation, error) {
 	for i, operation := range operations {
 		op, err := ToSDKOperation(operation)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse operation to sdk type: %w", err)
+			return nil, fmt.Errorf("failed to parse operation to sdk type: %w", err)
 		}
 		result[i] = op
 	}
@@ -460,7 +460,7 @@ func ToSDKRelatedTransactions(relatedTransactions []*RelatedTransaction) ([]*sdk
 	for i, transaction := range relatedTransactions {
 		tx, err := ToSDKRelatedTransaction(transaction)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse related transaction to sdk type: %w", err)
+			return nil, fmt.Errorf("failed to parse related transaction to sdk type: %w", err)
 		}
 		result[i] = tx
 	}
@@ -474,12 +474,12 @@ func ToSDKRelatedTransaction(relatedTransaction *RelatedTransaction) (*sdk.Relat
 	}
 
 	if relatedTransaction.TransactionIdentifier == nil {
-		return nil, xerrors.Errorf("missing TransactionIdentifier of related transaction")
+		return nil, fmt.Errorf("missing TransactionIdentifier of related transaction")
 	}
 
 	networkIdentifier, err := ToSDKNetworkIdentifier(relatedTransaction.NetworkIdentifier)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse networkIdentifier to sdk type: %w", err)
+		return nil, fmt.Errorf("failed to parse networkIdentifier to sdk type: %w", err)
 	}
 
 	return &sdk.RelatedTransaction{
@@ -499,7 +499,7 @@ func ToSDKSubNetworkIdentifier(subNetworkIdentifier *SubNetworkIdentifier) (*sdk
 
 	subNetworkMetadata, err := ToSDKMetadata(subNetworkIdentifier.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse subNetworkIdentifier metadata to sdk type: %w", err)
+		return nil, fmt.Errorf("failed to parse subNetworkIdentifier metadata to sdk type: %w", err)
 	}
 
 	return &sdk.SubNetworkIdentifier{
@@ -516,7 +516,7 @@ func ToSDKNetworkIdentifier(networkIdentifier *NetworkIdentifier) (*sdk.NetworkI
 
 	subNetworkIdentifier, err := ToSDKSubNetworkIdentifier(networkIdentifier.SubNetworkIdentifier)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse subNetworkIdentifier to sdk type: %w", err)
+		return nil, fmt.Errorf("failed to parse subNetworkIdentifier to sdk type: %w", err)
 	}
 
 	return &sdk.NetworkIdentifier{
@@ -561,20 +561,20 @@ func ToSDKOperation(rosettaOp *Operation) (*sdk.Operation, error) {
 	}
 
 	if rosettaOp.OperationIdentifier == nil {
-		return nil, xerrors.Errorf("missing OperationIdentifier")
+		return nil, fmt.Errorf("missing OperationIdentifier")
 	}
 
 	account, err := ToSDKAccountIdentifier(rosettaOp.Account)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse account to sdk type: %w", err)
+		return nil, fmt.Errorf("failed to parse account to sdk type: %w", err)
 	}
 	amount, err := ToSDKAmount(rosettaOp.Amount)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse amount to sdk type: %w", err)
+		return nil, fmt.Errorf("failed to parse amount to sdk type: %w", err)
 	}
 	metadata, err := ToSDKMetadata(rosettaOp.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse operation metadata to sdk type: %w", err)
+		return nil, fmt.Errorf("failed to parse operation metadata to sdk type: %w", err)
 	}
 
 	result := &sdk.Operation{
@@ -601,7 +601,7 @@ func ToSDKAccountIdentifier(account *AccountIdentifier) (*sdk.AccountIdentifier,
 	}
 	accountMetadata, err := ToSDKMetadata(account.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse account metadata %+v: %w", account.Metadata, err)
+		return nil, fmt.Errorf("failed to parse account metadata %+v: %w", account.Metadata, err)
 	}
 	sdkAccount := &sdk.AccountIdentifier{
 		Address:  account.Address,
@@ -611,7 +611,7 @@ func ToSDKAccountIdentifier(account *AccountIdentifier) (*sdk.AccountIdentifier,
 	if subAccount != nil {
 		subAccountMetadata, err := ToSDKMetadata(subAccount.Metadata)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse subAccount metadata %+v: %w", subAccount.Metadata, err)
+			return nil, fmt.Errorf("failed to parse subAccount metadata %+v: %w", subAccount.Metadata, err)
 		}
 		sdkAccount.SubAccount = &sdk.SubAccountIdentifier{
 			Address:  subAccount.Address,
@@ -628,7 +628,7 @@ func ToSDKAmount(amount *Amount) (*sdk.Amount, error) {
 	}
 	amountMetadata, err := ToSDKMetadata(amount.Metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse amount metadata %+v: %w", amount.Metadata, err)
+		return nil, fmt.Errorf("failed to parse amount metadata %+v: %w", amount.Metadata, err)
 	}
 
 	sdkAmount := &sdk.Amount{
@@ -639,7 +639,7 @@ func ToSDKAmount(amount *Amount) (*sdk.Amount, error) {
 	if amountCurrency != nil {
 		currencyMetadata, err := ToSDKMetadata(amountCurrency.Metadata)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse amount currency metadata %+v: %w", amountCurrency.Metadata, err)
+			return nil, fmt.Errorf("failed to parse amount currency metadata %+v: %w", amountCurrency.Metadata, err)
 		}
 		sdkAmount.Currency = &sdk.Currency{
 			Symbol:   amountCurrency.Symbol,
@@ -656,7 +656,7 @@ func ToSDKMetadata(metadata map[string]*anypb.Any) (map[string]interface{}, erro
 	for k, v := range metadata {
 		value, err := UnmarshalToInterface(v)
 		if err != nil {
-			return nil, xerrors.Errorf("unable to unmarshal proto value %+v to a generic Go interface", v)
+			return nil, fmt.Errorf("unable to unmarshal proto value %+v to a generic Go interface", v)
 		}
 		result[k] = value
 	}

@@ -2,11 +2,12 @@ package cron
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/dlq"
@@ -39,7 +40,7 @@ type (
 )
 
 var (
-	ErrSkipped = xerrors.New("skipped")
+	ErrSkipped = errors.New("skipped")
 )
 
 func NewDLQProcessor(params DLQProcessorTaskParams) Task {
@@ -76,18 +77,18 @@ func (t *dlqProcessorTask) DelayStartDuration() time.Duration {
 func (t *dlqProcessorTask) Run(ctx context.Context) error {
 	message, err := t.dlq.ReceiveMessage(ctx)
 	if err != nil {
-		if xerrors.Is(err, dlq.ErrNotFound) {
+		if errors.Is(err, dlq.ErrNotFound) {
 			t.logger.Info("dlq is empty")
 			return nil
 		}
 
-		return xerrors.Errorf("failed to receive message from dlq: %w", err)
+		return fmt.Errorf("failed to receive message from dlq: %w", err)
 	}
 
 	switch message.Topic {
 	case dlq.FailedTransactionTraceTopic:
 		if err := t.processFailedTransactionTrace(ctx, message); err != nil {
-			if !xerrors.Is(err, ErrSkipped) {
+			if !errors.Is(err, ErrSkipped) {
 				t.logger.Warn(
 					"failed to process message from failed_transaction_trace topic",
 					zap.Error(err),
@@ -123,32 +124,32 @@ func (t *dlqProcessorTask) processFailedTransactionTrace(ctx context.Context, me
 		// Old messages do not have the hash field.
 		block, err = t.blockchainClient.GetBlockByHeight(ctx, data.Tag, data.Height)
 		if err != nil {
-			return xerrors.Errorf("failed to extract block: %w", err)
+			return fmt.Errorf("failed to extract block: %w", err)
 		}
 	} else {
 		// Use hash for lookup if available. This ensures it's processing the same block even after a chain reorg.
 		block, err = t.blockchainClient.GetBlockByHash(ctx, data.Tag, data.Height, data.Hash)
 		if err != nil {
-			if xerrors.Is(err, client.ErrBlockNotFound) {
+			if errors.Is(err, client.ErrBlockNotFound) {
 				// The block is orphaned; therefore the message should be removed.
 				t.logger.Info("removed orphaned block from failed_transaction_trace topic", zap.Reflect("msg", message))
 				return nil
 			}
 
-			return xerrors.Errorf("failed to extract block: %w", err)
+			return fmt.Errorf("failed to extract block: %w", err)
 		}
 	}
 
 	metadata, err := t.metaStorage.GetBlockByHash(ctx, data.Tag, data.Height, data.Hash)
 	if err != nil {
-		return xerrors.Errorf("failed to get metadata: %w", err)
+		return fmt.Errorf("failed to get metadata: %w", err)
 	}
 	objectKey := metadata.ObjectKeyMain
 
 	compression := storage_utils.GetCompressionType(objectKey)
 	_, err = t.blobStorage.Upload(ctx, block, compression)
 	if err != nil {
-		return xerrors.Errorf("failed to upload to blob store with compression type %v: %w", compression.String(), err)
+		return fmt.Errorf("failed to upload to blob store with compression type %v: %w", compression.String(), err)
 	}
 
 	// Note that the block is already persisted in meta storage.

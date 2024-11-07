@@ -1,10 +1,12 @@
 package sqs
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/pointer"
 )
@@ -14,8 +16,8 @@ func (q *dlqImpl) resetLocalResources() error {
 
 	if err := q.initQueueURL(); err != nil {
 		var aerr awserr.Error
-		if !xerrors.As(err, &aerr) || aerr.Code() != sqs.ErrCodeQueueDoesNotExist {
-			return xerrors.Errorf("failed to init queue url: %w", err)
+		if !errors.As(err, &aerr) || aerr.Code() != sqs.ErrCodeQueueDoesNotExist {
+			return fmt.Errorf("failed to init queue url: %w", err)
 		}
 	}
 
@@ -23,7 +25,7 @@ func (q *dlqImpl) resetLocalResources() error {
 		if _, err := q.client.DeleteQueue(&sqs.DeleteQueueInput{
 			QueueUrl: pointer.Ref(q.queueURL),
 		}); err != nil {
-			return xerrors.Errorf("failed to delete queue: %w", err)
+			return fmt.Errorf("failed to delete queue: %w", err)
 		}
 
 		q.logger.Info("deleted sqs queue")
@@ -35,7 +37,7 @@ func (q *dlqImpl) resetLocalResources() error {
 			QueueName: pointer.Ref(q.config.AWS.DLQ.Name),
 		})
 		if err != nil {
-			return xerrors.Errorf("failed to create queue: %w", err)
+			return fmt.Errorf("failed to create queue: %w", err)
 		}
 
 		q.logger.Info("created sqs queue", zap.Reflect("output", output))

@@ -1,10 +1,11 @@
 package sdk
 
 import (
+	"fmt"
+
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -35,7 +36,7 @@ type (
 
 func New(manager services.SystemManager, cfg *Config) (Session, error) {
 	if err := cfg.validate(); err != nil {
-		return nil, xerrors.Errorf("invalid config %+v: %w", cfg, err)
+		return nil, fmt.Errorf("invalid config %+v: %w", cfg, err)
 	}
 
 	internalCfg, err := config.New(
@@ -45,7 +46,7 @@ func New(manager services.SystemManager, cfg *Config) (Session, error) {
 		config.WithSidechain(cfg.Sidechain),
 	)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create config %w", err)
+		return nil, fmt.Errorf("failed to create config %w", err)
 	}
 
 	var session Session
@@ -65,7 +66,7 @@ func New(manager services.SystemManager, cfg *Config) (Session, error) {
 		fx.Populate(&session),
 	)
 	if err := app.Start(manager.Context()); err != nil {
-		return nil, xerrors.Errorf("failed to start fx app: %w", err)
+		return nil, fmt.Errorf("failed to start fx app: %w", err)
 	}
 
 	manager.AddPreShutdownHook(func() {

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math/big"
 
 	geth "github.com/ethereum/go-ethereum/common"
@@ -14,8 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"go.uber.org/zap"
-
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -52,15 +52,15 @@ type (
 var (
 	_ internal.TrustlessValidator = (*ethereumValidator)(nil)
 
-	ErrInvalidBlockHash             = xerrors.New("invalid block hash")
-	ErrInvalidWithdrawalsHash       = xerrors.New("invalid withdrawals hash")
-	ErrInvalidTransactionsHash      = xerrors.New("invalid transactions hash")
-	ErrInvalidReceiptsHash          = xerrors.New("invalid receipts hash")
-	ErrAccountVerifyProofFailure    = xerrors.New("account verification fails")
-	ErrAccountNonceNotMatched       = xerrors.New("mismatched account nonce")
-	ErrAccountBalanceNotMatched     = xerrors.New("mismatched account balance")
-	ErrAccountStorageHashNotMatched = xerrors.New("mismatched account storage hash")
-	ErrAccountCodeHashNotMatched    = xerrors.New("mismatched account code hash")
+	ErrInvalidBlockHash             = errors.New("invalid block hash")
+	ErrInvalidWithdrawalsHash       = errors.New("invalid withdrawals hash")
+	ErrInvalidTransactionsHash      = errors.New("invalid transactions hash")
+	ErrInvalidReceiptsHash          = errors.New("invalid receipts hash")
+	ErrAccountVerifyProofFailure    = errors.New("account verification fails")
+	ErrAccountNonceNotMatched       = errors.New("mismatched account nonce")
+	ErrAccountBalanceNotMatched     = errors.New("mismatched account balance")
+	ErrAccountStorageHashNotMatched = errors.New("mismatched account storage hash")
+	ErrAccountCodeHashNotMatched    = errors.New("mismatched account code hash")
 )
 
 func NewEthereumValidator(params internal.ParserParams) internal.TrustlessValidator {
@@ -91,31 +91,31 @@ func (v *ethereumValidator) ValidateBlock(ctx context.Context, block *api.Native
 
 	ethereumBlock := block.GetEthereum()
 	if ethereumBlock == nil {
-		return xerrors.New("not an ethereum block")
+		return errors.New("not an ethereum block")
 	}
 
 	// Verify the block header.
 	err := v.validateBlockHeader(ctx, ethereumBlock.Header)
 	if err != nil {
-		return xerrors.Errorf("failed to validate block header: %w", err)
+		return fmt.Errorf("failed to validate block header: %w", err)
 	}
 
 	// Verify the Withdrawals in the block.
 	err = v.validateWithdrawals(ctx, ethereumBlock.Header.Withdrawals, ethereumBlock.Header.WithdrawalsRoot)
 	if err != nil {
-		return xerrors.Errorf("failed to validate withdrawals: %w", err)
+		return fmt.Errorf("failed to validate withdrawals: %w", err)
 	}
 
 	// Verify the transactions in the block.
 	err = v.validateTransactions(ctx, ethereumBlock.Transactions, ethereumBlock.Header.TransactionsRoot)
 	if err != nil {
-		return xerrors.Errorf("failed to validate transactions: %w", err)
+		return fmt.Errorf("failed to validate transactions: %w", err)
 	}
 
 	// Verify the receipts in the block.
 	err = v.validateReceipts(ctx, ethereumBlock.Transactions, ethereumBlock.Header.ReceiptsRoot)
 	if err != nil {
-		return xerrors.Errorf("failed to validate receipts: %w", err)
+		return fmt.Errorf("failed to validate receipts: %w", err)
 	}
 
 	return nil
@@ -123,12 +123,12 @@ func (v *ethereumValidator) ValidateBlock(ctx context.Context, block *api.Native
 
 func (v *ethereumValidator) validateBlockHeader(ctx context.Context, header *api.EthereumHeader) error {
 	if header == nil {
-		return xerrors.New("block header is nil")
+		return errors.New("block header is nil")
 	}
 
 	var nonce types.BlockNonce
 	if err := nonce.UnmarshalText([]byte(header.Nonce)); err != nil {
-		return xerrors.Errorf("failed to decode nonce %v: %w", header.Nonce, err)
+		return fmt.Errorf("failed to decode nonce %v: %w", header.Nonce, err)
 	}
 
 	protocolHeader := types.Header{
@@ -165,7 +165,7 @@ func (v *ethereumValidator) validateBlockHeader(ctx context.Context, header *api
 	expectedHash := protocolHeader.Hash()
 	actualHash := geth.HexToHash(header.Hash)
 	if expectedHash != actualHash {
-		return xerrors.Errorf("unexpected block hash (expected=%v, actual=%v): %w", expectedHash, actualHash, ErrInvalidBlockHash)
+		return fmt.Errorf("unexpected block hash (expected=%v, actual=%v): %w", expectedHash, actualHash, ErrInvalidBlockHash)
 	}
 
 	return nil
@@ -190,10 +190,10 @@ func (v *ethereumValidator) validateWithdrawals(ctx context.Context, withdrawals
 
 		// This is how geth calculates the withdrawals trie hash. We just leverage this function of geth to recompute it.
 		if actualHash := types.DeriveSha(gethWithdrawals, trie.NewStackTrie(nil)); actualHash != expectedHash {
-			return xerrors.Errorf("Withdrawals root hash mismatch (expected=%x, actual=%x): %w", expectedHash, actualHash, ErrInvalidWithdrawalsHash)
+			return fmt.Errorf("Withdrawals root hash mismatch (expected=%x, actual=%x): %w", expectedHash, actualHash, ErrInvalidWithdrawalsHash)
 		}
 	} else if len(withdrawals) != 0 {
-		return xerrors.Errorf("unexpected withdrawals in block body")
+		return fmt.Errorf("unexpected withdrawals in block body")
 	}
 
 	return nil
@@ -221,7 +221,7 @@ func (v *ethereumValidator) validateTransactions(ctx context.Context, transactio
 	for i := 0; i < numTxs; i++ {
 		gethTxs[i], err = v.toGethTransaction(transactions[i])
 		if err != nil {
-			return xerrors.Errorf("failed to convert to geth transaction: %w)", err)
+			return fmt.Errorf("failed to convert to geth transaction: %w)", err)
 		}
 	}
 
@@ -229,7 +229,7 @@ func (v *ethereumValidator) validateTransactions(ctx context.Context, transactio
 
 	// This is how geth calculates the transaction trie hash. We just leverage this function of geth to recompute it.
 	if actualHash := types.DeriveSha(gethTxs, trie.NewStackTrie(nil)); actualHash != expectedHash {
-		return xerrors.Errorf("transaction root hash mismatch (expected=%x, actual=%x): %w", expectedHash, actualHash, ErrInvalidTransactionsHash)
+		return fmt.Errorf("transaction root hash mismatch (expected=%x, actual=%x): %w", expectedHash, actualHash, ErrInvalidTransactionsHash)
 	}
 
 	return nil
@@ -248,7 +248,7 @@ func hasStateSyncTx(transactions []*api.EthereumTransaction) bool {
 // Convert one EthereumTransaction to geth transaction.
 func (v *ethereumValidator) toGethTransaction(transaction *api.EthereumTransaction) (*types.Transaction, error) {
 	if transaction == nil {
-		return nil, xerrors.New("input transaction is nil")
+		return nil, errors.New("input transaction is nil")
 	}
 
 	// When EthereumTransaction.To is "", return a null.
@@ -256,27 +256,27 @@ func (v *ethereumValidator) toGethTransaction(transaction *api.EthereumTransacti
 
 	value, ok := new(big.Int).SetString(transaction.GetValue(), 10)
 	if !ok {
-		return nil, xerrors.Errorf("failed to convert value %s to big.Int", transaction.GetValue())
+		return nil, fmt.Errorf("failed to convert value %s to big.Int", transaction.GetValue())
 	}
 
 	// Handle signatures: V, R, S.
 	sv, ok := new(big.Int).SetString(transaction.GetV(), 0)
 	if !ok {
-		return nil, xerrors.Errorf("failed to convert V %s to big.Int", transaction.GetV())
+		return nil, fmt.Errorf("failed to convert V %s to big.Int", transaction.GetV())
 	}
 	sr, ok := new(big.Int).SetString(transaction.GetR(), 0)
 	if !ok {
-		return nil, xerrors.Errorf("failed to convert R %s to big.Int", transaction.GetR())
+		return nil, fmt.Errorf("failed to convert R %s to big.Int", transaction.GetR())
 	}
 	ss, ok := new(big.Int).SetString(transaction.GetS(), 0)
 	if !ok {
-		return nil, xerrors.Errorf("failed to convert S %s to big.Int", transaction.GetS())
+		return nil, fmt.Errorf("failed to convert S %s to big.Int", transaction.GetS())
 	}
 
 	// Convert the input field. Note that, we need to remove the "0x" prefix.
 	input, err := hexutil.Decode(transaction.GetInput())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to convert input %s to []byte, %w", transaction.GetInput(), err)
+		return nil, fmt.Errorf("failed to convert input %s to []byte, %w", transaction.GetInput(), err)
 	}
 
 	// ChainId is used in transaction types: DynamicFeeTx and AccessListTx.
@@ -426,7 +426,7 @@ func (v *ethereumValidator) validateReceipts(ctx context.Context, transactions [
 	for i := 0; i < numTxs; i++ {
 		gethReceipts[i], err = toGethReceipt(transactions[i].GetReceipt())
 		if err != nil {
-			return xerrors.Errorf("failed to convert receipt: %w", err)
+			return fmt.Errorf("failed to convert receipt: %w", err)
 		}
 	}
 
@@ -434,7 +434,7 @@ func (v *ethereumValidator) validateReceipts(ctx context.Context, transactions [
 
 	// This is how geth calculates the receipt trie hash. We just leverage this function of geth to recompute it.
 	if actualHash := types.DeriveSha(gethReceipts, trie.NewStackTrie(nil)); actualHash != expectedHash {
-		return xerrors.Errorf("receipt root hash mismatch (expected=%x, actual=%x): %w", expectedHash, actualHash, ErrInvalidReceiptsHash)
+		return fmt.Errorf("receipt root hash mismatch (expected=%x, actual=%x): %w", expectedHash, actualHash, ErrInvalidReceiptsHash)
 	}
 
 	return nil
@@ -444,13 +444,13 @@ func toGethReceipt(receipt *api.EthereumTransactionReceipt) (*types.Receipt, err
 	// Convert the bloom field. Note that, we need to remove the "0x" prefix.
 	bloom, err := hexutil.Decode(receipt.GetLogsBloom())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to convert logs bloom %s, %w", receipt.GetLogsBloom(), err)
+		return nil, fmt.Errorf("failed to convert logs bloom %s, %w", receipt.GetLogsBloom(), err)
 	}
 
 	// Convert the receipt logs.
 	logs, err := toGethLogs(receipt.GetLogs())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to convert receipt logs, %w", err)
+		return nil, fmt.Errorf("failed to convert receipt logs, %w", err)
 	}
 
 	result := &types.Receipt{
@@ -474,7 +474,7 @@ func toGethReceipt(receipt *api.EthereumTransactionReceipt) (*types.Receipt, err
 		// Need to remove the "0x" prefix.
 		root, err := hexutil.Decode(receipt.GetRoot())
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert poststate %s, %w", receipt.GetRoot(), err)
+			return nil, fmt.Errorf("failed to convert poststate %s, %w", receipt.GetRoot(), err)
 		}
 
 		result.PostState = root
@@ -497,7 +497,7 @@ func toGethLogs(receiptLogs []*api.EthereumEventLog) ([]*types.Log, error) {
 		// Need to remove the "0x" prefix.
 		data, err := hexutil.Decode(l.GetData())
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert log data %s, %w", l.GetData(), err)
+			return nil, fmt.Errorf("failed to convert log data %s, %w", l.GetData(), err)
 		}
 
 		gethLogs[i] = &types.Log{
@@ -520,21 +520,21 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 	// First, process the input request, and extract the usefule info for the verification.
 	nativeBlock := req.GetBlock()
 	if nativeBlock == nil {
-		return nil, xerrors.Errorf("nil input native block: %w", internal.ErrInvalidParameters)
+		return nil, fmt.Errorf("nil input native block: %w", internal.ErrInvalidParameters)
 	}
 	ethereumBlock := nativeBlock.GetEthereum()
 	if ethereumBlock == nil {
-		return nil, xerrors.Errorf("nil input ethereum block: %w", internal.ErrInvalidParameters)
+		return nil, fmt.Errorf("nil input ethereum block: %w", internal.ErrInvalidParameters)
 	}
 	stateRootHash := ethereumBlock.Header.StateRoot
 
 	accountProof := req.GetAccountProof()
 	if accountProof == nil {
-		return nil, xerrors.Errorf("nil input account proof: %w", internal.ErrInvalidParameters)
+		return nil, fmt.Errorf("nil input account proof: %w", internal.ErrInvalidParameters)
 	}
 	ethereumProof := accountProof.GetEthereum()
 	if ethereumProof == nil {
-		return nil, xerrors.Errorf("nil input ethereum proof: %w", internal.ErrInvalidParameters)
+		return nil, fmt.Errorf("nil input ethereum proof: %w", internal.ErrInvalidParameters)
 	}
 	proofResult := ethereumProof.AccountProof
 
@@ -542,7 +542,7 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 	var accountResult AccountResult
 	err := json.Unmarshal(proofResult, &accountResult)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal proofResult: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal proofResult: %w", err)
 	}
 
 	// There are two cases here:
@@ -565,7 +565,7 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 
 	// Verify that this proofResult is for the target account
 	if accountResult.Address != geth.HexToAddress(account) {
-		return nil, xerrors.Errorf("the input proofResult has different account address, address in proof: %s, expected: %s", accountResult.Address.Hex(), account)
+		return nil, fmt.Errorf("the input proofResult has different account address, address in proof: %s, expected: %s", accountResult.Address.Hex(), account)
 	}
 
 	// Create the in-memory DB state of the state trie proof
@@ -574,52 +574,52 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 		// Need to remove the "0x" prefix.
 		nodeData, err := hexutil.Decode(node)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to hexutil.Decode the node %s: %w", node, err)
+			return nil, fmt.Errorf("failed to hexutil.Decode the node %s: %w", node, err)
 
 		}
 		// Reconstruct the node path information. The key is the hash of the node.
 		err = proofDB.Put(crypto.Keccak256(nodeData), nodeData)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to construct the in-memory DB for proofResult: %w", err)
+			return nil, fmt.Errorf("failed to construct the in-memory DB for proofResult: %w", err)
 		}
 	}
 
 	// Need to remove the "0x" prefix.
 	accountData, err := hexutil.Decode(account)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to hexutil.Decode the account %s: %w", account, err)
+		return nil, fmt.Errorf("failed to hexutil.Decode the account %s: %w", account, err)
 	}
 
 	// Use state_root_hash to walk through the returned proof to verify the state
 	// Note that, the input is the hash of the account.
 	validAccountState, err := trie.VerifyProof(geth.HexToHash(stateRootHash), crypto.Keccak256(accountData), proofDB)
 	if err != nil {
-		return nil, xerrors.Errorf("VerifyProof fails with %v for the account %s: %w", err, account, ErrAccountVerifyProofFailure)
+		return nil, fmt.Errorf("VerifyProof fails with %v for the account %s: %w", err, account, ErrAccountVerifyProofFailure)
 	}
 
 	// If the err is nil and returned account state is nil, then this means that the state trie doesn't include the target account, and the verification fails.
 	if validAccountState == nil {
-		return nil, xerrors.Errorf("VerifyProof fails, the account %s is not included in the state trie: %w", account, ErrAccountVerifyProofFailure)
+		return nil, fmt.Errorf("VerifyProof fails, the account %s is not included in the state trie: %w", account, ErrAccountVerifyProofFailure)
 	}
 
 	// If succsessful, decode the stored account state, and return it.
 	var verifiedAccountState types.StateAccount
 	if err := rlp.DecodeBytes(validAccountState, &verifiedAccountState); err != nil {
-		return nil, xerrors.Errorf("failed to rlp decode the verified account state: %w", err)
+		return nil, fmt.Errorf("failed to rlp decode the verified account state: %w", err)
 	}
 
 	// After the veirifcation is successful, we further check the input account proof is the same as the returned verified account state.
 	if accountResult.Nonce != hexutil.Uint64(verifiedAccountState.Nonce) {
-		return nil, xerrors.Errorf("account nonce is not matched, (nonce in proof=%v, nonce in verified result=%v): %w", accountResult.Nonce, hexutil.Uint64(verifiedAccountState.Nonce), ErrAccountNonceNotMatched)
+		return nil, fmt.Errorf("account nonce is not matched, (nonce in proof=%v, nonce in verified result=%v): %w", accountResult.Nonce, hexutil.Uint64(verifiedAccountState.Nonce), ErrAccountNonceNotMatched)
 	}
 	if accountResult.Balance.ToInt().Cmp(verifiedAccountState.Balance) != 0 {
-		return nil, xerrors.Errorf("account balance is not matched, (balance in proof=%v, balance in verified result=%v): %w", accountResult.Balance.ToInt(), verifiedAccountState.Balance, ErrAccountBalanceNotMatched)
+		return nil, fmt.Errorf("account balance is not matched, (balance in proof=%v, balance in verified result=%v): %w", accountResult.Balance.ToInt(), verifiedAccountState.Balance, ErrAccountBalanceNotMatched)
 	}
 	if accountResult.StorageHash != verifiedAccountState.Root {
-		return nil, xerrors.Errorf("account storage hash is not matched, (storage hash in proof=%v, storage hash in verified result=%v): %w", accountResult.StorageHash, verifiedAccountState.Root, ErrAccountStorageHashNotMatched)
+		return nil, fmt.Errorf("account storage hash is not matched, (storage hash in proof=%v, storage hash in verified result=%v): %w", accountResult.StorageHash, verifiedAccountState.Root, ErrAccountStorageHashNotMatched)
 	}
 	if !bytes.Equal(accountResult.CodeHash.Bytes(), verifiedAccountState.CodeHash) {
-		return nil, xerrors.Errorf("account code hash is not matched, (code hash in proof=%v, code hash in verified result=%v): %w", accountResult.CodeHash.Bytes(), verifiedAccountState.CodeHash, ErrAccountCodeHashNotMatched)
+		return nil, fmt.Errorf("account code hash is not matched, (code hash in proof=%v, code hash in verified result=%v): %w", accountResult.CodeHash.Bytes(), verifiedAccountState.CodeHash, ErrAccountCodeHashNotMatched)
 	}
 
 	// If the request is for the native token, return now.
@@ -639,14 +639,14 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 	// Now, we need to handle the erc20 account verification.
 	account = accountReq.Account
 	if len(accountResult.StorageProof) == 0 {
-		return nil, xerrors.Errorf("the storage proof is empty for the token account: %s", account)
+		return nil, fmt.Errorf("the storage proof is empty for the token account: %s", account)
 	}
 	storageResult := accountResult.StorageProof[0]
 
 	// Need to remove the "0x" prefix.
 	key, err := hexutil.Decode(storageResult.Key)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to hexutil.Decode the key %s: %w", storageResult.Key, err)
+		return nil, fmt.Errorf("failed to hexutil.Decode the key %s: %w", storageResult.Key, err)
 	}
 	// Need to pre-process the key.
 	keyData := geth.LeftPadBytes(key, 32)
@@ -657,12 +657,12 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 		// Need to remove the "0x" prefix.
 		nodeData, err := hexutil.Decode(node)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to hexutil.Decode the node %s: %w", node, err)
+			return nil, fmt.Errorf("failed to hexutil.Decode the node %s: %w", node, err)
 		}
 		// Reconstruct the node path information. The key is the hash of the node.
 		err = proofDB.Put(crypto.Keccak256(nodeData), nodeData)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to construct the in-memory DB for proofResult: %w", err)
+			return nil, fmt.Errorf("failed to construct the in-memory DB for proofResult: %w", err)
 		}
 	}
 
@@ -670,23 +670,23 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 	// Note that, the input is the hash of the storage key.
 	validAccountState, err = trie.VerifyProof(accountResult.StorageHash, crypto.Keccak256(keyData), proofDB)
 	if err != nil {
-		return nil, xerrors.Errorf("VerifyProof fails with %v for the token account %s: %w", err, account, ErrAccountVerifyProofFailure)
+		return nil, fmt.Errorf("VerifyProof fails with %v for the token account %s: %w", err, account, ErrAccountVerifyProofFailure)
 	}
 
 	// If the err is nil and returned account state is nil, then this means that the storage trie doesn't include the target account, and the verification fails.
 	if validAccountState == nil {
-		return nil, xerrors.Errorf("VerifyProof fails, the token account %s is not included in the storage state trie: %w", account, ErrAccountVerifyProofFailure)
+		return nil, fmt.Errorf("VerifyProof fails, the token account %s is not included in the storage state trie: %w", account, ErrAccountVerifyProofFailure)
 	}
 
 	// If succsessful, decode the stored account state, and return it.
 	var tokenBalance big.Int
 	if err := rlp.DecodeBytes(validAccountState, &tokenBalance); err != nil {
-		return nil, xerrors.Errorf("failed to rlp decode the verified token account state: %w", err)
+		return nil, fmt.Errorf("failed to rlp decode the verified token account state: %w", err)
 	}
 
 	// After the veirifcation is successful, we further check the token balance is the same as the returned verified account state.
 	if accountResult.StorageProof[0].Value.ToInt().Cmp(&tokenBalance) != 0 {
-		return nil, xerrors.Errorf("token account balance is not matched, (balance in proof=%v, balance in verified result=%v): %w", accountResult.StorageProof[0].Value.ToInt(), tokenBalance, ErrAccountBalanceNotMatched)
+		return nil, fmt.Errorf("token account balance is not matched, (balance in proof=%v, balance in verified result=%v): %w", accountResult.StorageProof[0].Value.ToInt(), tokenBalance, ErrAccountBalanceNotMatched)
 	}
 
 	return &api.ValidateAccountStateResponse{

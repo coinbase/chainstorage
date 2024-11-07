@@ -2,6 +2,8 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -9,7 +11,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
@@ -24,7 +25,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
-	"github.com/coinbase/chainstorage/internal/workflow/activity/errors"
+	workflowerrors "github.com/coinbase/chainstorage/internal/workflow/activity/errors"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -682,7 +683,7 @@ func (s *SyncerTestSuite) TestReorgWithSkippedBlocks4() {
 func (s *SyncerTestSuite) TestMasterNodeGetLatestHeightFailure() {
 	require := testutil.Require(s.T())
 
-	s.masterBlockchainClient.EXPECT().GetLatestHeight(gomock.Any()).Return(uint64(0), xerrors.Errorf("master node GetLatestHeight failure"))
+	s.masterBlockchainClient.EXPECT().GetLatestHeight(gomock.Any()).Return(uint64(0), fmt.Errorf("master node GetLatestHeight failure"))
 	_, err := s.syncer.handleReorg(context.TODO(), s.logger, tag, false, 0, 0)
 	require.Error(err)
 	require.Contains(err.Error(), "master node GetLatestHeight failure")
@@ -692,7 +693,7 @@ func (s *SyncerTestSuite) TestMetastoreGetLatestBlockFailure() {
 	require := testutil.Require(s.T())
 
 	s.masterBlockchainClient.EXPECT().GetLatestHeight(gomock.Any()).Return(uint64(100), nil)
-	s.metaStorage.EXPECT().GetLatestBlock(gomock.Any(), tag).Return(nil, xerrors.Errorf("metastore GetLatestBlock failure"))
+	s.metaStorage.EXPECT().GetLatestBlock(gomock.Any(), tag).Return(nil, fmt.Errorf("metastore GetLatestBlock failure"))
 	_, err := s.syncer.handleReorg(context.TODO(), s.logger, tag, false, 0, 0)
 	require.Error(err)
 	require.Contains(err.Error(), "metastore GetLatestBlock failure")
@@ -709,7 +710,7 @@ func (s *SyncerTestSuite) TestMetastoreGetBlocksInRangeFailure() {
 
 	s.metaStorage.EXPECT().
 		GetBlocksByHeightRange(gomock.Any(), tag, gomock.Any(), gomock.Any()).
-		Return(nil, xerrors.Errorf("metastore GetBlocksInRange failure"))
+		Return(nil, fmt.Errorf("metastore GetBlocksInRange failure"))
 	_, err := s.syncer.handleReorg(context.TODO(), s.logger, tag, false, 0, 0)
 	require.Error(err)
 	require.Contains(err.Error(), "metastore GetBlocksInRange failure")
@@ -738,7 +739,7 @@ func (s *SyncerTestSuite) TestBatchGetBlockMetadataFailure() {
 
 	s.masterBlockchainClient.EXPECT().
 		BatchGetBlockMetadata(gomock.Any(), tag, gomock.Any(), gomock.Any()).
-		Return(nil, xerrors.Errorf("master node BatchGetBlockMetadata failure"))
+		Return(nil, fmt.Errorf("master node BatchGetBlockMetadata failure"))
 
 	_, err := s.syncer.handleReorg(context.TODO(), s.logger, tag, false, 0, 0)
 	require.Error(err)
@@ -930,7 +931,7 @@ func (s *SyncerTestSuite) TestAddOrUpdateTransactionsInParallel_Err() {
 			return testutil.MakeBlocksWithTransactionsFromStartHeight(height, 1, tag, 3)[0], nil
 		})
 
-	s.metaStorage.EXPECT().AddTransactions(gomock.Any(), gomock.Any(), gomock.Any()).Return(xerrors.New("failed to add or update transaction")).Times(2)
+	s.metaStorage.EXPECT().AddTransactions(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("failed to add or update transaction")).Times(2)
 	s.blobStorage.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 
 	request := &SyncerRequest{
@@ -951,8 +952,8 @@ func (s *SyncerTestSuite) TestBlockValidationFailure() {
 	forkBlock := testutil.MakeBlockMetadata(100, tag)
 	s.metaStorage.EXPECT().GetLatestBlock(gomock.Any(), tag).Return(forkBlock, nil)
 
-	s.slaveBlockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), tag, gomock.Any()).Return(&api.Block{}, xerrors.New("block validation failed"))
-	s.masterBlockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), tag, gomock.Any(), gomock.Any()).Return(&api.Block{}, xerrors.New("block validation failed"))
+	s.slaveBlockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), tag, gomock.Any()).Return(&api.Block{}, errors.New("block validation failed"))
+	s.masterBlockchainClient.EXPECT().GetBlockByHeight(gomock.Any(), tag, gomock.Any(), gomock.Any()).Return(&api.Block{}, errors.New("block validation failed"))
 
 	request := &SyncerRequest{
 		Tag:             tag,
@@ -1057,7 +1058,7 @@ func (s *SyncerTestSuite) TestConsensusValidation_ConsensusClientFailure() {
 		Return(testutil.MakeBlockMetadatasFromStartHeight(latestFinalizedHeight, 1, tag)[0], nil)
 	s.consensusBlockchainClient.EXPECT().
 		BatchGetBlockMetadata(gomock.Any(), tag, latestFinalizedHeight, latestFinalizedHeight+1).
-		Return(nil, xerrors.New("failed to fetch block"))
+		Return(nil, errors.New("failed to fetch block"))
 
 	request := &SyncerRequest{
 		Tag:                  tag,
@@ -1069,7 +1070,7 @@ func (s *SyncerTestSuite) TestConsensusValidation_ConsensusClientFailure() {
 	_, err := s.syncer.Execute(s.env.BackgroundContext(), request)
 	require.Error(err)
 	require.ErrorContains(err, "failed to fetch block")
-	require.ErrorContains(err, errors.ErrTypeConsensusClusterFailure)
+	require.ErrorContains(err, workflowerrors.ErrTypeConsensusClusterFailure)
 }
 
 func (s *SyncerTestSuite) TestConsensusValidation_Muted() {
@@ -1107,7 +1108,7 @@ func (s *SyncerTestSuite) TestConsensusValidation_Muted() {
 		Return(testutil.MakeBlockMetadatasFromStartHeight(latestFinalizedHeight, 1, tag)[0], nil)
 	s.consensusBlockchainClient.EXPECT().
 		BatchGetBlockMetadata(gomock.Any(), tag, latestFinalizedHeight, latestFinalizedHeight+1).
-		Return(nil, xerrors.New("failed to fetch block"))
+		Return(nil, errors.New("failed to fetch block"))
 
 	s.metaStorage.EXPECT().PersistBlockMetas(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
@@ -1173,7 +1174,7 @@ func (s *SyncerTestSuite) TestConsensusValidation_BlockHashMismatch() {
 	_, err := s.syncer.Execute(s.env.BackgroundContext(), request)
 	require.Error(err)
 	require.ErrorContains(err, "detected mismatch block hash")
-	require.ErrorContains(err, errors.ErrTypeConsensusValidationFailure)
+	require.ErrorContains(err, workflowerrors.ErrTypeConsensusValidationFailure)
 }
 
 func (s *SyncerTestSuite) TestConsensusValidation_NoFinalizedBlock() {

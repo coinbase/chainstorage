@@ -2,12 +2,12 @@ package cron
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/robfig/cron/v3"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -66,11 +66,11 @@ func RegisterRunner(params RunnerParams) error {
 
 		job, err := NewJob(jobCtx, params.Config, logger, metrics, task)
 		if err != nil {
-			return xerrors.Errorf("failed to create job %v: %w", taskName, err)
+			return fmt.Errorf("failed to create job %v: %w", taskName, err)
 		}
 
 		if _, err := c.AddJob(task.Spec(), job); err != nil {
-			return xerrors.Errorf("failed to add job %v: %w", taskName, err)
+			return fmt.Errorf("failed to add job %v: %w", taskName, err)
 		}
 	}
 

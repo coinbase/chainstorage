@@ -3,6 +3,8 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -10,7 +12,6 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -43,7 +44,7 @@ const (
 var (
 	_ Client = (*restClient)(nil)
 
-	ErrNotImplemented = xerrors.New("not implemented")
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 func newRestClient(params Params) (Client, error) {
@@ -83,7 +84,7 @@ func newRestClient(params Params) (Client, error) {
 func (c *restClient) GetLatestBlock(ctx context.Context, request *api.GetLatestBlockRequest, _ ...grpc.CallOption) (*api.GetLatestBlockResponse, error) {
 	var response api.GetLatestBlockResponse
 	if err := c.makeRequest(ctx, "GetLatestBlock", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -92,7 +93,7 @@ func (c *restClient) GetLatestBlock(ctx context.Context, request *api.GetLatestB
 func (c *restClient) GetBlockFile(ctx context.Context, request *api.GetBlockFileRequest, _ ...grpc.CallOption) (*api.GetBlockFileResponse, error) {
 	var response api.GetBlockFileResponse
 	if err := c.makeRequest(ctx, "GetBlockFile", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -101,7 +102,7 @@ func (c *restClient) GetBlockFile(ctx context.Context, request *api.GetBlockFile
 func (c *restClient) GetBlockFilesByRange(ctx context.Context, request *api.GetBlockFilesByRangeRequest, _ ...grpc.CallOption) (*api.GetBlockFilesByRangeResponse, error) {
 	var response api.GetBlockFilesByRangeResponse
 	if err := c.makeRequest(ctx, "GetBlockFilesByRange", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -110,7 +111,7 @@ func (c *restClient) GetBlockFilesByRange(ctx context.Context, request *api.GetB
 func (c *restClient) GetRawBlock(ctx context.Context, request *api.GetRawBlockRequest, _ ...grpc.CallOption) (*api.GetRawBlockResponse, error) {
 	var response api.GetRawBlockResponse
 	if err := c.makeRequest(ctx, "GetRawBlock", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -119,7 +120,7 @@ func (c *restClient) GetRawBlock(ctx context.Context, request *api.GetRawBlockRe
 func (c *restClient) GetRawBlocksByRange(ctx context.Context, request *api.GetRawBlocksByRangeRequest, _ ...grpc.CallOption) (*api.GetRawBlocksByRangeResponse, error) {
 	var response api.GetRawBlocksByRangeResponse
 	if err := c.makeRequest(ctx, "GetRawBlocksByRange", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -128,7 +129,7 @@ func (c *restClient) GetRawBlocksByRange(ctx context.Context, request *api.GetRa
 func (c *restClient) GetNativeBlock(ctx context.Context, request *api.GetNativeBlockRequest, _ ...grpc.CallOption) (*api.GetNativeBlockResponse, error) {
 	var response api.GetNativeBlockResponse
 	if err := c.makeRequest(ctx, "GetNativeBlock", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -137,7 +138,7 @@ func (c *restClient) GetNativeBlock(ctx context.Context, request *api.GetNativeB
 func (c *restClient) GetNativeBlocksByRange(ctx context.Context, request *api.GetNativeBlocksByRangeRequest, _ ...grpc.CallOption) (*api.GetNativeBlocksByRangeResponse, error) {
 	var response api.GetNativeBlocksByRangeResponse
 	if err := c.makeRequest(ctx, "GetNativeBlocksByRange", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -146,7 +147,7 @@ func (c *restClient) GetNativeBlocksByRange(ctx context.Context, request *api.Ge
 func (c *restClient) GetRosettaBlock(ctx context.Context, request *api.GetRosettaBlockRequest, _ ...grpc.CallOption) (*api.GetRosettaBlockResponse, error) {
 	var response api.GetRosettaBlockResponse
 	if err := c.makeRequest(ctx, "GetRosettaBlock", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -155,20 +156,20 @@ func (c *restClient) GetRosettaBlock(ctx context.Context, request *api.GetRosett
 func (c *restClient) GetRosettaBlocksByRange(ctx context.Context, request *api.GetRosettaBlocksByRangeRequest, _ ...grpc.CallOption) (*api.GetRosettaBlocksByRangeResponse, error) {
 	var response api.GetRosettaBlocksByRangeResponse
 	if err := c.makeRequest(ctx, "GetRosettaBlocksByRange", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
 }
 
 func (c *restClient) StreamChainEvents(ctx context.Context, request *api.ChainEventsRequest, _ ...grpc.CallOption) (api.ChainStorage_StreamChainEventsClient, error) {
-	return nil, xerrors.Errorf("streaming is not supported under restful mode: %w", ErrNotImplemented)
+	return nil, fmt.Errorf("streaming is not supported under restful mode: %w", ErrNotImplemented)
 }
 
 func (c *restClient) GetChainEvents(ctx context.Context, request *api.GetChainEventsRequest, _ ...grpc.CallOption) (*api.GetChainEventsResponse, error) {
 	var response api.GetChainEventsResponse
 	if err := c.makeRequest(ctx, "GetChainEvents", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -177,7 +178,7 @@ func (c *restClient) GetChainEvents(ctx context.Context, request *api.GetChainEv
 func (c *restClient) GetChainMetadata(ctx context.Context, request *api.GetChainMetadataRequest, _ ...grpc.CallOption) (*api.GetChainMetadataResponse, error) {
 	var response api.GetChainMetadataResponse
 	if err := c.makeRequest(ctx, "GetChainMetadata", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -186,7 +187,7 @@ func (c *restClient) GetChainMetadata(ctx context.Context, request *api.GetChain
 func (c *restClient) GetVersionedChainEvent(ctx context.Context, request *api.GetVersionedChainEventRequest, _ ...grpc.CallOption) (*api.GetVersionedChainEventResponse, error) {
 	var response api.GetVersionedChainEventResponse
 	if err := c.makeRequest(ctx, "GetVersionedChainEvent", request, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -195,7 +196,7 @@ func (c *restClient) GetVersionedChainEvent(ctx context.Context, request *api.Ge
 func (c *restClient) GetBlockByTransaction(ctx context.Context, in *api.GetBlockByTransactionRequest, opts ...grpc.CallOption) (*api.GetBlockByTransactionResponse, error) {
 	var response api.GetBlockByTransactionResponse
 	if err := c.makeRequest(ctx, "GetBlockByTransaction", in, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -204,7 +205,7 @@ func (c *restClient) GetBlockByTransaction(ctx context.Context, in *api.GetBlock
 func (c *restClient) GetNativeTransaction(ctx context.Context, in *api.GetNativeTransactionRequest, opts ...grpc.CallOption) (*api.GetNativeTransactionResponse, error) {
 	var response api.GetNativeTransactionResponse
 	if err := c.makeRequest(ctx, "GetNativeTransaction", in, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -213,7 +214,7 @@ func (c *restClient) GetNativeTransaction(ctx context.Context, in *api.GetNative
 func (c *restClient) GetVerifiedAccountState(ctx context.Context, in *api.GetVerifiedAccountStateRequest, opts ...grpc.CallOption) (*api.GetVerifiedAccountStateResponse, error) {
 	var response api.GetVerifiedAccountStateResponse
 	if err := c.makeRequest(ctx, "GetVerifiedAccountState", in, &response); err != nil {
-		return nil, xerrors.Errorf("failed to make request: %w", err)
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 
 	return &response, nil
@@ -224,13 +225,13 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 		marshaler := protojson.MarshalOptions{}
 		requestBody, err := marshaler.Marshal(request)
 		if err != nil {
-			return xerrors.Errorf("failed to marshal request: %w", err)
+			return fmt.Errorf("failed to marshal request: %w", err)
 		}
 
 		url := c.getURL(method)
 		httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(requestBody))
 		if err != nil {
-			return xerrors.Errorf("failed to create request: %w", err)
+			return fmt.Errorf("failed to create request: %w", err)
 		}
 
 		httpRequest.Header.Set("Content-Type", "application/json")
@@ -246,7 +247,7 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 		)
 		httpResponse, err := c.httpClient.Do(httpRequest)
 		if err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to send http request: %w", err))
+			return retry.Retryable(fmt.Errorf("failed to send http request: %w", err))
 		}
 
 		finalizer := finalizer.WithCloser(httpResponse.Body)
@@ -254,14 +255,14 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 
 		body, err := ioutil.ReadAll(httpResponse.Body)
 		if err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to read from http response: %w", err))
+			return retry.Retryable(fmt.Errorf("failed to read from http response: %w", err))
 		}
 		if statusCode := httpResponse.StatusCode; statusCode != http.StatusOK {
 			if statusCode == 429 || statusCode >= 500 {
-				return retry.Retryable(xerrors.Errorf("received retryable status code %v: %v", statusCode, string(body)))
+				return retry.Retryable(fmt.Errorf("received retryable status code %v: %v", statusCode, string(body)))
 			}
 
-			return xerrors.Errorf("received non-retryable status code %v: %v", statusCode, string(body))
+			return fmt.Errorf("received non-retryable status code %v: %v", statusCode, string(body))
 		}
 
 		unmarshaler := protojson.UnmarshalOptions{
@@ -270,7 +271,7 @@ func (c *restClient) makeRequest(ctx context.Context, method string, request pro
 
 		proto.Reset(response)
 		if err := unmarshaler.Unmarshal(body, response); err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to decode response: %w", err))
+			return retry.Retryable(fmt.Errorf("failed to decode response: %w", err))
 		}
 
 		return nil

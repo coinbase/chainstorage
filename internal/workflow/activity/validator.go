@@ -2,13 +2,14 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
@@ -23,7 +24,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
-	"github.com/coinbase/chainstorage/internal/workflow/activity/errors"
+	workflowerrors "github.com/coinbase/chainstorage/internal/workflow/activity/errors"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -161,7 +162,7 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 	if request.Failover {
 		failoverCtx, err := v.failoverManager.WithFailoverContext(ctx, endpoints.MasterSlaveClusters)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create failover context: %w", err)
+			return nil, fmt.Errorf("failed to create failover context: %w", err)
 		}
 		ctx = failoverCtx
 	}
@@ -169,13 +170,13 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 	eventTag := request.EventTag
 	ingestedLatestBlock, err := v.metaStorage.GetLatestBlock(ctx, request.Tag)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get latest ingested block: %w", err)
+		return nil, fmt.Errorf("failed to get latest ingested block: %w", err)
 	}
 
 	tipOfChain, err := v.masterClient.GetLatestHeight(ctx)
 	if err != nil {
 		return nil, temporal.NewApplicationError(
-			xerrors.Errorf("failed to get tipOfChain from blockChainClient: %w", err).Error(), errors.ErrTypeNodeProvider)
+			fmt.Errorf("failed to get tipOfChain from blockChainClient: %w", err).Error(), workflowerrors.ErrTypeNodeProvider)
 	}
 
 	startHeight := request.StartHeight
@@ -187,7 +188,7 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 		logger,
 	)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to calculate endHeight: %w", err)
+		return nil, fmt.Errorf("failed to calculate endHeight: %w", err)
 	}
 
 	logger.Info(
@@ -201,12 +202,12 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 	)
 
 	if err = v.validateLatestBlock(ctx, logger, ingestedLatestBlock); err != nil {
-		return nil, xerrors.Errorf("failed to validate latest block: %+v: %w", ingestedLatestBlock, err)
+		return nil, fmt.Errorf("failed to validate latest block: %+v: %w", ingestedLatestBlock, err)
 	}
 
 	lastValidatedHeight, err := v.validateRange(ctx, logger, request.Tag, startHeight, endHeight, request.Parallelism)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to validate range tag=%d, range=[%d, %d): %w", request.Tag, startHeight, endHeight, err)
+		return nil, fmt.Errorf("failed to validate range tag=%d, range=[%d, %d): %w", request.Tag, startHeight, endHeight, err)
 	}
 
 	blockGap := tipOfChain - lastValidatedHeight
@@ -217,19 +218,19 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 
 	maxEventId, err := v.metaStorage.GetMaxEventId(ctx, eventTag)
 	if err != nil {
-		if xerrors.Is(err, storage.ErrNoEventHistory) {
+		if errors.Is(err, storage.ErrNoEventHistory) {
 			return &ValidatorResponse{
 				LastValidatedHeight: lastValidatedHeight,
 				BlockGap:            blockGap,
 				EventTag:            eventTag,
 			}, nil
 		}
-		return nil, xerrors.Errorf("failed to get max event id for eventTag=%v: %w", eventTag, err)
+		return nil, fmt.Errorf("failed to get max event id for eventTag=%v: %w", eventTag, err)
 	}
 
 	lastValidatedEventId, lastValidatedEventHeight, err := v.validateEvents(ctx, eventTag, request.StartEventId, request.MaxEventsToValidate)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to validate events (StartEventId:%d, MaxEventsToValidate:%d, EventTag:%d): %w", request.StartEventId, request.MaxEventsToValidate, eventTag, err)
+		return nil, fmt.Errorf("failed to validate events (StartEventId:%d, MaxEventsToValidate:%d, EventTag:%d): %w", request.StartEventId, request.MaxEventsToValidate, eventTag, err)
 	}
 
 	eventGap := maxEventId - lastValidatedEventId
@@ -247,28 +248,28 @@ func (v *Validator) execute(ctx context.Context, request *ValidatorRequest) (*Va
 func (v *Validator) validateLatestBlock(ctx context.Context, logger *zap.Logger, metadata *api.BlockMetadata) error {
 	rawBlock, err := v.blobStorage.Download(ctx, metadata)
 	if err != nil {
-		return xerrors.Errorf("failed to download latest block: %w", err)
+		return fmt.Errorf("failed to download latest block: %w", err)
 	}
 
 	nativeBlock, err := v.parser.ParseNativeBlock(ctx, rawBlock)
 	if err != nil {
-		return xerrors.Errorf("failed to parse native block: %w", err)
+		return fmt.Errorf("failed to parse native block: %w", err)
 	}
 
 	err = v.parser.ValidateBlock(ctx, nativeBlock)
-	if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
-		return xerrors.Errorf("failed to validate native block: %w", err)
+	if err != nil && !errors.Is(err, parser.ErrNotImplemented) {
+		return fmt.Errorf("failed to validate native block: %w", err)
 	}
 
 	rosettaBlock, err := v.parser.ParseRosettaBlock(ctx, rawBlock)
-	if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
-		return xerrors.Errorf("failed to parse rosetta block: %w", err)
+	if err != nil && !errors.Is(err, parser.ErrNotImplemented) {
+		return fmt.Errorf("failed to parse rosetta block: %w", err)
 	}
 
 	if rosettaBlock != nil {
 		err = v.parser.ValidateRosettaBlock(ctx, &api.ValidateRosettaBlockRequest{NativeBlock: nativeBlock}, rosettaBlock)
-		if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
-			return xerrors.Errorf("failed to validate rosetta block: %w", err)
+		if err != nil && !errors.Is(err, parser.ErrNotImplemented) {
+			return fmt.Errorf("failed to validate rosetta block: %w", err)
 		}
 	}
 
@@ -317,10 +318,10 @@ func (v *Validator) validateEvents(ctx context.Context, eventTag uint32, startEv
 		return v.metaStorage.GetEventsAfterEventId(ctx, eventTag, startEventId, maxEvents)
 	})
 	if err != nil {
-		return 0, 0, xerrors.Errorf("failed to call GetEventsAfterEventId (startEventId=%v, maxEvents=%v, eventTag=%v): %w", startEventId, maxEvents, eventTag, err)
+		return 0, 0, fmt.Errorf("failed to call GetEventsAfterEventId (startEventId=%v, maxEvents=%v, eventTag=%v): %w", startEventId, maxEvents, eventTag, err)
 	}
 	if len(events) == 0 {
-		return 0, 0, xerrors.Errorf("received empty event list (startEventId=%v, maxEvents=%v, eventTag=%v)", startEventId, maxEvents, eventTag)
+		return 0, 0, fmt.Errorf("received empty event list (startEventId=%v, maxEvents=%v, eventTag=%v)", startEventId, maxEvents, eventTag)
 	}
 	lastEvent := events[len(events)-1]
 	return lastEvent.EventId, lastEvent.BlockHeight, nil
@@ -353,7 +354,7 @@ func (v *Validator) validateRange(ctx context.Context, logger *zap.Logger, tag u
 
 	blockMetadataList, err := v.metaStorage.GetBlocksByHeightRange(ctx, tag, startHeight, endHeight+1)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get blocks [%v, %v]: %w", startHeight, endHeight, err)
+		return 0, fmt.Errorf("failed to get blocks [%v, %v]: %w", startHeight, endHeight, err)
 	}
 	blockMetadataList = v.sanitizeBlocks(blockMetadataList)
 	if len(blockMetadataList) == 0 {
@@ -366,14 +367,14 @@ func (v *Validator) validateRange(ctx context.Context, logger *zap.Logger, tag u
 	// Since startHeight is the last non-skipped block of the previous batch, we do not need to set lastBlock in parser.ValidateChain
 	err = parser.ValidateChain(blockMetadataList, nil)
 	if err != nil {
-		return 0, xerrors.Errorf("block chain is not continuous: %w", err)
+		return 0, fmt.Errorf("block chain is not continuous: %w", err)
 	}
 
 	expectedMetadataList, err := v.metrics.instrumentBatchGetBlockMeta.Instrument(ctx, func(ctx context.Context) ([]*api.BlockMetadata, error) {
 		metadataList, err := v.slaveClient.BatchGetBlockMetadata(ctx, tag, startHeight, endHeight+1)
 		if err != nil {
 			return nil, temporal.NewApplicationError(
-				xerrors.Errorf("failed to get block metadata from %v to %v: %w", startHeight, endHeight+1, err).Error(), errors.ErrTypeNodeProvider)
+				fmt.Errorf("failed to get block metadata from %v to %v: %w", startHeight, endHeight+1, err).Error(), workflowerrors.ErrTypeNodeProvider)
 		}
 		return metadataList, nil
 	})
@@ -392,14 +393,14 @@ func (v *Validator) validateRange(ctx context.Context, logger *zap.Logger, tag u
 		g.Go(func() error {
 			_, err := v.validateHeight(ctx, logger, validateBlock.Height, tag, validateBlock.Metadata)
 			if err != nil {
-				return xerrors.Errorf("failed to get validate height %d: %w", validateBlock.Height, err)
+				return fmt.Errorf("failed to get validate height %d: %w", validateBlock.Height, err)
 			}
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return 0, xerrors.Errorf("failed to validate block: %w", err)
+		return 0, fmt.Errorf("failed to validate block: %w", err)
 	}
 	return endHeight, nil
 }
@@ -414,7 +415,7 @@ func (v *Validator) validateHeight(ctx context.Context,
 		validatedBlockHash = expectedMetadata.Hash
 		actualBlockMetaData, err := v.metaStorage.GetBlockByHeight(ctx, tag, height)
 		if err != nil {
-			return xerrors.Errorf("failed to get block meta data from meta storage (height=%d): %w", height, err)
+			return fmt.Errorf("failed to get block meta data from meta storage (height=%d): %w", height, err)
 		}
 		if expectedMetadata.Tag != actualBlockMetaData.Tag ||
 			expectedMetadata.Hash != actualBlockMetaData.Hash ||
@@ -431,7 +432,7 @@ func (v *Validator) validateHeight(ctx context.Context,
 		}
 		actualRawBlock, err := v.blobStorage.Download(ctx, actualBlockMetaData)
 		if err != nil {
-			return xerrors.Errorf("failed to get block using storage client (key=%s): %w", actualBlockMetaData.ObjectKeyMain, err)
+			return fmt.Errorf("failed to get block using storage client (key=%s): %w", actualBlockMetaData.ObjectKeyMain, err)
 		}
 		if expectedMetadata.Hash != actualRawBlock.Metadata.Hash {
 			logger.Error("detected mismatch in block hash stored in s3",
@@ -452,7 +453,7 @@ func (v *Validator) validateHeight(ctx context.Context,
 		}
 
 		err = v.parser.ValidateBlock(ctx, nativeBlock)
-		if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
+		if err != nil && !errors.Is(err, parser.ErrNotImplemented) {
 			logger.Error("failed to validate native block",
 				zap.Error(err),
 				zap.Uint64("blockHeight", nativeBlock.GetHeight()),
@@ -464,7 +465,7 @@ func (v *Validator) validateHeight(ctx context.Context,
 
 		rosettaBlock, err := v.parser.ParseRosettaBlock(ctx, actualRawBlock)
 		// ParseRosettaBlock is not necessarily implemented for all chains, skip if so
-		if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
+		if err != nil && !errors.Is(err, parser.ErrNotImplemented) {
 			logger.Error("failed to parse raw block using rosetta parser",
 				zap.Error(err),
 				zap.Reflect("actualRawBlock", actualRawBlock.Metadata),
@@ -477,7 +478,7 @@ func (v *Validator) validateHeight(ctx context.Context,
 			err = v.parser.ValidateRosettaBlock(ctx, &api.ValidateRosettaBlockRequest{
 				NativeBlock: nativeBlock,
 			}, rosettaBlock)
-			if err != nil && !xerrors.Is(err, parser.ErrNotImplemented) {
+			if err != nil && !errors.Is(err, parser.ErrNotImplemented) {
 				logger.Error("failed to validate rosetta block using native block",
 					zap.Error(err),
 					zap.Int64("blockHeight", rosettaBlock.Block.BlockIdentifier.Index),

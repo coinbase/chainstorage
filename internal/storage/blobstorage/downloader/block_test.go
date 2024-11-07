@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,11 +10,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
-	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	storage_errors "github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	storage_utils "github.com/coinbase/chainstorage/internal/storage/utils"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -95,7 +95,7 @@ func (s *blockDownloaderTestSuite) TestDownloadFailure() {
 	)
 
 	_, err := s.downloader.Download(context.Background(), s.blockFile)
-	require.True(xerrors.Is(err, errors.ErrDownloadFailure))
+	require.True(errors.Is(err, storage_errors.ErrDownloadFailure))
 }
 
 func (s *blockDownloaderTestSuite) TestUnmarshalFailure() {

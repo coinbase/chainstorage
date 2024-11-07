@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -9,7 +10,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/consts"
@@ -81,7 +81,7 @@ const (
 )
 
 var (
-	ErrFailoverUnavailable = xerrors.New("no endpoint is available for failover")
+	ErrFailoverUnavailable = errors.New("no endpoint is available for failover")
 )
 
 func NewEndpointProvider(params EndpointProviderParams) (EndpointProviderResult, error) {
@@ -90,17 +90,17 @@ func NewEndpointProvider(params EndpointProviderParams) (EndpointProviderResult,
 
 	master, err := newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Master.EndpointGroup, masterEndpointGroupName)
 	if err != nil {
-		return EndpointProviderResult{}, xerrors.Errorf("failed to create master endpoint provider: %w", err)
+		return EndpointProviderResult{}, fmt.Errorf("failed to create master endpoint provider: %w", err)
 	}
 
 	slave, err := newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Slave.EndpointGroup, slaveEndpointGroupName)
 	if err != nil {
-		return EndpointProviderResult{}, xerrors.Errorf("failed to create slave endpoint provider: %w", err)
+		return EndpointProviderResult{}, fmt.Errorf("failed to create slave endpoint provider: %w", err)
 	}
 
 	validator, err := newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Validator.EndpointGroup, validatorEndpointGroupName)
 	if err != nil {
-		return EndpointProviderResult{}, xerrors.Errorf("failed to create validator endpoint provider: %w", err)
+		return EndpointProviderResult{}, fmt.Errorf("failed to create validator endpoint provider: %w", err)
 	}
 
 	// Consensus client is set as Slave by default
@@ -108,12 +108,12 @@ func NewEndpointProvider(params EndpointProviderParams) (EndpointProviderResult,
 	if !params.Config.Chain.Client.Consensus.EndpointGroup.Empty() {
 		consensus, err = newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Consensus.EndpointGroup, consensusEndpointGroupName)
 		if err != nil {
-			return EndpointProviderResult{}, xerrors.Errorf("failed to create consensus endpoint provider: %w", err)
+			return EndpointProviderResult{}, fmt.Errorf("failed to create consensus endpoint provider: %w", err)
 		}
 	} else {
 		consensus, err = newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Slave.EndpointGroup, consensusEndpointGroupName)
 		if err != nil {
-			return EndpointProviderResult{}, xerrors.Errorf("failed to create consensus endpoint provider with slave endpoints: %w", err)
+			return EndpointProviderResult{}, fmt.Errorf("failed to create consensus endpoint provider with slave endpoints: %w", err)
 		}
 	}
 
@@ -134,7 +134,7 @@ func newEndpointProvider(logger *zap.Logger, cfg *config.Config, scope tally.Sco
 		&endpointGroup.EndpointConfig,
 	)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create primary endpoints: %w", err)
+		return nil, fmt.Errorf("failed to create primary endpoints: %w", err)
 	}
 
 	secondaryEndpoints, secondaryPicker, err := newEndpoints(
@@ -145,7 +145,7 @@ func newEndpointProvider(logger *zap.Logger, cfg *config.Config, scope tally.Sco
 		&endpointGroup.EndpointConfigFailover,
 	)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create secondary endpoints: %w", err)
+		return nil, fmt.Errorf("failed to create secondary endpoints: %w", err)
 	}
 
 	if endpointGroup.UseFailover {
@@ -177,7 +177,7 @@ func newEndpoints(
 	for i := range endpoints {
 		endpoint, err := newEndpoint(cfg, logger, scope, &endpoints[i], endpointConfig)
 		if err != nil {
-			return nil, nil, xerrors.Errorf("failed to create endpoint: %w", err)
+			return nil, nil, fmt.Errorf("failed to create endpoint: %w", err)
 		}
 
 		res[i] = endpoint
@@ -247,7 +247,7 @@ func newEndpoint(
 			)
 			opts = append(opts, withStickySessionCookieHash(endpoint.Url, stickySessionCookie, stickySessionValue))
 		} else {
-			return nil, xerrors.Errorf("unknown sticky session type: %+v", stickySession)
+			return nil, fmt.Errorf("unknown sticky session type: %+v", stickySession)
 		}
 	}
 
@@ -265,7 +265,7 @@ func newEndpoint(
 
 	client, err := newHTTPClient(opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create http client for %v: %w", endpoint.Name, err)
+		return nil, fmt.Errorf("failed to create http client for %v: %w", endpoint.Name, err)
 	}
 
 	providerID := "unknown"
@@ -294,7 +294,7 @@ func getStickySessionValue(cfg *config.Config) string {
 func (e *endpointProvider) GetEndpoint(ctx context.Context) (*Endpoint, error) {
 	activeEndpoints, activePicker := e.getActiveEndpoints(ctx)
 	if len(activeEndpoints) == 0 {
-		return nil, xerrors.New("no endpoint is available")
+		return nil, errors.New("no endpoint is available")
 	}
 
 	pick := activePicker.Next().(*Endpoint)

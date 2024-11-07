@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -56,7 +56,7 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 		Env:        sdk.EnvProduction,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create session: %w", err)
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	ctx := manager.ServiceContext()
@@ -64,13 +64,13 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 
 	chainMetadata, err := client.GetChainMetadata(ctx, &api.GetChainMetadataRequest{})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain metadata: %w", err)
+		return nil, fmt.Errorf("failed to get chain metadata: %w", err)
 	}
 
 	irreversibleDistance := chainMetadata.IrreversibleDistance
 	backoffInterval, err := time.ParseDuration(chainMetadata.BlockTime)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block time: %w", err)
+		return nil, fmt.Errorf("failed to parse block time: %w", err)
 	}
 
 	events, err := client.GetChainEvents(ctx, &api.GetChainEventsRequest{
@@ -78,11 +78,11 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 		MaxNumEvents:            1,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain events: %w", err)
+		return nil, fmt.Errorf("failed to get chain events: %w", err)
 	}
 
 	if len(events) != 1 {
-		return nil, xerrors.Errorf("got unexpected number of events: %v", len(events))
+		return nil, fmt.Errorf("got unexpected number of events: %v", len(events))
 	}
 
 	checkpoint := events[0].SequenceNum - startDistance
@@ -113,7 +113,7 @@ func (w *Worker) Run() error {
 		sequence := w.checkpoint
 		nextSequence, err := w.processBatch(ctx, sequence, batchSize)
 		if err != nil {
-			return xerrors.Errorf("failed to process batch [%v, %v): %w", sequence, sequence+batchSize, err)
+			return fmt.Errorf("failed to process batch [%v, %v): %w", sequence, sequence+batchSize, err)
 		}
 
 		// Checkpoint is typically persisted in the database.
@@ -128,7 +128,7 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 		MaxNumEvents: batchSize,
 	})
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get chain events: %w", err)
+		return 0, fmt.Errorf("failed to get chain events: %w", err)
 	}
 
 	if len(events) == 0 {
@@ -161,12 +161,12 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 
 			block, err := w.session.Client().GetBlockWithTag(ctx, blockID.Tag, blockID.Height, blockID.Hash)
 			if err != nil {
-				return xerrors.Errorf("failed to get block {%+v}: %w", blockID, err)
+				return fmt.Errorf("failed to get block {%+v}: %w", blockID, err)
 			}
 
 			nativeBlock, err := w.session.Parser().ParseNativeBlock(ctx, block)
 			if err != nil {
-				return xerrors.Errorf("failed to parse block {%+v}: %w", blockID, err)
+				return fmt.Errorf("failed to parse block {%+v}: %w", blockID, err)
 			}
 
 			blocks[i] = nativeBlock
@@ -175,7 +175,7 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 	}
 
 	if err := group.Wait(); err != nil {
-		return 0, xerrors.Errorf("failed to get blocks: %w", err)
+		return 0, fmt.Errorf("failed to get blocks: %w", err)
 	}
 
 	w.numBatches += 1
@@ -194,7 +194,7 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 				// +1, +2, +3, -3, -2, +2', +3'
 				lastBlock := w.blocks[len(w.blocks)-1]
 				if block.Height != lastBlock.Height {
-					return 0, xerrors.Errorf("invalid chain: block=%v, lastBlock=%v", block.Height, lastBlock.Height)
+					return 0, fmt.Errorf("invalid chain: block=%v, lastBlock=%v", block.Height, lastBlock.Height)
 				}
 
 				// Remove the orphaned block.
@@ -208,7 +208,7 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 			)
 			w.numTransactions -= len(block.GetEthereum().Transactions)
 		} else {
-			return 0, xerrors.Errorf("unknown event type: %v", event.Type)
+			return 0, fmt.Errorf("unknown event type: %v", event.Type)
 		}
 	}
 

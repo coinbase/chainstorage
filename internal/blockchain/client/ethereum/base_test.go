@@ -2,12 +2,12 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -120,10 +120,10 @@ func (s *baseClientTestSuite) TestBaseTest_GetBlockByHeight_WithBestEffort() {
 					return transactionResponse, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{
@@ -183,10 +183,10 @@ func (s *baseClientTestSuite) TestBaseTest_GetBlockByHeight_WithoutBestEffort() 
 					return transactionResponse, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{

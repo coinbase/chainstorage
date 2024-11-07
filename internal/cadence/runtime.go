@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/durationpb"
 	zapadapter "logur.dev/adapter/zap"
 	"logur.dev/logur"
@@ -74,7 +74,7 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 	if tlsConfig.Enabled && params.Config.Env() != config.EnvLocal {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse address (%v): %w", address, err)
+			return nil, fmt.Errorf("failed to parse address (%v): %w", address, err)
 		}
 
 		connectionOptions.TLS = &tls.Config{
@@ -86,7 +86,7 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 		if tlsConfig.CertificateAuthority != "" {
 			caCertPool := x509.NewCertPool()
 			if !caCertPool.AppendCertsFromPEM([]byte(tlsConfig.CertificateAuthority)) {
-				return nil, xerrors.Errorf("failed to parse CA certificate: %v", tlsConfig.CertificateAuthority)
+				return nil, fmt.Errorf("failed to parse CA certificate: %v", tlsConfig.CertificateAuthority)
 			}
 			connectionOptions.TLS.RootCAs = caCertPool
 		}
@@ -94,7 +94,7 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 		if tlsConfig.ClientCertificate != "" && tlsConfig.ClientPrivateKey != "" {
 			clientCert, err := tls.X509KeyPair([]byte(tlsConfig.ClientCertificate), []byte(tlsConfig.ClientPrivateKey))
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse client certificate or key (%v): %w", tlsConfig.ClientCertificate, err)
+				return nil, fmt.Errorf("failed to parse client certificate or key (%v): %w", tlsConfig.ClientCertificate, err)
 			}
 			connectionOptions.TLS.Certificates = []tls.Certificate{clientCert}
 		}
@@ -110,12 +110,12 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 
 	namespaceClient, err := client.NewNamespaceClient(options)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create namespace client: %w", err)
+		return nil, fmt.Errorf("failed to create namespace client: %w", err)
 	}
 
 	workflowClient, err := client.Dial(options)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create workflow client: %w", err)
+		return nil, fmt.Errorf("failed to create workflow client: %w", err)
 	}
 
 	workers := make([]worker.Worker, len(params.Config.Workflows.Workers))
@@ -150,7 +150,7 @@ func (r *runtimeImpl) ListOpenWorkflows(ctx context.Context, namespace string, m
 		MaximumPageSize: maxPageSize,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get open workflows: %w", err)
+		return nil, fmt.Errorf("failed to get open workflows: %w", err)
 	}
 	return openWorkflows, nil
 }
@@ -202,11 +202,11 @@ func (r *runtimeImpl) OnStart(ctx context.Context) error {
 	r.logger.Info("starting workflow runtime")
 
 	if err := r.startDomain(ctx); err != nil {
-		return xerrors.Errorf("failed to start domain: %w", err)
+		return fmt.Errorf("failed to start domain: %w", err)
 	}
 
 	if err := r.startWorkers(); err != nil {
-		return xerrors.Errorf("failed to start workers: %w", err)
+		return fmt.Errorf("failed to start workers: %w", err)
 	}
 
 	return nil
@@ -241,7 +241,7 @@ func (r *runtimeImpl) startDomain(ctx context.Context) error {
 	describeResponse, err := retry.WrapWithResult(ctx, func(ctx context.Context) (*workflowservice.DescribeNamespaceResponse, error) {
 		res, err := r.namespaceClient.Describe(ctx, cadenceConfig.Domain)
 		if err != nil {
-			return nil, retry.Retryable(xerrors.Errorf("failed to register cadence domain: %w", err))
+			return nil, retry.Retryable(fmt.Errorf("failed to register cadence domain: %w", err))
 		}
 
 		return res, nil
@@ -257,7 +257,7 @@ func (r *runtimeImpl) startDomain(ctx context.Context) error {
 func (r *runtimeImpl) startWorkers() error {
 	for _, w := range r.workers {
 		if err := w.Start(); err != nil {
-			return xerrors.Errorf("failed to start worker: %w", err)
+			return fmt.Errorf("failed to start worker: %w", err)
 		}
 
 		r.logger.Info("started worker")

@@ -1,6 +1,8 @@
 package s3
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -8,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	otaws "github.com/opentracing-contrib/go-aws-sdk"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 )
@@ -37,7 +38,7 @@ type (
 func NewS3(params S3Params) (*S3, error) {
 	if params.Config.AWS.IsLocalStack {
 		if err := resetLocalResources(params); err != nil {
-			return nil, xerrors.Errorf("failed to prepare local resources for aws s3 session: %w", err)
+			return nil, fmt.Errorf("failed to prepare local resources for aws s3 session: %w", err)
 		}
 	}
 

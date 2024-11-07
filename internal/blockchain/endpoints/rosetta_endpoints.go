@@ -2,10 +2,10 @@ package endpoints
 
 import (
 	"context"
+	"fmt"
 
 	rc "github.com/coinbase/rosetta-sdk-go/client"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/consts"
 )
@@ -44,22 +44,22 @@ type (
 func NewRosettaEndpointProvider(params RosettaEndpointsParams) (RosettaEndpointsResult, error) {
 	master, err := newRosettaEndpointProvider(params.Master)
 	if err != nil {
-		return RosettaEndpointsResult{}, xerrors.Errorf("failed to create master endpoint provider: %w", err)
+		return RosettaEndpointsResult{}, fmt.Errorf("failed to create master endpoint provider: %w", err)
 	}
 
 	slave, err := newRosettaEndpointProvider(params.Slave)
 	if err != nil {
-		return RosettaEndpointsResult{}, xerrors.Errorf("failed to create slave endpoint provider: %w", err)
+		return RosettaEndpointsResult{}, fmt.Errorf("failed to create slave endpoint provider: %w", err)
 	}
 
 	validator, err := newRosettaEndpointProvider(params.Validator)
 	if err != nil {
-		return RosettaEndpointsResult{}, xerrors.Errorf("failed to create validator endpoint provider: %w", err)
+		return RosettaEndpointsResult{}, fmt.Errorf("failed to create validator endpoint provider: %w", err)
 	}
 
 	consensus, err := newRosettaEndpointProvider(params.Consensus)
 	if err != nil {
-		return RosettaEndpointsResult{}, xerrors.Errorf("failed to create consensus endpoint provider: %w", err)
+		return RosettaEndpointsResult{}, fmt.Errorf("failed to create consensus endpoint provider: %w", err)
 	}
 
 	return RosettaEndpointsResult{
@@ -86,7 +86,7 @@ func newRosettaEndpointProvider(endpointProvider EndpointProvider) (RosettaEndpo
 func (p *rosettaEndpointProvider) GetEndpoint(ctx context.Context) (*Endpoint, *rc.APIClient, error) {
 	endpoint, err := p.endpointProvider.GetEndpoint(ctx)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to get rosetta endpoint: %w", err)
+		return nil, nil, fmt.Errorf("failed to get rosetta endpoint: %w", err)
 	}
 	return endpoint, p.clients[endpoint], nil
 }

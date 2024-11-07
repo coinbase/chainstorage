@@ -6,28 +6,27 @@ import (
 	"strconv"
 
 	"github.com/prysmaticlabs/prysm/v4/math"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 )
 
 func (q *Quantity) UnmarshalJSON(input []byte) error {
 	if len(input) == 0 {
-		return xerrors.Errorf("input missing")
+		return fmt.Errorf("input missing")
 	}
 
 	var str string
 	if err := json.Unmarshal(input, &str); err != nil {
-		return xerrors.Errorf("failed to unmarshal Quantity into string: %w", err)
+		return fmt.Errorf("failed to unmarshal Quantity into string: %w", err)
 	}
 
 	if str == "" {
-		return xerrors.Errorf("empty string")
+		return fmt.Errorf("empty string")
 	}
 
 	val, err := strconv.ParseUint(str, 10, 64)
 	if err != nil {
-		return xerrors.Errorf("invalid value %v: %w", str, err)
+		return fmt.Errorf("invalid value %v: %w", str, err)
 	}
 	*q = Quantity(val)
 
@@ -44,16 +43,16 @@ func (q Quantity) Value() uint64 {
 
 func (t *ExecutionTransaction) UnmarshalJSON(input []byte) error {
 	if len(input) == 0 {
-		return xerrors.Errorf("input missing")
+		return fmt.Errorf("input missing")
 	}
 
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal ExecutionTransaction: %w", err)
+		return fmt.Errorf("failed to unmarshal ExecutionTransaction: %w", err)
 	}
 
 	if !internal.Has0xPrefix(s) {
-		return xerrors.Errorf("missing 0x prefix")
+		return fmt.Errorf("missing 0x prefix")
 	}
 
 	*t = []byte(s)
@@ -67,16 +66,16 @@ func (t ExecutionTransaction) MarshalJSON() ([]byte, error) {
 
 func (b *Blob) UnmarshalJSON(input []byte) error {
 	if len(input) == 0 {
-		return xerrors.Errorf("input missing")
+		return fmt.Errorf("input missing")
 	}
 
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal Blob: %w", err)
+		return fmt.Errorf("failed to unmarshal Blob: %w", err)
 	}
 
 	if !internal.Has0xPrefix(s) {
-		return xerrors.Errorf("missing 0x prefix")
+		return fmt.Errorf("missing 0x prefix")
 	}
 
 	*b = []byte(s)
@@ -93,7 +92,7 @@ func (b Blob) MarshalJSON() ([]byte, error) {
 func calculateEpoch(slot uint64) (uint64, error) {
 	epoch, err := math.Div64(slot, SlotsPerEpoch)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to calculate epoch for slot=%d: %w", slot, err)
+		return 0, fmt.Errorf("failed to calculate epoch for slot=%d: %w", slot, err)
 	}
 	return epoch, nil
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 )
@@ -136,9 +135,9 @@ func TestSyncGroup_WithFilter(t *testing.T) {
 
 	require := testutil.Require(t)
 
-	errIgnored := xerrors.New("ignore this error")
+	errIgnored := errors.New("ignore this error")
 	group, _ := New(context.Background(), WithFilter(func(err error) error {
-		if xerrors.Is(err, errIgnored) {
+		if errors.Is(err, errIgnored) {
 			return nil
 		}
 
@@ -165,12 +164,12 @@ func TestSyncGroup_WithThrottlingAndFilter(t *testing.T) {
 
 	require := testutil.Require(t)
 
-	errIgnored := xerrors.New("ignore this error")
+	errIgnored := errors.New("ignore this error")
 	group, _ := New(
 		context.Background(),
 		WithThrottling(limit),
 		WithFilter(func(err error) error {
-			if xerrors.Is(err, errIgnored) {
+			if errors.Is(err, errIgnored) {
 				return nil
 			}
 

@@ -2,10 +2,11 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/storage"
@@ -59,13 +60,13 @@ func (a *Reader) execute(ctx context.Context, request *ReaderRequest) (*ReaderRe
 
 	metadata, err := a.readBlock(ctx, request)
 	if err != nil {
-		if xerrors.Is(err, storage.ErrItemNotFound) {
+		if errors.Is(err, storage.ErrItemNotFound) {
 			// Convert not-found error into an empty response.
 			// If the block has not been processed previously, we will skip the continuous-chain validation.
 			return &ReaderResponse{}, nil
 		}
 
-		return nil, xerrors.Errorf("failed to read block: %w", err)
+		return nil, fmt.Errorf("failed to read block: %w", err)
 	}
 
 	return &ReaderResponse{

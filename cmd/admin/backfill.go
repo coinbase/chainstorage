@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/aws"
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
@@ -69,7 +68,7 @@ var (
 			}
 
 			if startHeight >= endHeight {
-				return xerrors.Errorf("invalid block range: [%v, %v)", startHeight, endHeight)
+				return fmt.Errorf("invalid block range: [%v, %v)", startHeight, endHeight)
 			}
 
 			chainInfo := fmt.Sprintf("%v-%v", commonFlags.blockchain, commonFlags.network)
@@ -89,12 +88,12 @@ var (
 			for height := startHeight; height < endHeight; height++ {
 				block, err := deps.Client.GetBlockByHeight(ctx, tag, height)
 				if err != nil {
-					return xerrors.Errorf("failed to get block: %w", err)
+					return fmt.Errorf("failed to get block: %w", err)
 				}
 
 				objectKey, err := deps.BlobStorage.Upload(ctx, block, compression)
 				if err != nil {
-					return xerrors.Errorf("failed to upload block in blob storage: %w", err)
+					return fmt.Errorf("failed to upload block in blob storage: %w", err)
 				}
 				block.Metadata.ObjectKeyMain = objectKey
 
@@ -109,7 +108,7 @@ var (
 			}
 
 			if err := deps.MetaStorage.PersistBlockMetas(ctx, updateWatermark, blockMetadatas, nil); err != nil {
-				return xerrors.Errorf("failed to persist block in meta storage: %w", err)
+				return fmt.Errorf("failed to persist block in meta storage: %w", err)
 			}
 
 			logger.Info(

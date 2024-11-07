@@ -3,12 +3,13 @@ package bitcoin
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -316,7 +317,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_GetBlockByHeight_BlockOutOfRa
 
 	_, err := s.client.GetBlockByHeight(context.Background(), btcTag, btcFixtureBlockHeight)
 	s.Error(err)
-	s.True(xerrors.Is(err, internal.ErrBlockNotFound), err.Error())
+	s.True(errors.Is(err, internal.ErrBlockNotFound), err.Error())
 }
 
 func (s *bitcoinClientTestSuite) TestBitcoinClient_GetBlockByHeight_BlockNotFound() {
@@ -343,7 +344,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_GetBlockByHeight_BlockNotFoun
 	).Return(nil, getBlockByHashResponse.Error)
 
 	block, err := s.client.GetBlockByHeight(context.Background(), btcTag, btcFixtureBlockHeight)
-	s.True(xerrors.Is(err, internal.ErrBlockNotFound))
+	s.True(errors.Is(err, internal.ErrBlockNotFound))
 	s.Nil(block)
 }
 
@@ -438,7 +439,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_GetBlockByHash_BlockNotFound(
 	).Return(nil, blockResponse.Error)
 
 	block, err := s.client.GetBlockByHash(context.Background(), btcTag, btcFixtureBlockHeight, btcFixtureBlockHash)
-	s.True(xerrors.Is(err, internal.ErrBlockNotFound))
+	s.True(errors.Is(err, internal.ErrBlockNotFound))
 	s.Nil(block)
 }
 
@@ -551,7 +552,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_GetBlockByHash_GetInputTransa
 	}
 	s.rpcClient.EXPECT().BatchCall(
 		gomock.Any(), bitcoinGetRawTransactionMethod, expectedParams,
-	).Return(nil, xerrors.Errorf("error making http requests"))
+	).Return(nil, fmt.Errorf("error making http requests"))
 
 	block, err := s.client.GetBlockByHash(context.Background(), btcTag, btcFixtureBlockHeight, btcFixtureBlockHash)
 	s.Error(err)
@@ -596,7 +597,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_GetBlockByHash_GetRawTransact
 	}
 	s.rpcClient.EXPECT().BatchCall(
 		gomock.Any(), bitcoinGetRawTransactionMethod, expectedParams,
-	).Return(getRawTransactionResponse, xerrors.Errorf("error making http requests"))
+	).Return(getRawTransactionResponse, fmt.Errorf("error making http requests"))
 
 	block, err := s.client.GetBlockByHash(context.Background(), btcTag, btcFixtureBlockHeight, btcFixtureBlockHash)
 	s.Error(err)
@@ -700,7 +701,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_GetLatestHeight_ResponseError
 func (s *bitcoinClientTestSuite) TestBitcoinClient_GetLatestHeight_CallError() {
 	s.rpcClient.EXPECT().Call(
 		gomock.Any(), bitcoinGetBlockCountMethod, jsonrpc.Params{},
-	).Return(nil, xerrors.Errorf("error making http request"))
+	).Return(nil, fmt.Errorf("error making http request"))
 
 	height, err := s.client.GetLatestHeight(context.Background())
 	s.Error(err)
@@ -784,7 +785,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_BatchGetBlockMetadataByRange_
 
 	s.rpcClient.EXPECT().BatchCall(
 		gomock.Any(), bitcoinGetBlockHashMethod, getBlockHashesParams,
-	).Return(nil, xerrors.Errorf("error making http request"))
+	).Return(nil, fmt.Errorf("error making http request"))
 
 	metadata, err := s.client.BatchGetBlockMetadata(context.Background(), btcTag, 101, 104)
 	s.Error(err)
@@ -829,7 +830,7 @@ func (s *bitcoinClientTestSuite) TestBitcoinClient_BatchGetBlockMetadataByRange_
 
 	s.rpcClient.EXPECT().BatchCall(
 		gomock.Any(), bitcoinGetBlockByHashMethod, getBlocksParams,
-	).Return(nil, xerrors.Errorf("error getting blocks"))
+	).Return(nil, fmt.Errorf("error getting blocks"))
 
 	metadata, err := s.client.BatchGetBlockMetadata(context.Background(), btcTag, 101, 104)
 	s.Error(err)

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -22,7 +21,7 @@ func ParseCompression(compression string) (api.Compression, error) {
 	compression = strings.ToUpper(compression)
 	parsedCompression, ok := api.Compression_value[compression]
 	if !ok {
-		return api.Compression_NONE, xerrors.Errorf("failed to parse compression type %v", compression)
+		return api.Compression_NONE, fmt.Errorf("failed to parse compression type %v", compression)
 	}
 	return api.Compression(parsedCompression), nil
 }
@@ -65,7 +64,7 @@ func ParseBlockchain(blockchainName string) (common.Blockchain, error) {
 	parsedBlockchain, ok := common.Blockchain_value[formattedBlockchainName]
 	if !ok {
 		return common.Blockchain_BLOCKCHAIN_UNKNOWN,
-			xerrors.Errorf("error blockchain name: `%s` did not parse correctly to an enum", blockchainName)
+			fmt.Errorf("error blockchain name: `%s` did not parse correctly to an enum", blockchainName)
 	}
 
 	return common.Blockchain(parsedBlockchain), nil
@@ -81,7 +80,7 @@ func ParseNetwork(networkName string) (common.Network, error) {
 	parsedNetwork, ok := common.Network_value[formattedNetworkName]
 	if !ok {
 		return common.Network_NETWORK_UNKNOWN,
-			xerrors.Errorf("error network name: `%s` did not parse correctly to an enum", networkName)
+			fmt.Errorf("error network name: `%s` did not parse correctly to an enum", networkName)
 	}
 
 	return common.Network(parsedNetwork), nil

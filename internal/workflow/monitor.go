@@ -11,7 +11,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -87,7 +86,7 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 	return w.executeWorkflow(ctx, request, func() error {
 		var cfg config.MonitorWorkflowConfig
 		if err := w.readConfig(ctx, &cfg); err != nil {
-			return xerrors.Errorf("failed to read config: %w", err)
+			return fmt.Errorf("failed to read config: %w", err)
 		}
 
 		logger := w.getLogger(ctx).With(
@@ -125,7 +124,7 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 		if request.BackoffInterval != "" {
 			backoffInterval, err = time.ParseDuration(request.BackoffInterval)
 			if err != nil {
-				return xerrors.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
+				return fmt.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
 			}
 		}
 		zeroBackoff := backoffInterval == 0
@@ -184,7 +183,7 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 					return w.continueAsNew(ctx, request)
 				}
 
-				return xerrors.Errorf("failed to execute validator: %w", err)
+				return fmt.Errorf("failed to execute validator: %w", err)
 			}
 			logger.Info("validated blocks", zap.Reflect("response", validatorResponse))
 			lastValidatedHeight := validatorResponse.LastValidatedHeight
@@ -221,7 +220,7 @@ func (w *Monitor) execute(ctx workflow.Context, request *MonitorRequest) error {
 
 			if !zeroBackoff {
 				if err := backoff.Get(ctx, nil); err != nil {
-					return xerrors.Errorf("failed to sleep: %w", err)
+					return fmt.Errorf("failed to sleep: %w", err)
 				}
 			}
 		}

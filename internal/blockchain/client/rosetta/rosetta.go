@@ -12,7 +12,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
@@ -148,7 +147,7 @@ func (f *rosettaClientFactory) getRosettaClientWithRawBlockApi(endpointProvider 
 
 func (c *rosettaClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint32, from uint64, to uint64) ([]*api.BlockMetadata, error) {
 	if from >= to {
-		return nil, xerrors.Errorf("invalid height range of [%d, %d)", from, to)
+		return nil, fmt.Errorf("invalid height range of [%d, %d)", from, to)
 	}
 
 	numBlocks := int(to - from)
@@ -161,7 +160,7 @@ func (c *rosettaClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint3
 			height := from + uint64(index)
 			block, err := c.getBlockByHeight(ctx, tag, int64(height), false)
 			if err != nil {
-				return xerrors.Errorf("failed to get block for height %d: %w", height, err)
+				return fmt.Errorf("failed to get block for height %d: %w", height, err)
 			}
 			blocks[index] = block.Metadata
 			return nil
@@ -169,7 +168,7 @@ func (c *rosettaClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint3
 	}
 
 	if err := group.Wait(); err != nil {
-		return nil, xerrors.Errorf("failed to get block metadata in parallel: %w", err)
+		return nil, fmt.Errorf("failed to get block metadata in parallel: %w", err)
 	}
 	return blocks, nil
 }
@@ -184,7 +183,7 @@ func (c *rosettaClientImpl) GetBlockByHash(
 	req := c.getBlockRequest(&rt.PartialBlockIdentifier{Hash: &hash})
 	endpoint, rosettaApiClient, err := c.endpointProvider.GetEndpoint(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get rosetta api client %w", err)
+		return nil, fmt.Errorf("failed to get rosetta api client %w", err)
 	}
 	endpoint.IncRequestsCounter(1)
 	resp, err := c.queryBlock(ctx, req, rosettaApiClient, endpoint)
@@ -193,7 +192,7 @@ func (c *rosettaClientImpl) GetBlockByHash(
 	}
 	actualHash := resp.Block.BlockIdentifier.Hash
 	if strings.Compare(hash, actualHash) != 0 {
-		return nil, xerrors.Errorf(
+		return nil, fmt.Errorf(
 			"inconsistent hash of returned rosetta block, expected: %s, actual: %s",
 			hash,
 			actualHash)
@@ -208,7 +207,7 @@ func (c *rosettaClientImpl) GetBlockByHash(
 func (c *rosettaClientImpl) GetLatestHeight(ctx context.Context) (uint64, error) {
 	endpoint, rosettaApiClient, err := c.endpointProvider.GetEndpoint(ctx)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get rosetta api client %w", err)
+		return 0, fmt.Errorf("failed to get rosetta api client %w", err)
 	}
 	endpoint.IncRequestsCounter(1)
 	resp, err := c.queryNetwork(ctx, rosettaApiClient, endpoint)
@@ -235,7 +234,7 @@ func (c *rosettaClientImpl) getBlockByHeight(
 	req := c.getBlockRequest(&rt.PartialBlockIdentifier{Index: &height})
 	endpoint, rosettaApiClient, err := c.endpointProvider.GetEndpoint(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get rosetta api client %w", err)
+		return nil, fmt.Errorf("failed to get rosetta api client %w", err)
 	}
 	endpoint.IncRequestsCounter(1)
 	resp, err := c.queryBlock(ctx, req, rosettaApiClient, endpoint)
@@ -245,7 +244,7 @@ func (c *rosettaClientImpl) getBlockByHeight(
 	expectedHeight := *req.BlockIdentifier.Index
 	actualHeight := resp.Block.BlockIdentifier.Index
 	if expectedHeight != actualHeight {
-		return nil, xerrors.Errorf(
+		return nil, fmt.Errorf(
 			"inconsistent height of returned rosetta block, expected: %d, actual: %d", expectedHeight, actualHeight)
 	}
 	var transactions []*rt.BlockTransactionResponse
@@ -291,7 +290,7 @@ func (c *rosettaClientImpl) queryBlock(
 			return c.mapRosettaError(nodeErr, fmt.Sprintf("failed to get rosetta block for request %+v", req))
 		}
 		if err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to get rosetta block for request %+v: %w", req, err))
+			return retry.Retryable(fmt.Errorf("failed to get rosetta block for request %+v: %w", req, err))
 		}
 		return nil
 	}); err != nil {
@@ -317,7 +316,7 @@ func (c *rosettaClientImpl) queryTransactions(
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return nil, xerrors.Errorf("failed to query transactions: %w", err)
+		return nil, fmt.Errorf("failed to query transactions: %w", err)
 	}
 	return transactions, nil
 }
@@ -333,7 +332,7 @@ func (c *rosettaClientImpl) queryTransaction(
 			return c.mapRosettaError(nodeErr, fmt.Sprintf("failed to get transaction for request %+v", req))
 		}
 		if err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to get transaction for request %+v: %w", req, err))
+			return retry.Retryable(fmt.Errorf("failed to get transaction for request %+v: %w", req, err))
 		}
 		return nil
 	}); err != nil {
@@ -359,7 +358,7 @@ func (c *rosettaClientImpl) queryNetwork(
 			return c.mapRosettaError(nodeErr, fmt.Sprintf("failed to get network status for request %+v", req))
 		}
 		if err != nil {
-			return retry.Retryable(xerrors.Errorf("failed to get network status for request %+v: %w", req, err))
+			return retry.Retryable(fmt.Errorf("failed to get network status for request %+v: %w", req, err))
 		}
 		return nil
 	}); err != nil {
@@ -372,14 +371,14 @@ func (c *rosettaClientImpl) getRawBlock(
 	tag uint32, resp *rt.BlockResponse, transactions []*rt.BlockTransactionResponse) (*api.Block, error) {
 	header, err := json.Marshal(resp)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal rosetta block to bytes %w", err)
+		return nil, fmt.Errorf("failed to marshal rosetta block to bytes %w", err)
 	}
 	otherTransactions := make([][]byte, len(transactions))
 	if len(transactions) > 0 {
 		for i, tx := range transactions {
 			txData, err := json.Marshal(tx)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to marshal transaction %w", err)
+				return nil, fmt.Errorf("failed to marshal transaction %w", err)
 			}
 			otherTransactions[i] = txData
 		}
@@ -431,11 +430,11 @@ func (c *rosettaClientImpl) mapRosettaError(error *rt.Error, message string) err
 	// Code is a network-specific error code according to the Rosetta spec.
 	for _, c := range c.config.Chain.Rosetta.BlockNotFoundErrorCodes {
 		if c == error.Code {
-			return xerrors.Errorf("%v: rosetta error %+v: %w", message, error, internal.ErrBlockNotFound)
+			return fmt.Errorf("%v: rosetta error %+v: %w", message, error, internal.ErrBlockNotFound)
 		}
 	}
 
-	err := xerrors.Errorf("%v: rosetta error %+v", message, error)
+	err := fmt.Errorf("%v: rosetta error %+v", message, error)
 	if error.Retriable {
 		return retry.Retryable(err)
 	}
@@ -449,12 +448,12 @@ func (c *rosettaClientWithRawBlockApiImpl) GetBlockByHeight(
 	// TODO Evaluate if block and raw_block calls should be parallelized
 	block, err := c.rosettaClientImpl.GetBlockByHeight(ctx, tag, height, opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get rosetta block by height: %w", err)
+		return nil, fmt.Errorf("failed to get rosetta block by height: %w", err)
 	}
 
 	rawBlock, err := c.getRawBlockByHash(ctx, block.GetMetadata().Hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw block: %w", err)
+		return nil, fmt.Errorf("failed to get raw block: %w", err)
 	}
 	block.GetRosetta().RawBlock = rawBlock
 
@@ -467,12 +466,12 @@ func (c *rosettaClientWithRawBlockApiImpl) GetBlockByHash(
 	// TODO Evaluate if block and raw_block calls should be parallelized
 	block, err := c.rosettaClientImpl.GetBlockByHash(ctx, tag, height, hash, opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get rosetta block by hash: %w", err)
+		return nil, fmt.Errorf("failed to get rosetta block by hash: %w", err)
 	}
 
 	rawBlock, err := c.getRawBlockByHash(ctx, hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw block: %w", err)
+		return nil, fmt.Errorf("failed to get raw block: %w", err)
 	}
 	block.GetRosetta().RawBlock = rawBlock
 
@@ -487,7 +486,7 @@ func (c *rosettaClientWithRawBlockApiImpl) getRawBlockByHash(ctx context.Context
 
 	response, err := c.restClient.Call(ctx, rawBlockMethod, body)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to call restapi: %w", err)
+		return nil, fmt.Errorf("failed to call restapi: %w", err)
 	}
 
 	return response, nil
@@ -506,7 +505,7 @@ func (c *rosettaClientWithRawBlockApiImpl) getBlockByHashRequest(hash string) ([
 
 	body, err := json.Marshal(request)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create getBlockByHashRequest: %w", request, err)
+		return nil, fmt.Errorf("failed to create getBlockByHashRequest: %w", request, err)
 	}
 
 	return body, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -81,12 +81,12 @@ func NewPolygonRosettaParser(params internal.ParserParams, nativeParser internal
 func (p *polygonRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.RosettaBlock, error) {
 	nativeBlock, err := p.nativeParser.ParseBlock(ctx, rawBlock)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block into native format: %w", err)
+		return nil, fmt.Errorf("failed to parse block into native format: %w", err)
 	}
 
 	block := nativeBlock.GetEthereum()
 	if block == nil {
-		return nil, xerrors.New("failed to find polygon block")
+		return nil, errors.New("failed to find polygon block")
 	}
 
 	blockIdentifier := &rosetta.BlockIdentifier{
@@ -104,7 +104,7 @@ func (p *polygonRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 
 	transactions, err := p.getRosettaTransactions(block, rawBlock.GetEthereum(), nativeBlock.Tag, nativeBlock.Network)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse block transactions: %w", err)
 	}
 
 	if nativeBlock.Height == 0 {
@@ -115,7 +115,7 @@ func (p *polygonRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 
 		genesisTransactions, err := p.getGenesisTransactions(genesisAllocation)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to generate genesis transactions: %w", err)
+			return nil, fmt.Errorf("failed to generate genesis transactions: %w", err)
 		}
 		transactions = append(transactions, genesisTransactions...)
 	}
@@ -137,7 +137,7 @@ func (p *polygonRosettaParserImpl) getRosettaTransactions(block *api.EthereumBlo
 	// For backward compatibility in polygon-mainnet, since author data is not ingested For historical blocks with tag = 1
 	if (network == c3common.Network_NETWORK_POLYGON_MAINNET && blockTag > 1) || network == c3common.Network_NETWORK_POLYGON_TESTNET {
 		if err := json.Unmarshal(blobData.GetPolygon().GetAuthor(), &author); err != nil {
-			return nil, xerrors.Errorf("unexpected author: %w", err)
+			return nil, fmt.Errorf("unexpected author: %w", err)
 		}
 	}
 
@@ -156,7 +156,7 @@ func (p *polygonRosettaParserImpl) getRosettaTransactions(block *api.EthereumBlo
 func (p *polygonRosettaParserImpl) feeOps(transaction *api.EthereumTransaction, author string, block *api.EthereumBlock) ([]*rosetta.Operation, error) {
 	feeDetails, err := getFeeDetails(transaction, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to calculate polygon fee details: %w", err)
+		return nil, fmt.Errorf("failed to calculate polygon fee details: %w", err)
 	}
 
 	if feeDetails.feeAmount.Cmp(new(big.Int)) == 0 {
@@ -256,7 +256,7 @@ func (p *polygonRosettaParserImpl) tokenTransferOpsFn(transaction *api.EthereumT
 
 	var status string
 	if transaction.GetReceipt().GetOptionalStatus() == nil {
-		return nil, xerrors.Errorf("receipt status not exist for transaction=%v", transaction.GetHash())
+		return nil, fmt.Errorf("receipt status not exist for transaction=%v", transaction.GetHash())
 	}
 	if transaction.GetReceipt().GetStatus() == 1 {
 		status = opStatusSuccess
@@ -273,7 +273,7 @@ func (p *polygonRosettaParserImpl) tokenTransferOpsFn(transaction *api.EthereumT
 		// If value <= 0, skip to the next receiptLog. Otherwise, proceed to generate the debit + credit operations.
 		value, err := internal.BigInt(tokenTransfer.Value)
 		if err != nil {
-			return nil, xerrors.Errorf("unable to parse value of tokenTransfer %s due to %w", tokenTransfer.Value, err)
+			return nil, fmt.Errorf("unable to parse value of tokenTransfer %s due to %w", tokenTransfer.Value, err)
 		}
 		if value.Cmp(big.NewInt(0)) < 1 {
 			continue
@@ -282,19 +282,19 @@ func (p *polygonRosettaParserImpl) tokenTransferOpsFn(transaction *api.EthereumT
 		contractAddress := tokenTransfer.TokenAddress
 		_, err = internal.ChecksumAddress(contractAddress)
 		if err != nil {
-			return nil, xerrors.Errorf("%s is not a valid address", contractAddress)
+			return nil, fmt.Errorf("%s is not a valid address", contractAddress)
 		}
 
 		fromAddress := tokenTransfer.FromAddress
 		_, err = internal.ChecksumAddress(fromAddress)
 		if err != nil {
-			return nil, xerrors.Errorf("%s is not a valid address", fromAddress)
+			return nil, fmt.Errorf("%s is not a valid address", fromAddress)
 		}
 
 		toAddress := tokenTransfer.ToAddress
 		_, err = internal.ChecksumAddress(toAddress)
 		if err != nil {
-			return nil, xerrors.Errorf("%s is not a valid address", toAddress)
+			return nil, fmt.Errorf("%s is not a valid address", toAddress)
 		}
 
 		// Use default currency as there is no way to fetch currency based on contract address
@@ -302,7 +302,7 @@ func (p *polygonRosettaParserImpl) tokenTransferOpsFn(transaction *api.EthereumT
 			ContractAddressKey: contractAddress,
 		})
 		if err != nil {
-			return nil, xerrors.Errorf("failed to marshal currency metadata for contractAddress %v: %w", contractAddress, err)
+			return nil, fmt.Errorf("failed to marshal currency metadata for contractAddress %v: %w", contractAddress, err)
 		}
 		currency := &rosetta.Currency{
 			Symbol:   defaultERC20Symbol,
@@ -527,7 +527,7 @@ func (p *polygonRosettaParserImpl) getGenesisTransactions(allocations []*bootstr
 		address := allo.AccountIdentifier.Address
 		_, err := internal.ChecksumAddress(address)
 		if err != nil {
-			return nil, xerrors.Errorf("%s is not a valid address", address)
+			return nil, fmt.Errorf("%s is not a valid address", address)
 		}
 		addressLower := strings.ToLower(address)
 
@@ -577,7 +577,7 @@ func getDerivedBorTxHash(receiptKey []byte) string {
 // getAddressFromTopic returns an address from a given topic
 func getAddressFromTopic(topic string) (string, error) {
 	if len(topic) < topicLength {
-		return "", xerrors.Errorf("topic is too short: %v", topic)
+		return "", fmt.Errorf("topic is too short: %v", topic)
 	}
 
 	return prepend0x(topic[len(topic)-addressHexLength:]), nil
@@ -588,12 +588,12 @@ func getValueFromHex(hexStr string, length int) (*big.Int, error) {
 	strippedHex := strip0x(hexStr)
 
 	if len(strippedHex) < length {
-		return nil, xerrors.Errorf("value is too short: %v", hexStr)
+		return nil, fmt.Errorf("value is too short: %v", hexStr)
 	}
 
 	result, ok := big.NewInt(0).SetString(strippedHex[:length], 16)
 	if !ok {
-		return nil, xerrors.Errorf("invalid hex string: %v", hexStr)
+		return nil, fmt.Errorf("invalid hex string: %v", hexStr)
 	}
 
 	return result, nil

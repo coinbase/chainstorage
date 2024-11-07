@@ -10,7 +10,6 @@ import (
 	"go.temporal.io/sdk/client"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/aws"
 	blockchainModule "github.com/coinbase/chainstorage/internal/blockchain"
@@ -92,24 +91,24 @@ func init() {
 func startWorkflow() error {
 	workflowIdentity := workflow.GetWorkflowIdentify(workflowFlags.workflow)
 	if workflowIdentity == workflow.UnknownIdentity {
-		return xerrors.Errorf("invalid workflow: %v", workflowFlags.workflow)
+		return fmt.Errorf("invalid workflow: %v", workflowFlags.workflow)
 	}
 
 	app, executors, err := initApp()
 	if err != nil {
-		return xerrors.Errorf("failed to init app: %w", err)
+		return fmt.Errorf("failed to init app: %w", err)
 	}
 	defer app.Close()
 
 	ctx := context.Background()
 	workflowIdentityString, err := workflowIdentity.String()
 	if err != nil {
-		return xerrors.Errorf("error parsing workflowIdentity: %w", err)
+		return fmt.Errorf("error parsing workflowIdentity: %w", err)
 	}
 
 	req, err := workflowIdentity.UnmarshalJsonStringToRequest(workflowFlags.input)
 	if err != nil {
-		return xerrors.Errorf("error converting input flag to request: %w", err)
+		return fmt.Errorf("error converting input flag to request: %w", err)
 	}
 
 	if !confirmWorkflowOperation("start", workflowIdentityString, req) {
@@ -121,60 +120,60 @@ func startWorkflow() error {
 	case workflow.BackfillerIdentity:
 		request, ok := req.(workflow.BackfillerRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.Backfiller.Execute(ctx, &request)
 	case workflow.MonitorIdentity:
 		request, ok := req.(workflow.MonitorRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.Monitor.Execute(ctx, &request)
 	case workflow.PollerIdentity:
 		request, ok := req.(workflow.PollerRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.Poller.Execute(ctx, &request)
 	case workflow.StreamerIdentity:
 		request, ok := req.(workflow.StreamerRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.Streamer.Execute(ctx, &request)
 	case workflow.BenchmarkerIdentity:
 		request, ok := req.(workflow.BenchmarkerRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.Benchmarker.Execute(ctx, &request)
 	case workflow.CrossValidatorIdentity:
 		request, ok := req.(workflow.CrossValidatorRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.CrossValidator.Execute(ctx, &request)
 	case workflow.EventBackfillerIdentity:
 		request, ok := req.(workflow.EventBackfillerRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.EventBackfiller.Execute(ctx, &request)
 	case workflow.ReplicatorIdentity:
 		request, ok := req.(workflow.ReplicatorRequest)
 		if !ok {
-			return xerrors.Errorf("error converting to request type")
+			return fmt.Errorf("error converting to request type")
 		}
 		run, err = executors.Replicator.Execute(ctx, &request)
 	default:
-		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
+		return fmt.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}
 
 	if err != nil {
 		logger.Error("failed to start workflow",
 			zap.String("workflowIdentity", workflowIdentityString),
 		)
-		return xerrors.Errorf("failed to start workflow: %w", err)
+		return fmt.Errorf("failed to start workflow: %w", err)
 	}
 
 	workflowURL := getWorkflowURL(app, run)
@@ -192,12 +191,12 @@ func stopWorkflow() error {
 	var err error
 	workflowIdentity := workflow.GetWorkflowIdentify(workflowFlags.workflow)
 	if workflowIdentity == workflow.UnknownIdentity {
-		return xerrors.Errorf("invalid workflow: %v", workflowFlags.workflow)
+		return fmt.Errorf("invalid workflow: %v", workflowFlags.workflow)
 	}
 
 	app, executors, err := initApp()
 	if err != nil {
-		return xerrors.Errorf("failed to init app: %w", err)
+		return fmt.Errorf("failed to init app: %w", err)
 	}
 	defer app.Close()
 
@@ -206,7 +205,7 @@ func stopWorkflow() error {
 	} else {
 		workflowIdentityString, err = workflowIdentity.String()
 		if err != nil {
-			return xerrors.Errorf("error parsing workflowIdentity: %w", err)
+			return fmt.Errorf("error parsing workflowIdentity: %w", err)
 		}
 	}
 	if !confirmWorkflowOperation("stop", workflowIdentityString, nil) {
@@ -237,11 +236,11 @@ func stopWorkflow() error {
 	case workflow.ReplicatorIdentity:
 		err = executors.Replicator.StopWorkflow(ctx, workflowIdentityString, reason)
 	default:
-		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
+		return fmt.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}
 
 	if err != nil {
-		return xerrors.Errorf("failed to stop workflow for workflowID=%s: %w", workflowIdentityString, err)
+		return fmt.Errorf("failed to stop workflow for workflowID=%s: %w", workflowIdentityString, err)
 	}
 
 	logger.Info("stopped workflow",

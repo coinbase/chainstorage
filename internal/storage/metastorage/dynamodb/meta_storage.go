@@ -1,8 +1,9 @@
 package dynamodb
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws/session"
-	"golang.org/x/xerrors"
 
 	"go.uber.org/fx"
 
@@ -31,17 +32,17 @@ type (
 func NewMetaStorage(params Params) (internal.Result, error) {
 	blockStorage, err := newBlockStorage(params)
 	if err != nil {
-		return internal.Result{}, xerrors.Errorf("failed create new BlockStorage: %w", err)
+		return internal.Result{}, fmt.Errorf("failed create new BlockStorage: %w", err)
 	}
 
 	eventStorage, err := newEventStorage(params)
 	if err != nil {
-		return internal.Result{}, xerrors.Errorf("failed create new EventStorage: %w", err)
+		return internal.Result{}, fmt.Errorf("failed create new EventStorage: %w", err)
 	}
 
 	transactionStorage, err := newTransactionStorage(params)
 	if err != nil {
-		return internal.Result{}, xerrors.Errorf("failed create new TransactionStorage: %w", err)
+		return internal.Result{}, fmt.Errorf("failed create new TransactionStorage: %w", err)
 	}
 
 	metaStorage := &metaStorageImpl{

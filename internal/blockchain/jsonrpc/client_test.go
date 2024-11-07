@@ -3,6 +3,8 @@ package jsonrpc_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -12,7 +14,6 @@ import (
 
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	jsonrpcmocks "github.com/coinbase/chainstorage/internal/blockchain/jsonrpc/mocks"
@@ -114,7 +115,7 @@ func TestCall_HTTPError(t *testing.T) {
 	require.Contains(err.Error(), "endpoint=node_name")
 
 	var errHTTP *jsonrpc.HTTPError
-	require.True(xerrors.As(err, &errHTTP))
+	require.True(errors.As(err, &errHTTP))
 	require.Equal(400, errHTTP.Code)
 	require.Equal("an unexpected error occurred", errHTTP.Response)
 }
@@ -159,7 +160,7 @@ func TestCall_RPCError(t *testing.T) {
 	require.Contains(err.Error(), "endpoint=node_name")
 
 	var errRPC *jsonrpc.RPCError
-	require.True(xerrors.As(err, &errRPC))
+	require.True(errors.As(err, &errRPC))
 	require.Equal(8, errRPC.Code)
 	require.Equal("an unexpected error occurred", errRPC.Message)
 }
@@ -202,7 +203,7 @@ func TestCall_AllowsRPCError(t *testing.T) {
 	)
 	require.NoError(err)
 	var errRPC *jsonrpc.RPCError
-	require.True(xerrors.As(response.Error, &errRPC))
+	require.True(errors.As(response.Error, &errRPC))
 	require.Equal(8, errRPC.Code)
 	require.Equal("an unexpected error occurred", errRPC.Message)
 }
@@ -246,7 +247,7 @@ func TestCall_RPCError_StatusNotOK(t *testing.T) {
 	require.Nil(result)
 
 	var errRPC *jsonrpc.RPCError
-	require.True(xerrors.As(err, &errRPC))
+	require.True(errors.As(err, &errRPC))
 	require.Equal(8, errRPC.Code)
 	require.Equal("an unexpected error occurred", errRPC.Message)
 }
@@ -290,7 +291,7 @@ func TestCall_RPCError_TooManyRequests(t *testing.T) {
 	require.Nil(result)
 
 	var errRPC *jsonrpc.RPCError
-	require.True(xerrors.As(err, &errRPC))
+	require.True(errors.As(err, &errRPC))
 	require.Equal(429, errRPC.Code)
 	require.Equal("too many requests", errRPC.Message)
 }
@@ -379,7 +380,7 @@ func TestCall_RPCError_StatusNotOK_WithCustomizedAttempts(t *testing.T) {
 	require.Nil(result)
 
 	var errRPC *jsonrpc.RPCError
-	require.True(xerrors.As(err, &errRPC))
+	require.True(errors.As(err, &errRPC))
 	require.Equal(8, errRPC.Code)
 	require.Equal("an unexpected error occurred", errRPC.Message)
 }
@@ -394,7 +395,7 @@ func TestCall_URLError(t *testing.T) {
 	urlError := &url.Error{
 		Op:  "Post",
 		URL: "foo.com",
-		Err: xerrors.Errorf("a test error"),
+		Err: fmt.Errorf("a test error"),
 	}
 	httpClient.EXPECT().Do(gomock.Any()).Return(nil, urlError).Times(retry.DefaultMaxAttempts)
 
@@ -422,8 +423,8 @@ func TestCall_URLError(t *testing.T) {
 	require.Nil(result)
 
 	var uerr *url.Error
-	require.False(xerrors.As(err, &uerr))
-	errMsg := xerrors.Unwrap(err).Error()
+	require.False(errors.As(err, &uerr))
+	errMsg := errors.Unwrap(err).Error()
 	require.Contains(errMsg, "a test error")
 	require.NotContains(errMsg, "foo.com")
 }
@@ -525,7 +526,7 @@ func TestBatchCall_RPCError(t *testing.T) {
 	require.Error(err)
 
 	var errRPC *jsonrpc.RPCError
-	require.True(xerrors.As(err, &errRPC))
+	require.True(errors.As(err, &errRPC))
 	require.Equal(-3, errRPC.Code)
 	require.Equal("an unexpected error occurred", errRPC.Message)
 }
@@ -580,7 +581,7 @@ func TestBatchCall_AllowsRPCError(t *testing.T) {
 	require.Nil(responses[2].Error)
 
 	var errRPC *jsonrpc.RPCError
-	require.True(xerrors.As(responses[1].Error, &errRPC))
+	require.True(errors.As(responses[1].Error, &errRPC))
 	require.Equal(-3, errRPC.Code)
 	require.Equal("an unexpected error occurred", errRPC.Message)
 }
@@ -753,7 +754,7 @@ func TestBatchCall_URLError(t *testing.T) {
 	urlError := &url.Error{
 		Op:  "Post",
 		URL: "foo.com",
-		Err: xerrors.Errorf("a test error"),
+		Err: fmt.Errorf("a test error"),
 	}
 	httpClient.EXPECT().Do(gomock.Any()).Return(nil, urlError).Times(retry.DefaultMaxAttempts)
 
@@ -782,8 +783,8 @@ func TestBatchCall_URLError(t *testing.T) {
 	require.Error(err)
 
 	var uerr *url.Error
-	require.False(xerrors.As(err, &uerr))
-	errMsg := xerrors.Unwrap(err).Error()
+	require.False(errors.As(err, &uerr))
+	errMsg := errors.Unwrap(err).Error()
 	require.Contains(errMsg, "a test error")
 	require.NotContains(errMsg, "foo.com")
 }

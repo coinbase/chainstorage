@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -54,7 +54,7 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 		Env:        sdk.EnvProduction,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create session: %w", err)
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	ctx := manager.ServiceContext()
@@ -62,18 +62,18 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 
 	chainMetadata, err := client.GetChainMetadata(ctx, &api.GetChainMetadataRequest{})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain metadata: %w", err)
+		return nil, fmt.Errorf("failed to get chain metadata: %w", err)
 	}
 
 	irreversibleDistance := chainMetadata.IrreversibleDistance
 	backoffInterval, err := time.ParseDuration(chainMetadata.BlockTime)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block time: %w", err)
+		return nil, fmt.Errorf("failed to parse block time: %w", err)
 	}
 
 	latestHeight, err := client.GetLatestBlockWithTag(ctx, client.GetTag())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get latest block: %w", err)
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
 
 	// Checkpoint is typically persisted in the database.
@@ -106,7 +106,7 @@ func (w *Worker) Run() error {
 		startHeight := w.checkpoint
 		latestHeight, err := w.session.Client().GetLatestBlockWithTag(ctx, blockTag)
 		if err != nil {
-			return xerrors.Errorf("failed to get latest block: %w", err)
+			return fmt.Errorf("failed to get latest block: %w", err)
 		}
 
 		endHeight := latestHeight - w.irreversibleDistance
@@ -115,7 +115,7 @@ func (w *Worker) Run() error {
 		}
 
 		if err := w.processBatch(ctx, startHeight, endHeight); err != nil {
-			return xerrors.Errorf("failed to process batch [%v, %v): %w", startHeight, endHeight, err)
+			return fmt.Errorf("failed to process batch [%v, %v): %w", startHeight, endHeight, err)
 		}
 
 		// Checkpoint is typically persisted in the database.
@@ -144,14 +144,14 @@ func (w *Worker) processBatch(ctx context.Context, startHeight uint64, endHeight
 
 	blocks, err := w.session.Client().GetBlocksByRange(ctx, startHeight, endHeight)
 	if err != nil {
-		return xerrors.Errorf("failed to get blocks: %w", err)
+		return fmt.Errorf("failed to get blocks: %w", err)
 	}
 
 	parser := w.session.Parser()
 	for _, block := range blocks {
 		nativeBlock, err := parser.ParseNativeBlock(ctx, block)
 		if err != nil {
-			return xerrors.Errorf("failed to parse block {%+v}: %w", block.Metadata, err)
+			return fmt.Errorf("failed to parse block {%+v}: %w", block.Metadata, err)
 		}
 
 		ethereumBlock := nativeBlock.GetEthereum()

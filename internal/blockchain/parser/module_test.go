@@ -2,10 +2,10 @@ package parser
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -56,9 +56,9 @@ func TestParserNotImplemented(t *testing.T) {
 		_, err := parser.ParseRosettaBlock(context.Background(), block)
 		require.Error(err)
 		if cfg.Chain.Feature.RosettaParser {
-			require.False(xerrors.Is(err, internal.ErrNotImplemented), "'%v' should NOT be ErrNotImplemented", err.Error())
+			require.False(errors.Is(err, internal.ErrNotImplemented), "'%v' should NOT be ErrNotImplemented", err.Error())
 		} else {
-			require.True(xerrors.Is(err, internal.ErrNotImplemented), "'%v' should be ErrNotImplemented", err.Error())
+			require.True(errors.Is(err, internal.ErrNotImplemented), "'%v' should be ErrNotImplemented", err.Error())
 		}
 	})
 }

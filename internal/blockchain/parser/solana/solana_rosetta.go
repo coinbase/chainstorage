@@ -2,11 +2,11 @@ package solana
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -74,7 +74,7 @@ func NewSolanaRosettaParser(
 func (p *solanaRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.RosettaBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
-		return nil, xerrors.New("metadata not found")
+		return nil, errors.New("metadata not found")
 	}
 
 	if metadata.Skipped {
@@ -93,12 +93,12 @@ func (p *solanaRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api.
 
 	nativeBlock, err := p.nativeParser.ParseBlock(ctx, rawBlock)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block into native format: %w", err)
+		return nil, fmt.Errorf("failed to parse block into native format: %w", err)
 	}
 
 	block := nativeBlock.GetSolanaV2()
 	if block == nil {
-		return nil, xerrors.New("failed to find solana block")
+		return nil, errors.New("failed to find solana block")
 	}
 
 	blockIdentifier := &rosetta.BlockIdentifier{
@@ -113,12 +113,12 @@ func (p *solanaRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api.
 
 	transactions, err := p.getRosettaTransactions(block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse block transactions: %w", err)
 	}
 
 	rewardOps, err := p.parseRewards(block.GetRewards(), OpStatusSuccess, 0)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block rewards: %w", err)
+		return nil, fmt.Errorf("failed to parse block rewards: %w", err)
 	}
 
 	if len(rewardOps) != 0 {
@@ -154,7 +154,7 @@ func (p *solanaRosettaParserImpl) getRosettaTransactions(block *api.SolanaBlockV
 
 		feeOps, err := p.feeOps(tx, len(ops))
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse fee operations: %w", err)
+			return nil, fmt.Errorf("failed to parse fee operations: %w", err)
 		}
 		ops = append(ops, feeOps...)
 
@@ -164,20 +164,20 @@ func (p *solanaRosettaParserImpl) getRosettaTransactions(block *api.SolanaBlockV
 		if len(rewards) > 0 {
 			rewardOps, err = p.parseRewards(rewards, status, len(ops))
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse rewards for tx=%v: %w", tx.GetTransactionId(), err)
+				return nil, fmt.Errorf("failed to parse rewards for tx=%v: %w", tx.GetTransactionId(), err)
 			}
 			ops = append(ops, rewardOps...)
 		}
 
 		parseResult, err := p.parseInstructionsForTransaction(tx, status, len(ops))
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse instructions: %w", err)
+			return nil, fmt.Errorf("failed to parse instructions: %w", err)
 		}
 
 		if parseResult.containsThirdPartyPrograms {
 			thirdPartyOps, err := p.processThirdPartyTransaction(tx, status, ops)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to process third party transaction: %w", err)
+				return nil, fmt.Errorf("failed to process third party transaction: %w", err)
 			}
 
 			// ops entirely derived from processThirdPartyTransaction
@@ -193,7 +193,7 @@ func (p *solanaRosettaParserImpl) getRosettaTransactions(block *api.SolanaBlockV
 			})
 
 			if err != nil {
-				return nil, xerrors.Errorf("failed to convert metadata: %w", err)
+				return nil, fmt.Errorf("failed to convert metadata: %w", err)
 			}
 		}
 
@@ -263,7 +263,7 @@ func (p *solanaRosettaParserImpl) parseInstructionsForTransaction(tx *api.Solana
 	for _, instruction := range instructions {
 		parseResult, err := p.parseInstruction(instruction, tx, status, startIndex+len(ops))
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse instruction=%+v for tx=%s: %w", instruction, tx.TransactionId, err)
+			return nil, fmt.Errorf("failed to parse instruction=%+v for tx=%s: %w", instruction, tx.TransactionId, err)
 		}
 
 		if parseResult.containsThirdPartyPrograms {
@@ -280,7 +280,7 @@ func (p *solanaRosettaParserImpl) parseInstructionsForTransaction(tx *api.Solana
 		for _, instruction := range innerInstruction.GetInstructions() {
 			parseResult, err := p.parseInstruction(instruction, tx, status, startIndex+len(ops))
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse innerInstruction=%v for tx=%s: %w", instruction, tx.TransactionId, err)
+				return nil, fmt.Errorf("failed to parse innerInstruction=%v for tx=%s: %w", instruction, tx.TransactionId, err)
 			}
 
 			if parseResult.containsThirdPartyPrograms {
@@ -307,12 +307,12 @@ func (p *solanaRosettaParserImpl) processThirdPartyTransaction(
 ) ([]*rosetta.Operation, error) {
 	ops, err := p.processBalancesForThirdPartyProgram(tx, status, ops)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to process balance transfer: %w", err)
+		return nil, fmt.Errorf("failed to process balance transfer: %w", err)
 	}
 
 	ops, err = p.processTokenBalancesForThirdPartyProgram(tx, status, ops)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to process token balance transfer: %w", err)
+		return nil, fmt.Errorf("failed to process token balance transfer: %w", err)
 	}
 	return ops, nil
 }
@@ -330,7 +330,7 @@ func (p *solanaRosettaParserImpl) processBalancesForThirdPartyProgram(
 	}
 
 	if len(accountKeys) != len(preBalances) || len(accountKeys) != len(postBalances) {
-		return nil, xerrors.Errorf("unexpected lengths of accountKeys in tx=%v", tx.GetTransactionId())
+		return nil, fmt.Errorf("unexpected lengths of accountKeys in tx=%v", tx.GetTransactionId())
 	}
 
 	// convert to bigInt for easy comparison between amount value and pre/postBalances
@@ -356,12 +356,12 @@ func (p *solanaRosettaParserImpl) processBalancesForThirdPartyProgram(
 		account := op.Account.Address
 		accountIndex, ok := accountKeyIndexMap[account]
 		if !ok {
-			return nil, xerrors.Errorf("address=%s not found in account map", account)
+			return nil, fmt.Errorf("address=%s not found in account map", account)
 		}
 
 		amount, ok := new(big.Int).SetString(op.Amount.Value, 10)
 		if !ok {
-			return nil, xerrors.Errorf("failed to convert amount from string=%s", op.Amount.Value)
+			return nil, fmt.Errorf("failed to convert amount from string=%s", op.Amount.Value)
 		}
 		observedBalances[accountIndex].Add(observedBalances[accountIndex], amount)
 	}
@@ -380,7 +380,7 @@ func (p *solanaRosettaParserImpl) processBalancesForThirdPartyProgram(
 			instructionTypeMetadataKey: instructionTypeUnknown,
 		})
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert metadata: %w", err)
+			return nil, fmt.Errorf("failed to convert metadata: %w", err)
 		}
 
 		op := &rosetta.Operation{
@@ -416,7 +416,7 @@ func (p *solanaRosettaParserImpl) processTokenBalancesForThirdPartyProgram(
 	for _, preTokenBalance := range preTokenBalances {
 		preAmount, ok := new(big.Int).SetString(preTokenBalance.TokenAmount.Amount, 10)
 		if !ok {
-			return nil, xerrors.Errorf("failed to parse balance=%+v", preTokenBalance)
+			return nil, fmt.Errorf("failed to parse balance=%+v", preTokenBalance)
 		}
 
 		var postAmount *big.Int
@@ -428,7 +428,7 @@ func (p *solanaRosettaParserImpl) processTokenBalancesForThirdPartyProgram(
 			// transfer
 			postAmount, ok = new(big.Int).SetString(postTokenBalance.TokenAmount.Amount, 10)
 			if !ok {
-				return nil, xerrors.Errorf("failed to parse TokenAmount=%+v", postTokenBalance.TokenAmount.Amount)
+				return nil, fmt.Errorf("failed to parse TokenAmount=%+v", postTokenBalance.TokenAmount.Amount)
 			}
 		}
 
@@ -439,7 +439,7 @@ func (p *solanaRosettaParserImpl) processTokenBalancesForThirdPartyProgram(
 		}
 
 		if postTokenBalance != nil && postTokenBalance.TokenAmount.Decimals != preTokenBalance.TokenAmount.Decimals {
-			return nil, xerrors.Errorf("token amount decimals do not match. preTokenBalance.Decimals=%d, postTokenBalance.Decimals=%d",
+			return nil, fmt.Errorf("token amount decimals do not match. preTokenBalance.Decimals=%d, postTokenBalance.Decimals=%d",
 				preTokenBalance.TokenAmount.Decimals,
 				postTokenBalance.TokenAmount.Decimals,
 			)
@@ -447,7 +447,7 @@ func (p *solanaRosettaParserImpl) processTokenBalancesForThirdPartyProgram(
 
 		transferOp, err := p.tokenTransferOp(preTokenBalance, accountKeys, new(big.Int).Sub(postAmount, preAmount), status, len(ops))
 		if err != nil {
-			return nil, xerrors.Errorf("failed to generate token transfer op for balance=%+v: %w", preTokenBalance, err)
+			return nil, fmt.Errorf("failed to generate token transfer op for balance=%+v: %w", preTokenBalance, err)
 		}
 		ops = append(ops, transferOp)
 	}
@@ -457,7 +457,7 @@ func (p *solanaRosettaParserImpl) processTokenBalancesForThirdPartyProgram(
 	for _, postTokenBalance := range postTokenBalances {
 		postAmount, ok := new(big.Int).SetString(postTokenBalance.TokenAmount.Amount, 10)
 		if !ok {
-			return nil, xerrors.Errorf("failed to parse balance=%+v", postTokenBalance)
+			return nil, fmt.Errorf("failed to parse balance=%+v", postTokenBalance)
 		}
 
 		_, ok = preTokenBalanceMap[makeTokenBalanceLookUpKey(postTokenBalance)]
@@ -468,7 +468,7 @@ func (p *solanaRosettaParserImpl) processTokenBalancesForThirdPartyProgram(
 
 		transferOp, err := p.tokenTransferOp(postTokenBalance, accountKeys, postAmount, status, len(ops))
 		if err != nil {
-			return nil, xerrors.Errorf("failed to generate token transfer op for balance=%+v: %w", postTokenBalance, err)
+			return nil, fmt.Errorf("failed to generate token transfer op for balance=%+v: %w", postTokenBalance, err)
 		}
 		ops = append(ops, transferOp)
 	}
@@ -498,7 +498,7 @@ func (p *solanaRosettaParserImpl) parseInstruction(
 	}
 
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse instruction=%+v: %w", instruction, err)
+		return nil, fmt.Errorf("failed to parse instruction=%+v: %w", instruction, err)
 	}
 
 	if parseResult.containsThirdPartyPrograms {
@@ -547,7 +547,7 @@ func (p *solanaRosettaParserImpl) parseStakeProgram(
 
 	ops, err = p.transferOps(source, destination, status, lamports, startIndex, instructionType.String())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse instruction=%v: %w", instructionType, err)
+		return nil, fmt.Errorf("failed to parse instruction=%v: %w", instructionType, err)
 	}
 
 	return &parseInstructionResult{
@@ -582,7 +582,7 @@ func (p *solanaRosettaParserImpl) parseVoteProgram(
 
 	ops, err = p.transferOps(source, destination, status, lamports, startIndex, instructionType.String())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse instruction=%v: %w", instructionType, err)
+		return nil, fmt.Errorf("failed to parse instruction=%v: %w", instructionType, err)
 	}
 
 	return &parseInstructionResult{
@@ -624,7 +624,7 @@ func (p *solanaRosettaParserImpl) parseSystemProgram(
 
 	ops, err = p.transferOps(source, destination, status, lamports, startIndex, instructionType.String())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse instruction=%v: %w", instructionType, err)
+		return nil, fmt.Errorf("failed to parse instruction=%v: %w", instructionType, err)
 	}
 	return &parseInstructionResult{ops: ops}, nil
 }
@@ -636,7 +636,7 @@ func (p *solanaRosettaParserImpl) feeOps(transaction *api.SolanaTransactionV2, s
 
 	accounts := transaction.GetPayload().GetMessage().GetAccountKeys()
 	if len(accounts) == 0 {
-		return nil, xerrors.Errorf("accountKeys are empty in transactionId=%v", transaction.TransactionId)
+		return nil, fmt.Errorf("accountKeys are empty in transactionId=%v", transaction.TransactionId)
 	}
 
 	// the first account always pays the fee
@@ -668,7 +668,7 @@ func (p *solanaRosettaParserImpl) transferOps(fromAccount string, toAccount stri
 		instructionTypeMetadataKey: instructionType,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal metadata for instructionType %v: %w", instructionType, err)
+		return nil, fmt.Errorf("failed to marshal metadata for instructionType %v: %w", instructionType, err)
 	}
 
 	return []*rosetta.Operation{
@@ -714,21 +714,21 @@ func (p *solanaRosettaParserImpl) tokenTransferOp(
 ) (*rosetta.Operation, error) {
 	address, err := p.getTokenTransferOpAddress(balance, accountKeys)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get address for token transfer: %w", err)
+		return nil, fmt.Errorf("failed to get address for token transfer: %w", err)
 	}
 
 	amountMetadata, err := rosetta.FromSDKMetadata(map[string]any{
 		ContractAddressAmountMetadataKey: balance.Mint,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal currency metadata for contractAddress %v: %w", balance.Mint, err)
+		return nil, fmt.Errorf("failed to marshal currency metadata for contractAddress %v: %w", balance.Mint, err)
 	}
 
 	metadata, err := rosetta.FromSDKMetadata(map[string]any{
 		instructionTypeMetadataKey: instructionTypeUnknown,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal metadata for instructionType %v: %w", instructionTypeUnknown, err)
+		return nil, fmt.Errorf("failed to marshal metadata for instructionType %v: %w", instructionTypeUnknown, err)
 	}
 
 	return &rosetta.Operation{
@@ -770,12 +770,12 @@ func (p *solanaRosettaParserImpl) getTokenTransferOpAddress(balance *api.SolanaT
 
 	accountIndex := balance.AccountIndex
 	if accountIndex >= uint64(len(accountKeys)) || accountIndex < 0 {
-		return "", xerrors.Errorf("invalid account index in balance=%+v, len(accountKeys)=%d", balance, len(accountKeys))
+		return "", fmt.Errorf("invalid account index in balance=%+v, len(accountKeys)=%d", balance, len(accountKeys))
 	}
 
 	tokenAccount := accountKeys[accountIndex].GetPubkey()
 	if len(tokenAccount) == 0 {
-		return "", xerrors.New("both owner and token account are empty")
+		return "", errors.New("both owner and token account are empty")
 	}
 
 	return tokenAccount, nil

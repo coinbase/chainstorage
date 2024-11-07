@@ -3,6 +3,8 @@ package sqs
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -10,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq/internal"
@@ -79,12 +80,12 @@ func New(params DLQParams) (DLQ, error) {
 	}
 	if params.Config.AWS.IsLocalStack {
 		if err := impl.resetLocalResources(); err != nil {
-			return nil, xerrors.Errorf("failed to reset local resources: %w", err)
+			return nil, fmt.Errorf("failed to reset local resources: %w", err)
 		}
 	}
 
 	if err := impl.initQueueURL(); err != nil {
-		return nil, xerrors.Errorf("failed to init queue url: %w", err)
+		return nil, fmt.Errorf("failed to init queue url: %w", err)
 	}
 	return impl, nil
 }
@@ -93,7 +94,7 @@ func (q *dlqImpl) SendMessage(ctx context.Context, message *Message) error {
 	return q.instrumentSendMessage.Instrument(ctx, func(ctx context.Context) error {
 		body, err := json.Marshal(message.Data)
 		if err != nil {
-			return xerrors.Errorf("failed to marshal body: %w", err)
+			return fmt.Errorf("failed to marshal body: %w", err)
 		}
 		messageBody := string(body)
 
@@ -110,7 +111,7 @@ func (q *dlqImpl) SendMessage(ctx context.Context, message *Message) error {
 		}
 
 		if _, err := q.client.SendMessageWithContext(ctx, input); err != nil {
-			return xerrors.Errorf("failed to send message: %w", err)
+			return fmt.Errorf("failed to send message: %w", err)
 		}
 
 		q.logger.Info(
@@ -126,7 +127,7 @@ func (q *dlqImpl) ResendMessage(ctx context.Context, message *Message) error {
 	return q.instrumentResendMessage.Instrument(ctx, func(ctx context.Context) error {
 		body, err := json.Marshal(message.Data)
 		if err != nil {
-			return xerrors.Errorf("failed to marshal body: %w", err)
+			return fmt.Errorf("failed to marshal body: %w", err)
 		}
 		messageBody := string(body)
 
@@ -149,7 +150,7 @@ func (q *dlqImpl) ResendMessage(ctx context.Context, message *Message) error {
 		}
 
 		if _, err := q.client.SendMessageWithContext(ctx, input); err != nil {
-			return xerrors.Errorf("failed to send message: %w", err)
+			return fmt.Errorf("failed to send message: %w", err)
 		}
 
 		// Delete the original message.
@@ -157,7 +158,7 @@ func (q *dlqImpl) ResendMessage(ctx context.Context, message *Message) error {
 			QueueUrl:      pointer.Ref(q.queueURL),
 			ReceiptHandle: pointer.Ref(message.ReceiptHandle),
 		}); err != nil {
-			return xerrors.Errorf("failed to delete message: %w", err)
+			return fmt.Errorf("failed to delete message: %w", err)
 		}
 
 		q.logger.Info(
@@ -187,7 +188,7 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 
 		output, err := q.client.ReceiveMessageWithContext(ctx, input)
 		if err != nil {
-			return xerrors.Errorf("failed to receive message: %w", err)
+			return fmt.Errorf("failed to receive message: %w", err)
 		}
 
 		numMessages := len(output.Messages)
@@ -196,7 +197,7 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		}
 
 		if numMessages != 1 {
-			return xerrors.Errorf("received more messages than expected: %v", numMessages)
+			return fmt.Errorf("received more messages than expected: %v", numMessages)
 		}
 
 		outputMessage := output.Messages[0]
@@ -205,13 +206,13 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		sentTimestampAttribute := pointer.Deref(outputMessage.Attributes[sqs.MessageSystemAttributeNameSentTimestamp])
 		sentTimestampEpoch, err := strconv.ParseInt(sentTimestampAttribute, 10, 64)
 		if err != nil {
-			return xerrors.Errorf("failed to parse sent timestamp: %v", sentTimestampAttribute)
+			return fmt.Errorf("failed to parse sent timestamp: %v", sentTimestampAttribute)
 		}
 		sentTimestamp := time.Unix(sentTimestampEpoch/1000, 0)
 
 		topicAttribute := outputMessage.MessageAttributes[topicAttributeName]
 		if topicAttribute == nil {
-			return xerrors.Errorf("topic not found: %v", outputMessage)
+			return fmt.Errorf("topic not found: %v", outputMessage)
 		}
 		topic := pointer.Deref(topicAttribute.StringValue)
 
@@ -235,7 +236,7 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		if data != nil {
 			body := []byte(pointer.Deref(outputMessage.Body))
 			if err := json.Unmarshal(body, data); err != nil {
-				return xerrors.Errorf("failed to unmarshal message: %w", err)
+				return fmt.Errorf("failed to unmarshal message: %w", err)
 			}
 		}
 
@@ -267,7 +268,7 @@ func (q *dlqImpl) DeleteMessage(ctx context.Context, message *Message) error {
 			QueueUrl:      pointer.Ref(q.queueURL),
 			ReceiptHandle: pointer.Ref(message.ReceiptHandle),
 		}); err != nil {
-			return xerrors.Errorf("failed to delete message: %w", err)
+			return fmt.Errorf("failed to delete message: %w", err)
 		}
 
 		q.logger.Info(
@@ -290,12 +291,12 @@ func (q *dlqImpl) initQueueURL() error {
 
 	output, err := q.client.GetQueueUrl(queueURLInput)
 	if err != nil {
-		return xerrors.Errorf("failed to get queue url (name=%v): %w", q.config.AWS.DLQ.Name, err)
+		return fmt.Errorf("failed to get queue url (name=%v): %w", q.config.AWS.DLQ.Name, err)
 	}
 
 	queueURL := pointer.Deref(output.QueueUrl)
 	if queueURL == "" {
-		return xerrors.New("empty queue url")
+		return errors.New("empty queue url")
 	}
 
 	q.queueURL = queueURL

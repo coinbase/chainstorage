@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -16,7 +17,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/config"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
@@ -532,17 +532,17 @@ func New(opts ...ConfigOption) (*Config, error) {
 	// Get "blockchain", "network" "env"
 	configOpts, err := getConfigOptions(configName, opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get config options %w", err)
+		return nil, fmt.Errorf("failed to get config options %w", err)
 	}
 
 	if err := validate.Struct(configOpts); err != nil {
-		return nil, xerrors.Errorf("failed to validate config options: %w", err)
+		return nil, fmt.Errorf("failed to validate config options: %w", err)
 	}
 
 	// Get data in base.yml for the target blockchain-network-env
 	configReader, err := getConfigData(configOpts.Namespace, EnvBase, configOpts.Blockchain, configOpts.Network, configOpts.Sidechain)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to locate config file: %w", err)
+		return nil, fmt.Errorf("failed to locate config file: %w", err)
 	}
 
 	cfg := Config{
@@ -572,17 +572,17 @@ func New(opts ...ConfigOption) (*Config, error) {
 
 	// Read the data in base.yml
 	if err := v.ReadConfig(configReader); err != nil {
-		return nil, xerrors.Errorf("failed to read config: %w", err)
+		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
 	// Merge in the env-specific config, such as development.yml
 	if err := mergeInConfig(v, configOpts, configOpts.Env); err != nil {
-		return nil, xerrors.Errorf("failed to merge in %v config: %w", configOpts.Env, err)
+		return nil, fmt.Errorf("failed to merge in %v config: %w", configOpts.Env, err)
 	}
 
 	// Merge in .secrets.yml. Note that this is a no-op for development and production env.
 	if err := mergeInConfig(v, configOpts, envSecrets); err != nil {
-		return nil, xerrors.Errorf("failed to merge in %v config: %w", envSecrets, err)
+		return nil, fmt.Errorf("failed to merge in %v config: %w", envSecrets, err)
 	}
 
 	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
@@ -597,24 +597,24 @@ func New(opts ...ConfigOption) (*Config, error) {
 		stringToCompressionHookFunc(),
 		stringToSidechainHookFunc(),
 	))); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal config: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	cfg.setDerivedConfigs(reflect.ValueOf(&cfg))
 
 	if err := validate.Struct(&cfg); err != nil {
-		return nil, xerrors.Errorf("failed to validate config: %w", err)
+		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 
 	if cfg.Chain.Blockchain != common.Blockchain_BLOCKCHAIN_ETHEREUM || cfg.Chain.Network != common.Network_NETWORK_ETHEREUM_MAINNET {
 		// Zero-value blockTag is reserved as an alias of the stable blockTag.
 		// Other than ethereum/mainnet (whose tags actually started from zero), do not allow zero-value blockTag.
 		if cfg.Chain.BlockTag.Stable == 0 {
-			return nil, xerrors.New("stable block tag cannot be zero")
+			return nil, errors.New("stable block tag cannot be zero")
 		}
 
 		if cfg.Chain.BlockTag.Latest == 0 {
-			return nil, xerrors.New("latest block tag cannot be zero")
+			return nil, errors.New("latest block tag cannot be zero")
 		}
 	}
 
@@ -652,7 +652,7 @@ func mergeInConfig(v *viper.Viper, configOpts *configOptions, env Env) error {
 	if configReader, err := getConfigData(configOpts.Namespace, env, configOpts.Blockchain, configOpts.Network, configOpts.Sidechain); err == nil {
 		v.SetConfigName(string(env))
 		if err := v.MergeConfig(configReader); err != nil {
-			return xerrors.Errorf("failed to merge config %v: %w", env, err)
+			return fmt.Errorf("failed to merge config %v: %w", env, err)
 		}
 	}
 	return nil
@@ -829,7 +829,7 @@ func getConfigOptions(configName string, opts ...ConfigOption) (*configOptions, 
 	if configOpts.Blockchain == common.Blockchain_BLOCKCHAIN_UNKNOWN && configOpts.Network == common.Network_NETWORK_UNKNOWN {
 		blockchain, network, sidechain, err := ParseConfigName(configName)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse config name: %w", err)
+			return nil, fmt.Errorf("failed to parse config name: %w", err)
 		}
 
 		configOpts.Blockchain = blockchain
@@ -846,26 +846,26 @@ func ParseConfigName(configName string) (common.Blockchain, common.Network, api.
 
 	splitString := strings.Split(configName, "_")
 	if len(splitString) < 2 || len(splitString) > 3 {
-		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("config name is invalid: %v", configName)
+		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, fmt.Errorf("config name is invalid: %v", configName)
 	}
 
 	blockchainName := splitString[0]
 	blockchain, err := utils.ParseBlockchain(blockchainName)
 	if err != nil {
-		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse blockchain from config name %v: %w", configName, err)
+		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, fmt.Errorf("failed to parse blockchain from config name %v: %w", configName, err)
 	}
 
 	networkName := fmt.Sprintf("%v_%v", splitString[0], splitString[1])
 	network, err := utils.ParseNetwork(networkName)
 	if err != nil {
-		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse network from config name %v: %w", configName, err)
+		return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, fmt.Errorf("failed to parse network from config name %v: %w", configName, err)
 	}
 
 	if len(splitString) == 3 {
 		sidechainName := fmt.Sprintf("%v_%v_%v", splitString[0], splitString[1], splitString[2])
 		sidechain, err := utils.ParseSidechain(sidechainName)
 		if err != nil {
-			return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse sidechain from config name %v: %w", configName, err)
+			return common.Blockchain_BLOCKCHAIN_UNKNOWN, common.Network_NETWORK_UNKNOWN, api.SideChain_SIDECHAIN_NONE, fmt.Errorf("failed to parse sidechain from config name %v: %w", configName, err)
 		}
 
 		return blockchain, network, sidechain, nil
@@ -887,7 +887,7 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 		if len(configRoot) == 0 {
 			_, filename, _, ok := runtime.Caller(0)
 			if !ok {
-				return nil, xerrors.Errorf("failed to recover the filename information")
+				return nil, fmt.Errorf("failed to recover the filename information")
 			}
 			rootDir := strings.TrimSuffix(filename, CurrentFileName)
 			configRoot = fmt.Sprintf("%v/config", rootDir)
@@ -898,7 +898,7 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 		}
 		reader, err := os.Open(configPath)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to read config file %v: %w", configPath, err)
+			return nil, fmt.Errorf("failed to read config file %v: %w", configPath, err)
 		}
 		return reader, nil
 	}
@@ -916,7 +916,7 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 	if len(configPath) > 0 {
 		reader, err := os.Open(configPath)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to read config file %v: %w", configPath, err)
+			return nil, fmt.Errorf("failed to read config file %v: %w", configPath, err)
 		}
 		return reader, nil
 	}
@@ -929,7 +929,7 @@ func getConfigData(namespace string, env Env, blockchain common.Blockchain, netw
 
 	data, err := config.Store.ReadFile(configPath)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to read config file %v: %w", configPath, err)
+		return nil, fmt.Errorf("failed to read config file %v: %w", configPath, err)
 	}
 	return bytes.NewBuffer(data), nil
 }
@@ -956,7 +956,7 @@ func stringToBlobStorageTypeHookFunc() mapstructure.DecodeHookFunc {
 
 		v, ok := BlobStorageType_value[data.(string)]
 		if !ok {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"invalid blob storage type: %v, possible values are: %v",
 				data, strings.Join(keysWithoutUnspecified(BlobStorageType_value), ", "))
 		}
@@ -977,7 +977,7 @@ func stringToMetaStorageTypeHookFunc() mapstructure.DecodeHookFunc {
 
 		v, ok := MetaStorageType_value[data.(string)]
 		if !ok {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"invalid blob storage type: %v, possible values are: %v",
 				data, strings.Join(keysWithoutUnspecified(MetaStorageType_value), ", "))
 		}
@@ -998,7 +998,7 @@ func stringToDLQTypeHookFunc() mapstructure.DecodeHookFunc {
 
 		v, ok := DLQType_value[data.(string)]
 		if !ok {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"invalid dlq type: %v, possible values are: %v",
 				data, strings.Join(keysWithoutUnspecified(DLQType_value), ", "))
 		}
@@ -1074,7 +1074,7 @@ func (f *FunctionalTestConfig) UnmarshalText(text []byte) error {
 
 	err := json.Unmarshal(text, &ft)
 	if err != nil {
-		return xerrors.Errorf("failed to parse FunctionalTestConfig JSON: %w", err)
+		return fmt.Errorf("failed to parse FunctionalTestConfig JSON: %w", err)
 	}
 	f.SkipFunctionalTest = ft.SkipFunctionalTest
 
@@ -1115,14 +1115,14 @@ func (e *EndpointGroup) UnmarshalText(text []byte) error {
 	var eg endpointGroup
 	err := json.Unmarshal(text, &eg)
 	if err != nil {
-		return xerrors.Errorf("failed to parse EndpointGroup JSON: %w", err)
+		return fmt.Errorf("failed to parse EndpointGroup JSON: %w", err)
 	}
 
 	if len(eg.Endpoints) == 0 {
-		return xerrors.New("endpoints is empty")
+		return errors.New("endpoints is empty")
 	}
 	if eg.UseFailover && len(eg.EndpointsFailover) == 0 {
-		return xerrors.New("failover endpoints is empty")
+		return errors.New("failover endpoints is empty")
 	}
 
 	e.Endpoints = eg.Endpoints
@@ -1132,20 +1132,20 @@ func (e *EndpointGroup) UnmarshalText(text []byte) error {
 	e.EndpointConfigFailover = eg.EndpointConfigFailover
 
 	if err := e.EndpointConfig.StickySession.validateStickySession(); err != nil {
-		return xerrors.Errorf("invalid sticky session config for the primary endpoint group: %w", err)
+		return fmt.Errorf("invalid sticky session config for the primary endpoint group: %w", err)
 	}
 
 	if err := e.EndpointConfigFailover.StickySession.validateStickySession(); err != nil {
-		return xerrors.Errorf("invalid sticky session config for the failover endpoint group: %w", err)
+		return fmt.Errorf("invalid sticky session config for the failover endpoint group: %w", err)
 	}
 
 	for _, endpoints := range [][]Endpoint{e.Endpoints, e.EndpointsFailover} {
 		for _, endpoint := range endpoints {
 			if endpoint.Name == "" {
-				return xerrors.New("empty endpoint.Name")
+				return errors.New("empty endpoint.Name")
 			}
 			if endpoint.Url == "" {
-				return xerrors.New("empty endpoint.URL")
+				return errors.New("empty endpoint.URL")
 			}
 		}
 	}
@@ -1154,7 +1154,7 @@ func (e *EndpointGroup) UnmarshalText(text []byte) error {
 
 func (e *StickySessionConfig) validateStickySession() error {
 	if e.enabled() > 1 {
-		return xerrors.New("only one sticky session type can be supported")
+		return errors.New("only one sticky session type can be supported")
 	}
 	return nil
 }
@@ -1266,15 +1266,15 @@ func (c *AuthConfig) UnmarshalText(text []byte) error {
 	var tmp authConfig
 	err := json.Unmarshal(text, &tmp)
 	if err != nil {
-		return xerrors.Errorf("failed to parse AuthConfig: %w", err)
+		return fmt.Errorf("failed to parse AuthConfig: %w", err)
 	}
 
 	for _, client := range tmp.Clients {
 		if client.ClientID == "" {
-			return xerrors.New("empty client_id")
+			return errors.New("empty client_id")
 		}
 		if client.Token == "" {
-			return xerrors.New("empty token")
+			return errors.New("empty token")
 		}
 	}
 

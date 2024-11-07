@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/utils/finalizer"
@@ -109,22 +109,22 @@ const (
 func New(params ClientParams) (ClientResult, error) {
 	master, err := newClient(params, params.Master)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create master client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create master client: %w", err)
 	}
 
 	slave, err := newClient(params, params.Slave)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create slave client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create slave client: %w", err)
 	}
 
 	validator, err := newClient(params, params.Validator)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create validator client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create validator client: %w", err)
 	}
 
 	consensus, err := newClient(params, params.Consensus)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create consensus client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create consensus client: %w", err)
 	}
 
 	return ClientResult{
@@ -175,7 +175,7 @@ func (c *clientImpl) Call(ctx context.Context, method *RequestMethod, params Par
 
 	endpoint, err := c.endpointProvider.GetEndpoint(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get endpoint for request: %w", err)
+		return nil, fmt.Errorf("failed to get endpoint for request: %w", err)
 	}
 
 	endpoint.IncRequestsCounter(1)
@@ -191,7 +191,7 @@ func (c *clientImpl) Call(ctx context.Context, method *RequestMethod, params Par
 	if err := c.wrap(ctx, method.Name, endpoint.Name, []Params{params}, func(ctx context.Context) error {
 		response = new(Response)
 		if err := c.makeHTTPRequest(ctx, method.Timeout, endpoint, request, response); err != nil {
-			return xerrors.Errorf("failed to make http request (method=%v, params=%v, endpoint=%v): %w", method, params, endpoint.Name, err)
+			return fmt.Errorf("failed to make http request (method=%v, params=%v, endpoint=%v): %w", method, params, endpoint.Name, err)
 		}
 
 		return nil
@@ -200,7 +200,7 @@ func (c *clientImpl) Call(ctx context.Context, method *RequestMethod, params Par
 	}
 
 	if response.Error != nil && !options.allowsRPCError {
-		return nil, xerrors.Errorf("received rpc error (method=%v, params=%v, endpoint=%v): %w", method, params, endpoint.Name, response.Error)
+		return nil, fmt.Errorf("received rpc error (method=%v, params=%v, endpoint=%v): %w", method, params, endpoint.Name, response.Error)
 	}
 
 	return response, nil
@@ -214,7 +214,7 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 
 	endpoint, err := c.endpointProvider.GetEndpoint(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get endpoint for request: %w", err)
+		return nil, fmt.Errorf("failed to get endpoint for request: %w", err)
 	}
 
 	endpoint.IncRequestsCounter(int64(len(batchParams)))
@@ -233,14 +233,14 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 	if err := c.wrap(ctx, method.Name, endpoint.Name, batchParams, func(ctx context.Context) error {
 		var batchResponses []Response
 		if err := c.makeHTTPRequest(ctx, method.Timeout, endpoint, batchRequests, &batchResponses); err != nil {
-			return xerrors.Errorf(
+			return fmt.Errorf(
 				"failed to make http request (method=%v, endpoint=%v): %w",
 				method, endpoint.Name, err,
 			)
 		}
 
 		if len(batchParams) != len(batchResponses) {
-			return xerrors.Errorf(
+			return fmt.Errorf(
 				"received wrong number of responses (method=%v, endpoint=%v, want=%v, got=%v)",
 				method, endpoint.Name, len(batchParams), len(batchResponses),
 			)
@@ -253,7 +253,7 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 
 			id := int(response.ID)
 			if id >= len(finalBatchResponses) {
-				return xerrors.Errorf(
+				return fmt.Errorf(
 					"received unexpected response id (method=%v, endpoint=%v, id=%v)",
 					method, endpoint.Name, id,
 				)
@@ -265,7 +265,7 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 					continue
 				}
 
-				return xerrors.Errorf(
+				return fmt.Errorf(
 					"received rpc error (method=%v, endpoint=%v): %w",
 					method, endpoint.Name, response.Error,
 				)
@@ -273,7 +273,7 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 
 			if IsNullOrEmpty(response.Result) {
 				// Retry the batch call if any of the responses is null.
-				return retry.Retryable(xerrors.Errorf(
+				return retry.Retryable(fmt.Errorf(
 					"received a null response (method=%v, endpoint=%v, index=%v, response=%v)",
 					method, endpoint.Name, i, string(response.Result),
 				))
@@ -289,7 +289,7 @@ func (c *clientImpl) BatchCall(ctx context.Context, method *RequestMethod, batch
 
 	for i := range finalBatchResponses {
 		if finalBatchResponses[i] == nil {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"missing response (method=%v, endpoint=%v, id=%v)",
 				method, endpoint.Name, i,
 			)
@@ -306,7 +306,7 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration,
 
 	requestBody, err := json.Marshal(data)
 	if err != nil {
-		return xerrors.Errorf("failed to marshal request: %w", err)
+		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -314,7 +314,7 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration,
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(requestBody))
 	if err != nil {
 		err = c.sanitizedError(err)
-		return xerrors.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	request.Header.Set("Content-Type", "application/json")
@@ -327,7 +327,7 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration,
 	response, err := c.getHTTPClient(endpoint).Do(request)
 	if err != nil {
 		err = c.sanitizedError(err)
-		return retry.Retryable(xerrors.Errorf("failed to send http request: %w", err))
+		return retry.Retryable(fmt.Errorf("failed to send http request: %w", err))
 	}
 
 	finalizer := finalizer.WithCloser(response.Body)
@@ -335,11 +335,11 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration,
 
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return retry.Retryable(xerrors.Errorf("failed to read http response: %w", err))
+		return retry.Retryable(fmt.Errorf("failed to read http response: %w", err))
 	}
 
 	if response.StatusCode != http.StatusOK {
-		errHTTP := xerrors.Errorf("received http error: %w", &HTTPError{
+		errHTTP := fmt.Errorf("received http error: %w", &HTTPError{
 			Code:     response.StatusCode,
 			Response: string(responseBody),
 		})
@@ -365,7 +365,7 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, timeout time.Duration,
 	if err := json.Unmarshal(responseBody, out); err != nil {
 		// Some upstream clients (e.g. Erigon client for ETH) return invalid JSON responses for otherwise retryable
 		// errors such as execution timeouts.
-		return retry.Retryable(xerrors.Errorf("failed to decode response %v: %w", string(responseBody), err))
+		return retry.Retryable(fmt.Errorf("failed to decode response %v: %w", string(responseBody), err))
 	}
 
 	return finalizer.Close()
@@ -436,7 +436,7 @@ func IsNullOrEmpty(r json.RawMessage) bool {
 
 func (c *clientImpl) sanitizedError(err error) error {
 	var uerr *url.Error
-	if xerrors.As(err, &uerr) {
+	if errors.As(err, &uerr) {
 		// url.Error includes the url in the error message, which may contain the API key.
 		err = uerr.Err
 	}

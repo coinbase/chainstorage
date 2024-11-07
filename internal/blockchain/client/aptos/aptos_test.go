@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -142,7 +141,7 @@ func (s *aptosClientTestSuite) TestBatchGetBlockMetadata_Failure() {
 		Code:     http.StatusInternalServerError,
 		Response: string(response),
 	}
-	callErr := xerrors.Errorf("received http error: %w", &expectedHTTPErr)
+	callErr := fmt.Errorf("received http error: %w", &expectedHTTPErr)
 
 	s.restClient.EXPECT().Call(gomock.Any(), expectedMethod1, gomock.Any()).Return(metaResponse1, nil)
 	// Make the second request failed
@@ -199,7 +198,7 @@ func (s *aptosClientTestSuite) TestGetBlockByHeight_AptosError() {
 		Code:     http.StatusInternalServerError,
 		Response: string(response),
 	}
-	callErr := xerrors.Errorf("received http error: %w", &expectedHTTPErr)
+	callErr := fmt.Errorf("received http error: %w", &expectedHTTPErr)
 
 	expectedMethod := &restapi.RequestMethod{
 		Name:       "GetBlockByHeight",
@@ -231,7 +230,7 @@ func (s *aptosClientTestSuite) TestGetBlockByHeight_NotFound() {
 		VmErrorCode: 0,
 	}
 	response, _ := json.Marshal(&expectedErrAptos)
-	callErr := xerrors.Errorf("received http error: %w", &restapi.HTTPError{
+	callErr := fmt.Errorf("received http error: %w", &restapi.HTTPError{
 		Code:     http.StatusInternalServerError,
 		Response: string(response),
 	})
@@ -296,7 +295,7 @@ func (s *aptosClientTestSuite) TestGetBlockByHash_AptosError() {
 		Code:     http.StatusInternalServerError,
 		Response: string(response),
 	}
-	callErr := xerrors.Errorf("received http error: %w", &expectedHTTPErr)
+	callErr := fmt.Errorf("received http error: %w", &expectedHTTPErr)
 
 	expectedMethod := &restapi.RequestMethod{
 		Name:       "GetBlockByHeight",
@@ -387,7 +386,7 @@ func (s *aptosClientTestSuite) TestGetLatestBlock_AptosError() {
 		Code:     http.StatusInternalServerError,
 		Response: string(response),
 	}
-	callErr := xerrors.Errorf("received http error: %w", &expectedHTTPErr)
+	callErr := fmt.Errorf("received http error: %w", &expectedHTTPErr)
 
 	expectedMethod := &restapi.RequestMethod{
 		Name:       "GetLedgerInfo",

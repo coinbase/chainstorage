@@ -10,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -71,7 +70,7 @@ func (b *Benchmarker) execute(ctx workflow.Context, request *BenchmarkerRequest)
 
 	var cfg config.BenchmarkerWorkflowConfig
 	if err := b.readConfig(ctx, &cfg); err != nil {
-		return xerrors.Errorf("failed to read config: %w", err)
+		return fmt.Errorf("failed to read config: %w", err)
 	}
 
 	logger := b.getLogger(ctx).With(

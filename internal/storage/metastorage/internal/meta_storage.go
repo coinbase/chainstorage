@@ -2,9 +2,9 @@ package internal
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
@@ -85,11 +85,11 @@ func WithMetaStorageFactory(params MetaStorageFactoryParams) (Result, error) {
 		factory = params.Firestore
 	}
 	if factory == nil {
-		return Result{}, xerrors.Errorf("meta storage type is not implemented: %v", storageType)
+		return Result{}, fmt.Errorf("meta storage type is not implemented: %v", storageType)
 	}
 	result, err := factory.Create()
 	if err != nil {
-		return Result{}, xerrors.Errorf("failed to create meta storage of type %v, error: %w", storageType, err)
+		return Result{}, fmt.Errorf("failed to create meta storage of type %v, error: %w", storageType, err)
 	}
 	return result, nil
 }

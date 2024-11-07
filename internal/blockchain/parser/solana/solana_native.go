@@ -3,12 +3,13 @@ package solana
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -224,7 +225,7 @@ func NewSolanaNativeParser(params internal.ParserParams, opts ...internal.Parser
 func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
-		return nil, xerrors.New("metadata not found")
+		return nil, errors.New("metadata not found")
 	}
 
 	if metadata.Skipped {
@@ -239,7 +240,7 @@ func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.B
 
 	blobdata := rawBlock.GetSolana()
 	if blobdata == nil {
-		return nil, xerrors.Errorf("blobdata not found (metadata={%+v})", metadata)
+		return nil, fmt.Errorf("blobdata not found (metadata={%+v})", metadata)
 	}
 
 	if metadata.Tag < 2 {
@@ -248,12 +249,12 @@ func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.B
 
 	var block SolanaBlockV2
 	if err := json.Unmarshal(blobdata.Header, &block); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal header (metadata={%+v}: %w", metadata, err)
+		return nil, fmt.Errorf("failed to unmarshal header (metadata={%+v}: %w", metadata, err)
 	}
 
 	nativeBlock, err := p.parseBlockV2(metadata.Height, &block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block (metadata={%+v}: %w", metadata, err)
+		return nil, fmt.Errorf("failed to parse block (metadata={%+v}: %w", metadata, err)
 	}
 
 	return &api.NativeBlock{
@@ -274,11 +275,11 @@ func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.B
 
 func (p *solanaNativeParserImpl) GetTransaction(ctx context.Context, nativeBlock *api.NativeBlock, transactionHash string) (*api.NativeTransaction, error) {
 	if nativeBlock.Blockchain != common.Blockchain_BLOCKCHAIN_SOLANA {
-		return nil, xerrors.Errorf("invalid blockchain: %v", nativeBlock.Blockchain)
+		return nil, fmt.Errorf("invalid blockchain: %v", nativeBlock.Blockchain)
 	}
 
 	if nativeBlock.Skipped {
-		return nil, xerrors.Errorf(
+		return nil, fmt.Errorf(
 			"the slot (%v %v) is skipped: %w",
 			nativeBlock.Height,
 			nativeBlock.Hash,
@@ -288,7 +289,7 @@ func (p *solanaNativeParserImpl) GetTransaction(ctx context.Context, nativeBlock
 
 	solanaBlock := nativeBlock.GetSolana()
 	if solanaBlock == nil {
-		return nil, xerrors.Errorf(
+		return nil, fmt.Errorf(
 			"failed to get solana block: %v %v",
 			nativeBlock.Height,
 			nativeBlock.Hash,
@@ -310,7 +311,7 @@ func (p *solanaNativeParserImpl) GetTransaction(ctx context.Context, nativeBlock
 		}
 	}
 
-	return nil, xerrors.Errorf(
+	return nil, fmt.Errorf(
 		"failed to find the transaction (%v) in the given slot (%v %v): %w",
 		transactionHash,
 		nativeBlock.Height,
@@ -328,17 +329,17 @@ func (p *solanaNativeParserImpl) parseTimestamp(ts int64) *timestamp.Timestamp {
 func (p *solanaNativeParserImpl) parseBlockV2(slot uint64, block *SolanaBlockV2) (*api.SolanaBlockV2, error) {
 	header, err := p.parseHeaderV2(slot, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse header: %w", err)
+		return nil, fmt.Errorf("failed to parse header: %w", err)
 	}
 
 	transactions, err := p.parseTransactionsV2(block.Transactions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse transactions: %w", err)
 	}
 
 	rewards, err := p.parseRewards(block.Rewards)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse rewards: %w", err)
+		return nil, fmt.Errorf("failed to parse rewards: %w", err)
 	}
 
 	return &api.SolanaBlockV2{
@@ -350,7 +351,7 @@ func (p *solanaNativeParserImpl) parseBlockV2(slot uint64, block *SolanaBlockV2)
 
 func (p *solanaNativeParserImpl) parseHeader(slot uint64, block *SolanaBlock) (*api.SolanaHeader, error) {
 	if block.BlockHash == "" {
-		return nil, xerrors.New("block hash is empty")
+		return nil, errors.New("block hash is empty")
 	}
 
 	return &api.SolanaHeader{
@@ -365,7 +366,7 @@ func (p *solanaNativeParserImpl) parseHeader(slot uint64, block *SolanaBlock) (*
 
 func (p *solanaNativeParserImpl) parseHeaderV2(slot uint64, block *SolanaBlockV2) (*api.SolanaHeader, error) {
 	if block.BlockHash == "" {
-		return nil, xerrors.New("block hash is empty")
+		return nil, errors.New("block hash is empty")
 	}
 
 	return &api.SolanaHeader{
@@ -385,7 +386,7 @@ func (p *solanaNativeParserImpl) parseTransactions(transactions []SolanaTransact
 
 		payload, accounts, err := p.parseTransactionPayload(v.Payload, v.Meta)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction payload (payload={%+v}): %w", v.Payload, err)
+			return nil, fmt.Errorf("failed to parse transaction payload (payload={%+v}): %w", v.Payload, err)
 		}
 
 		transactionID, err := ValidateSolanaParsedTransactionId(payload.Signatures)
@@ -395,7 +396,7 @@ func (p *solanaNativeParserImpl) parseTransactions(transactions []SolanaTransact
 
 		meta, err := p.parseTransactionMeta(v.Meta, accounts)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction meta (transactionID=%v, meta={%+v}): %w", transactionID, v.Meta, err)
+			return nil, fmt.Errorf("failed to parse transaction meta (transactionID=%v, meta={%+v}): %w", transactionID, v.Meta, err)
 		}
 
 		result[i] = &api.SolanaTransaction{
@@ -421,12 +422,12 @@ func (p *solanaNativeParserImpl) parseTransactionsV2(transactions []SolanaTransa
 
 		payload, err := p.parseTransactionPayloadV2(v.Payload)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction payload (transactionID=%v, payload={%+v}): %w", transactionID, v.Payload, err)
+			return nil, fmt.Errorf("failed to parse transaction payload (transactionID=%v, payload={%+v}): %w", transactionID, v.Payload, err)
 		}
 
 		meta, err := p.parseTransactionMetaV2(v.Meta)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction meta (transactionID=%v, meta={%+v}): %w", transactionID, v.Meta, err)
+			return nil, fmt.Errorf("failed to parse transaction meta (transactionID=%v, meta={%+v}): %w", transactionID, v.Meta, err)
 		}
 
 		result[i] = &api.SolanaTransactionV2{
@@ -448,17 +449,17 @@ func (p *solanaNativeParserImpl) parseTransactionMeta(meta *SolanaTransactionMet
 
 	rewards, err := p.parseRewards(meta.Rewards)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse rewards: %w", err)
+		return nil, fmt.Errorf("failed to parse rewards: %w", err)
 	}
 
 	txErr, err := p.parseError(meta.Err)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse error: %w", err)
+		return nil, fmt.Errorf("failed to parse error: %w", err)
 	}
 
 	innerInstructions, err := p.parseInnerInstructions(meta.InnerInstructions, accounts)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse inner instructions: %w", err)
+		return nil, fmt.Errorf("failed to parse inner instructions: %w", err)
 	}
 
 	return &api.SolanaTransactionMeta{
@@ -482,17 +483,17 @@ func (p *solanaNativeParserImpl) parseTransactionMetaV2(meta *SolanaTransactionM
 
 	rewards, err := p.parseRewards(meta.Rewards)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse rewards: %w", err)
+		return nil, fmt.Errorf("failed to parse rewards: %w", err)
 	}
 
 	txErr, err := p.parseError(meta.Err)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse error: %w", err)
+		return nil, fmt.Errorf("failed to parse error: %w", err)
 	}
 
 	innerInstructions, err := p.parseInnerInstructionsV2(meta.InnerInstructions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse inner instructions: %w", err)
+		return nil, fmt.Errorf("failed to parse inner instructions: %w", err)
 	}
 
 	return &api.SolanaTransactionMetaV2{
@@ -523,7 +524,7 @@ func (p *solanaNativeParserImpl) appendLookupAccounts(accounts *solana.AccountMe
 	for _, accountKey := range loadedAddresses.Writable {
 		publicKey, err := solana.PublicKeyFromBase58(accountKey)
 		if err != nil {
-			return xerrors.Errorf("failed to parse public key of writable address (%v): %w", accountKey, err)
+			return fmt.Errorf("failed to parse public key of writable address (%v): %w", accountKey, err)
 		}
 
 		accounts.Append(&solana.AccountMeta{
@@ -536,7 +537,7 @@ func (p *solanaNativeParserImpl) appendLookupAccounts(accounts *solana.AccountMe
 	for _, accountKey := range loadedAddresses.Readonly {
 		publicKey, err := solana.PublicKeyFromBase58(accountKey)
 		if err != nil {
-			return xerrors.Errorf("failed to parse public key of readonly address (%v): %w", accountKey, err)
+			return fmt.Errorf("failed to parse public key of readonly address (%v): %w", accountKey, err)
 		}
 
 		accounts.Append(&solana.AccountMeta{
@@ -554,7 +555,7 @@ func (p *solanaNativeParserImpl) parseInnerInstructions(input []SolanaInnerInstr
 	for i, v := range input {
 		instructions, err := p.parseInstructions(p.toRichInstructions(v.Instructions), accounts)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse instructions: %w", err)
+			return nil, fmt.Errorf("failed to parse instructions: %w", err)
 		}
 
 		output[i] = &api.SolanaInnerInstruction{
@@ -571,7 +572,7 @@ func (p *solanaNativeParserImpl) parseInnerInstructionsV2(input []SolanaInnerIns
 	for i, v := range input {
 		instructions, err := p.parseInstructionsV2(v.Instructions)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse instructions: %w", err)
+			return nil, fmt.Errorf("failed to parse instructions: %w", err)
 		}
 
 		output[i] = &api.SolanaInnerInstructionV2{
@@ -602,7 +603,7 @@ func (p *solanaNativeParserImpl) parseError(error SolanaTransactionError) (strin
 		//   ]
 		// }
 		if len(v) > 1 {
-			return "", xerrors.Errorf("failed to parse error: %v", error)
+			return "", fmt.Errorf("failed to parse error: %v", error)
 		}
 
 		var result string
@@ -614,7 +615,7 @@ func (p *solanaNativeParserImpl) parseError(error SolanaTransactionError) (strin
 
 		return result, nil
 	default:
-		return "", xerrors.Errorf("unexpected type %T: %v", v, v)
+		return "", fmt.Errorf("unexpected type %T: %v", v, v)
 	}
 }
 
@@ -666,12 +667,12 @@ func (p *solanaNativeParserImpl) parseTransactionVersion(transactionVersion *Sol
 
 func (p *solanaNativeParserImpl) parseTransactionPayload(payload *SolanaTransactionPayload, meta *SolanaTransactionMeta) (*api.SolanaTransactionPayload, solana.AccountMetaSlice, error) {
 	if payload == nil {
-		return nil, nil, xerrors.New("payload is null")
+		return nil, nil, errors.New("payload is null")
 	}
 
 	message, accounts, err := p.parseTransactionMessage(&payload.Message, meta)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse transaction message: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse transaction message: %w", err)
 	}
 
 	return &api.SolanaTransactionPayload{
@@ -683,7 +684,7 @@ func (p *solanaNativeParserImpl) parseTransactionPayload(payload *SolanaTransact
 func (p *solanaNativeParserImpl) parseTransactionPayloadV2(payload *SolanaTransactionPayloadV2) (*api.SolanaTransactionPayloadV2, error) {
 	message, err := p.parseTransactionMessageV2(&payload.Message)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction message: %w", err)
+		return nil, fmt.Errorf("failed to parse transaction message: %w", err)
 	}
 
 	return &api.SolanaTransactionPayloadV2{
@@ -695,12 +696,12 @@ func (p *solanaNativeParserImpl) parseTransactionPayloadV2(payload *SolanaTransa
 func (p *solanaNativeParserImpl) parseTransactionMessage(message *SolanaMessage, meta *SolanaTransactionMeta) (*api.SolanaMessage, solana.AccountMetaSlice, error) {
 	richMessage, err := p.toRichMessage(message)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse message: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse message: %w", err)
 	}
 
 	accounts, err := richMessage.AccountMetaList()
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to get account meta: %w", err)
+		return nil, nil, fmt.Errorf("failed to get account meta: %w", err)
 	}
 
 	// Need to append addresses from lookup tables for non-legacy transaction type.
@@ -709,12 +710,12 @@ func (p *solanaNativeParserImpl) parseTransactionMessage(message *SolanaMessage,
 	// Transaction hash: 5X7cr7bxjwoWvWFvSmVfmF3PhYcid4ojtNGYiDsRRP6P5cfzkahxbZfwH4YDdhy9RnSEyaT255aDw14vis5Qxvqh
 	err = p.appendLookupAccounts(&accounts, meta)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to append accounts from meta: %w", err)
+		return nil, nil, fmt.Errorf("failed to append accounts from meta: %w", err)
 	}
 
 	instructions, err := p.parseInstructions(richMessage.Instructions, accounts)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse instructions: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse instructions: %w", err)
 	}
 
 	parsedMessage := &api.SolanaMessage{
@@ -753,7 +754,7 @@ func (p *solanaNativeParserImpl) parseTransactionMessageV2(message *SolanaMessag
 
 	instructions, err := p.parseInstructionsV2(message.Instructions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse instructions: %w", err)
+		return nil, fmt.Errorf("failed to parse instructions: %w", err)
 	}
 
 	parsedMessage := &api.SolanaMessageV2{
@@ -783,7 +784,7 @@ func (p *solanaNativeParserImpl) parseInstructions(instructions []solana.Compile
 	for i, instruction := range instructions {
 		programID := accounts.Get(int(instruction.ProgramIDIndex))
 		if programID == nil {
-			return nil, xerrors.Errorf("failed to find program account at %v", instruction.ProgramIDIndex)
+			return nil, fmt.Errorf("failed to find program account at %v", instruction.ProgramIDIndex)
 		}
 
 		numAccounts := len(instruction.Accounts)
@@ -793,7 +794,7 @@ func (p *solanaNativeParserImpl) parseInstructions(instructions []solana.Compile
 		for j, accountIndex := range instruction.Accounts {
 			account := accounts.Get(int(accountIndex))
 			if account == nil {
-				return nil, xerrors.Errorf("failed to find program account at %v", accountIndex)
+				return nil, fmt.Errorf("failed to find program account at %v", accountIndex)
 			}
 
 			accountIndexes[j] = uint64(accountIndex)
@@ -845,10 +846,10 @@ func (p *solanaNativeParserImpl) parseInstructionsV2(instructions []SolanaInstru
 		case UnparsedProgram:
 			res, err = p.parseRawInstruction(instruction)
 		default:
-			return nil, xerrors.Errorf("unknown program %s", instruction.Program)
+			return nil, fmt.Errorf("unknown program %s", instruction.Program)
 		}
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse instructions (program=%v): %w", instruction.Program, err)
+			return nil, fmt.Errorf("failed to parse instructions (program=%v): %w", instruction.Program, err)
 		}
 
 		result[i] = res
@@ -861,7 +862,7 @@ func (p *solanaNativeParserImpl) parseVoteInstruction(instruction SolanaInstruct
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed vote instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed vote instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -875,10 +876,10 @@ func (p *solanaNativeParserImpl) parseVoteInstruction(instruction SolanaInstruct
 		var info VoteInitializeInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal vote initialize instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal vote initialize instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate vote initialize instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate vote initialize instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_VoteProgram{
@@ -901,10 +902,10 @@ func (p *solanaNativeParserImpl) parseVoteInstruction(instruction SolanaInstruct
 		var info VoteVoteInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal vote vote instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal vote vote instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate vote vote instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate vote vote instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_VoteProgram{
@@ -929,10 +930,10 @@ func (p *solanaNativeParserImpl) parseVoteInstruction(instruction SolanaInstruct
 		var info VoteWithdrawInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal vote withdraw instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal vote withdraw instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate vote withdraw instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate vote withdraw instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_VoteProgram{
@@ -952,10 +953,10 @@ func (p *solanaNativeParserImpl) parseVoteInstruction(instruction SolanaInstruct
 		var info VoteCompactUpdateVoteStateInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal vote compact update vote state instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal vote compact update vote state instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate vote compact update vote state instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate vote compact update vote state instruction: %w", err)
 		}
 
 		lockouts := make([]*api.SolanaVoteCompactUpdateVoteStateInstruction_Lockout, len(info.VoteStateUpdate.Lockouts))
@@ -1003,7 +1004,7 @@ func (p *solanaNativeParserImpl) parseSystemInstruction(instruction SolanaInstru
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed system instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed system instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1017,10 +1018,10 @@ func (p *solanaNativeParserImpl) parseSystemInstruction(instruction SolanaInstru
 		var info SystemCreateAccountInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal system createAccount instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal system createAccount instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate system createAccount instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate system createAccount instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_SystemProgram{
@@ -1041,10 +1042,10 @@ func (p *solanaNativeParserImpl) parseSystemInstruction(instruction SolanaInstru
 		var info SystemTransferInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal system transfer instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal system transfer instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate system transfer instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate system transfer instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_SystemProgram{
@@ -1063,10 +1064,10 @@ func (p *solanaNativeParserImpl) parseSystemInstruction(instruction SolanaInstru
 		var info SystemCreateAccountWithSeedInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal system createAccountWithSeed instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal system createAccountWithSeed instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate system createAccountWithSeed instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate system createAccountWithSeed instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_SystemProgram{
@@ -1089,10 +1090,10 @@ func (p *solanaNativeParserImpl) parseSystemInstruction(instruction SolanaInstru
 		var info SystemTransferWithSeedInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal system transferWithSeed instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal system transferWithSeed instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate system transferWithSeed instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate system transferWithSeed instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_SystemProgram{
@@ -1130,7 +1131,7 @@ func (p *solanaNativeParserImpl) parseStakeInstruction(instruction SolanaInstruc
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed stake instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed stake instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1144,10 +1145,10 @@ func (p *solanaNativeParserImpl) parseStakeInstruction(instruction SolanaInstruc
 		var info StakeInitializeInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal stake initialize instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal stake initialize instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate stake initialize instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate stake initialize instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_StakeProgram{
@@ -1174,10 +1175,10 @@ func (p *solanaNativeParserImpl) parseStakeInstruction(instruction SolanaInstruc
 		var info StakeDelegateInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal stake delegate instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal stake delegate instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate stake delegate instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate stake delegate instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_StakeProgram{
@@ -1199,10 +1200,10 @@ func (p *solanaNativeParserImpl) parseStakeInstruction(instruction SolanaInstruc
 		var info StakeDeactivateInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal stake deactivate instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal stake deactivate instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate stake deactivate instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate stake deactivate instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_StakeProgram{
@@ -1221,10 +1222,10 @@ func (p *solanaNativeParserImpl) parseStakeInstruction(instruction SolanaInstruc
 		var info StakeMergeInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal stake merge instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal stake merge instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate stake merge instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate stake merge instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_StakeProgram{
@@ -1245,10 +1246,10 @@ func (p *solanaNativeParserImpl) parseStakeInstruction(instruction SolanaInstruc
 		var info StakeSplitInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal stake split instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal stake split instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate stake split instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate stake split instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_StakeProgram{
@@ -1268,10 +1269,10 @@ func (p *solanaNativeParserImpl) parseStakeInstruction(instruction SolanaInstruc
 		var info StakeWithdrawInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal stake withdraw instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal stake withdraw instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate stake withdraw instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate stake withdraw instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_StakeProgram{
@@ -1309,7 +1310,7 @@ func (p *solanaNativeParserImpl) parseSplMemoInstruction(instruction SolanaInstr
 	var memo string
 	err := json.Unmarshal(instruction.ParsedInstruction, &memo)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed spl-memo instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed spl-memo instruction:%w", err)
 	}
 
 	res := &api.SolanaInstructionV2{
@@ -1334,7 +1335,7 @@ func (p *solanaNativeParserImpl) parseSplTokenInstruction(instruction SolanaInst
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed spl-token instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed spl-token instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1348,10 +1349,10 @@ func (p *solanaNativeParserImpl) parseSplTokenInstruction(instruction SolanaInst
 		var info SplTokenGetAccountDataSizeInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal token getAccountDataSize instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal token getAccountDataSize instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate token getAccountDataSize instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate token getAccountDataSize instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_SplTokenProgram{
@@ -1369,10 +1370,10 @@ func (p *solanaNativeParserImpl) parseSplTokenInstruction(instruction SolanaInst
 		var info SplTokenInitializeImmutableOwnerInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal token initializeImmutableOwner instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal token initializeImmutableOwner instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate token initializeImmutableOwner instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate token initializeImmutableOwner instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_SplTokenProgram{
@@ -1389,10 +1390,10 @@ func (p *solanaNativeParserImpl) parseSplTokenInstruction(instruction SolanaInst
 		var info SplTokenTransferInstructionInfo
 		err := json.Unmarshal(parsedInstruction.InstructionInfo, &info)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal token transfer instruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal token transfer instruction: %w", err)
 		}
 		if err := p.validateStruct(info); err != nil {
-			return nil, xerrors.Errorf("failed to validate token transfer instruction: %w", err)
+			return nil, fmt.Errorf("failed to validate token transfer instruction: %w", err)
 		}
 
 		res.ProgramData = &api.SolanaInstructionV2_SplTokenProgram{
@@ -1428,7 +1429,7 @@ func (p *solanaNativeParserImpl) parseSplToken2022Instruction(instruction Solana
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed spl-token-2022 instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed spl-token-2022 instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1458,7 +1459,7 @@ func (p *solanaNativeParserImpl) parseSplAssociatedTokenAccountInstruction(instr
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed spl-associated-token-account instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed spl-associated-token-account instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1488,7 +1489,7 @@ func (p *solanaNativeParserImpl) parseAddressLookupTableInstruction(instruction 
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed address-lookup-table instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed address-lookup-table instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1518,7 +1519,7 @@ func (p *solanaNativeParserImpl) parseBpfLoaderInstruction(instruction SolanaIns
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed bpf-loader instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed bpf-loader instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1548,7 +1549,7 @@ func (p *solanaNativeParserImpl) parseBpfUpgradeableLoaderInstruction(instructio
 	var parsedInstruction SolanaParsedInstruction
 	err := json.Unmarshal(instruction.ParsedInstruction, &parsedInstruction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal parsed bpf-upgradeable-loader instruction:%w", err)
+		return nil, fmt.Errorf("failed to unmarshal parsed bpf-upgradeable-loader instruction:%w", err)
 	}
 
 	instructionType := parsedInstruction.InstructionType
@@ -1592,7 +1593,7 @@ func (p *solanaNativeParserImpl) toRichMessage(input *SolanaMessage) (*solana.Me
 	for i, accountKey := range input.AccountKeys {
 		publicKey, err := solana.PublicKeyFromBase58(accountKey)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse public key (%v): %w", accountKey, err)
+			return nil, fmt.Errorf("failed to parse public key (%v): %w", accountKey, err)
 		}
 
 		accountKeys[i] = publicKey
@@ -1600,7 +1601,7 @@ func (p *solanaNativeParserImpl) toRichMessage(input *SolanaMessage) (*solana.Me
 
 	recentBlockHash, err := solana.HashFromBase58(input.RecentBlockHash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse recent block hash (%v): %w", input.RecentBlockHash, err)
+		return nil, fmt.Errorf("failed to parse recent block hash (%v): %w", input.RecentBlockHash, err)
 	}
 
 	instructions := p.toRichInstructions(input.Instructions)
@@ -1640,7 +1641,7 @@ func (v *SolanaTransactionVersion) UnmarshalJSON(input []byte) error {
 	if len(input) > 0 && input[0] != '"' {
 		var i uint32
 		if err := json.Unmarshal(input, &i); err != nil {
-			return xerrors.Errorf("failed to unmarshal SolanaTransactionVersion into uint32: %w", err)
+			return fmt.Errorf("failed to unmarshal SolanaTransactionVersion into uint32: %w", err)
 		}
 
 		*v = SolanaTransactionVersion(i)
@@ -1649,14 +1650,14 @@ func (v *SolanaTransactionVersion) UnmarshalJSON(input []byte) error {
 
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal SolanaTransactionVersion into string: %w", err)
+		return fmt.Errorf("failed to unmarshal SolanaTransactionVersion into string: %w", err)
 	}
 
 	if s == "" || s == SolanaLegacyVersionStr {
 		*v = SolanaTransactionVersion(SolanaLegacyVersion)
 		return nil
 	}
-	return xerrors.Errorf("unsupported transaction version: %v", s)
+	return fmt.Errorf("unsupported transaction version: %v", s)
 }
 
 func (v SolanaTransactionVersion) Value() int32 {
@@ -1675,12 +1676,12 @@ func (b *solanaNativeParserImpl) validateStruct(s any) error {
 func ValidateSolanaParsedTransactionId(signatureList []string) (string, error) {
 	// transactionID is the first signature in a transaction, which can be used to uniquely identify the transaction across the complete ledger.
 	if len(signatureList) == 0 {
-		return "", xerrors.New("signatures are empty")
+		return "", errors.New("signatures are empty")
 	}
 
 	transactionID := signatureList[0]
 	if transactionID == "" {
-		return "", xerrors.New("transaction id is empty")
+		return "", errors.New("transaction id is empty")
 	}
 
 	return transactionID, nil

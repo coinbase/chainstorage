@@ -3,12 +3,13 @@ package beacon
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -261,7 +262,7 @@ func NewNativeParser(params internal.ParserParams, opts ...internal.ParserFactor
 func (p *nativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
-		return nil, xerrors.New("metadata not found")
+		return nil, errors.New("metadata not found")
 	}
 
 	if metadata.Skipped {
@@ -278,26 +279,26 @@ func (p *nativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) 
 
 	blobdata := rawBlock.GetEthereumBeacon()
 	if blobdata == nil {
-		return nil, xerrors.New("blobdata not found")
+		return nil, errors.New("blobdata not found")
 	}
 
 	header, err := p.parseHeader(blobdata.Header, metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse header: %w", err)
+		return nil, fmt.Errorf("failed to parse header: %w", err)
 	}
 
 	blockResult, err := p.parseBlock(blobdata.Block, metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block data for slot height=%v, hash=%v: %w", metadata.Height, metadata.Hash, err)
+		return nil, fmt.Errorf("failed to parse block data for slot height=%v, hash=%v: %w", metadata.Height, metadata.Hash, err)
 	}
 
 	if blockResult.block == nil {
-		return nil, xerrors.Errorf("block data is nil for slot height=%v, hash=%v", metadata.Height, metadata.Hash)
+		return nil, fmt.Errorf("block data is nil for slot height=%v, hash=%v", metadata.Height, metadata.Hash)
 	}
 
 	blobs, err := p.parseBlobs(blobdata.Blobs, metadata, blockResult.blobKzgCommitments)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse blobs for slot height=%v, hash=%v: %w", metadata.Height, metadata.Hash, err)
+		return nil, fmt.Errorf("failed to parse blobs for slot height=%v, hash=%v: %w", metadata.Height, metadata.Hash, err)
 	}
 
 	return &api.NativeBlock{
@@ -322,31 +323,31 @@ func (p *nativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) 
 
 func (p *nativeParserImpl) parseHeader(data []byte, metadata *api.BlockMetadata) (*api.EthereumBeaconBlockHeader, error) {
 	if len(data) == 0 {
-		return nil, xerrors.New("block header is empty")
+		return nil, errors.New("block header is empty")
 	}
 
 	var header BlockHeader
 	if err := json.Unmarshal(data, &header); err != nil {
-		return nil, xerrors.Errorf("failed to parse block header on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse block header on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(header); err != nil {
-		return nil, xerrors.Errorf("failed to parse block header on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse block header on struct validate: %w", err)
 	}
 	headerData := header.Data
 	message := headerData.Header.Message
 
 	slot := message.Slot.Value()
 	if slot != metadata.Height {
-		return nil, xerrors.Errorf("block slot=%d does not match metadata in header {%+v}", slot, metadata)
+		return nil, fmt.Errorf("block slot=%d does not match metadata in header {%+v}", slot, metadata)
 	}
 	if headerData.Root != metadata.Hash {
-		return nil, xerrors.Errorf("block root=%s does not match metadata in header {%+v}", headerData.Root, metadata)
+		return nil, fmt.Errorf("block root=%s does not match metadata in header {%+v}", headerData.Root, metadata)
 	}
 
 	epoch, err := calculateEpoch(slot)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to calculate epoch for slot=%d: %w", slot, err)
+		return nil, fmt.Errorf("failed to calculate epoch for slot=%d: %w", slot, err)
 	}
 
 	return &api.EthereumBeaconBlockHeader{
@@ -363,17 +364,17 @@ func (p *nativeParserImpl) parseHeader(data []byte, metadata *api.BlockMetadata)
 
 func (p *nativeParserImpl) parseBlock(data []byte, metadata *api.BlockMetadata) (*blockResultHolder, error) {
 	if len(data) == 0 {
-		return nil, xerrors.New("block data is empty")
+		return nil, errors.New("block data is empty")
 	}
 
 	var blockLit BlockResponseLit
 	if err := json.Unmarshal(data, &blockLit); err != nil {
-		return nil, xerrors.Errorf("failed to parse block on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse block on unmarshal: %w", err)
 	}
 
 	v, err := version.FromString(blockLit.Version)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block version=%v: %w", blockLit.Version, err)
+		return nil, fmt.Errorf("failed to parse block version=%v: %w", blockLit.Version, err)
 	}
 
 	switch v {
@@ -388,30 +389,30 @@ func (p *nativeParserImpl) parseBlock(data []byte, metadata *api.BlockMetadata) 
 	case version.Deneb:
 		return p.parseDenebBlock(blockLit.Data, metadata)
 	default:
-		return nil, xerrors.Errorf("unsupported block version=%v", blockLit.Version)
+		return nil, fmt.Errorf("unsupported block version=%v", blockLit.Version)
 	}
 }
 
 func (p *nativeParserImpl) parsePhase0Block(data []byte, metadata *api.BlockMetadata) (*blockResultHolder, error) {
 	var block SignedBlockPhase0
 	if err := json.Unmarshal(data, &block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Phase0 block on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse Phase0 block on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Phase0 block on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse Phase0 block on struct validate: %w", err)
 	}
 
 	blockMessage := block.Message
 	blockBody := blockMessage.Body
 
 	if blockMessage.Slot.Value() != metadata.Height {
-		return nil, xerrors.Errorf("Phase0 block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
+		return nil, fmt.Errorf("Phase0 block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
 	}
 
 	eth1Data, err := p.parseEth1Data(blockBody.Eth1Data)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse eth1Data: %w", err)
+		return nil, fmt.Errorf("failed to parse eth1Data: %w", err)
 	}
 
 	return &blockResultHolder{
@@ -435,23 +436,23 @@ func (p *nativeParserImpl) parsePhase0Block(data []byte, metadata *api.BlockMeta
 func (p *nativeParserImpl) parseAltairBlock(data []byte, metadata *api.BlockMetadata) (*blockResultHolder, error) {
 	var block SignedBlockAltair
 	if err := json.Unmarshal(data, &block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Altair block on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse Altair block on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Altair block on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse Altair block on struct validate: %w", err)
 	}
 
 	blockMessage := block.Message
 	blockBody := blockMessage.Body
 
 	if blockMessage.Slot.Value() != metadata.Height {
-		return nil, xerrors.Errorf("Altair block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
+		return nil, fmt.Errorf("Altair block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
 	}
 
 	eth1Data, err := p.parseEth1Data(blockBody.Eth1Data)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse eth1Data: %w", err)
+		return nil, fmt.Errorf("failed to parse eth1Data: %w", err)
 	}
 
 	return &blockResultHolder{
@@ -475,11 +476,11 @@ func (p *nativeParserImpl) parseAltairBlock(data []byte, metadata *api.BlockMeta
 func (p *nativeParserImpl) parseBellatrixBlock(data []byte, metadata *api.BlockMetadata) (*blockResultHolder, error) {
 	var block SignedBlockBellatrix
 	if err := json.Unmarshal(data, &block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Bellatrix block on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse Bellatrix block on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Bellatrix block on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse Bellatrix block on struct validate: %w", err)
 	}
 
 	blockMessage := block.Message
@@ -487,12 +488,12 @@ func (p *nativeParserImpl) parseBellatrixBlock(data []byte, metadata *api.BlockM
 	executionPayload := blockBody.ExecutionPayload
 
 	if blockMessage.Slot.Value() != metadata.Height {
-		return nil, xerrors.Errorf("Bellatrix block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
+		return nil, fmt.Errorf("Bellatrix block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
 	}
 
 	eth1Data, err := p.parseEth1Data(blockBody.Eth1Data)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse eth1Data: %w", err)
+		return nil, fmt.Errorf("failed to parse eth1Data: %w", err)
 	}
 
 	return &blockResultHolder{
@@ -532,11 +533,11 @@ func (p *nativeParserImpl) parseBellatrixBlock(data []byte, metadata *api.BlockM
 func (p *nativeParserImpl) parseCapellaBlock(data []byte, metadata *api.BlockMetadata) (*blockResultHolder, error) {
 	var block SignedBlockCapella
 	if err := json.Unmarshal(data, &block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Capella block on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse Capella block on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Capella block on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse Capella block on struct validate: %w", err)
 	}
 
 	blockMessage := block.Message
@@ -544,12 +545,12 @@ func (p *nativeParserImpl) parseCapellaBlock(data []byte, metadata *api.BlockMet
 	executionPayload := blockBody.ExecutionPayload
 
 	if blockMessage.Slot.Value() != metadata.Height {
-		return nil, xerrors.Errorf("Capella block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
+		return nil, fmt.Errorf("Capella block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
 	}
 
 	eth1Data, err := p.parseEth1Data(blockBody.Eth1Data)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse eth1Data: %w", err)
+		return nil, fmt.Errorf("failed to parse eth1Data: %w", err)
 	}
 
 	withdrawals := p.parseWithdrawals(executionPayload.Withdrawals)
@@ -592,11 +593,11 @@ func (p *nativeParserImpl) parseCapellaBlock(data []byte, metadata *api.BlockMet
 func (p *nativeParserImpl) parseDenebBlock(data []byte, metadata *api.BlockMetadata) (*blockResultHolder, error) {
 	var block SignedBlockDeneb
 	if err := json.Unmarshal(data, &block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Deneb block on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse Deneb block on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(block); err != nil {
-		return nil, xerrors.Errorf("failed to parse Deneb block on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse Deneb block on struct validate: %w", err)
 	}
 
 	blockMessage := block.Message
@@ -604,12 +605,12 @@ func (p *nativeParserImpl) parseDenebBlock(data []byte, metadata *api.BlockMetad
 	executionPayload := blockBody.ExecutionPayload
 
 	if blockMessage.Slot.Value() != metadata.Height {
-		return nil, xerrors.Errorf("block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
+		return nil, fmt.Errorf("block slot=%d does not match metadata {%+v}", blockMessage.Slot.Value(), metadata)
 	}
 
 	eth1Data, err := p.parseEth1Data(blockBody.Eth1Data)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse eth1Data: %w", err)
+		return nil, fmt.Errorf("failed to parse eth1Data: %w", err)
 	}
 
 	withdrawals := p.parseWithdrawals(executionPayload.Withdrawals)
@@ -656,7 +657,7 @@ func (p *nativeParserImpl) parseDenebBlock(data []byte, metadata *api.BlockMetad
 func (p *nativeParserImpl) parseEth1Data(eth1Data *Eth1Data) (*api.EthereumBeaconEth1Data, error) {
 	depositCount, err := strconv.ParseUint(eth1Data.DepositCount, 10, 64)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse depositCount=%v to uint64: %w", eth1Data.DepositCount, err)
+		return nil, fmt.Errorf("failed to parse depositCount=%v to uint64: %w", eth1Data.DepositCount, err)
 	}
 	return &api.EthereumBeaconEth1Data{
 		DepositRoot:  eth1Data.DepositRoot,
@@ -693,20 +694,20 @@ func (p *nativeParserImpl) parseBlobs(data []byte, metadata *api.BlockMetadata, 
 	}
 
 	if len(data) == 0 && len(blobKzgCommitments) != 0 {
-		return nil, xerrors.Errorf("blobs data is empty but blobKzgCommitments is not, expected=%d", len(blobKzgCommitments))
+		return nil, fmt.Errorf("blobs data is empty but blobKzgCommitments is not, expected=%d", len(blobKzgCommitments))
 	}
 
 	var blobs Blobs
 	if err := json.Unmarshal(data, &blobs); err != nil {
-		return nil, xerrors.Errorf("failed to parse blobs on unmarshal: %w", err)
+		return nil, fmt.Errorf("failed to parse blobs on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(blobs); err != nil {
-		return nil, xerrors.Errorf("failed to parse blobs on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse blobs on struct validate: %w", err)
 	}
 
 	if len(blobs.Data) != len(blobKzgCommitments) {
-		return nil, xerrors.Errorf("blob count=%d does not match blobKzgCommitments count=%d", len(blobs.Data), len(blobKzgCommitments))
+		return nil, fmt.Errorf("blob count=%d does not match blobKzgCommitments count=%d", len(blobs.Data), len(blobKzgCommitments))
 	}
 
 	result := make([]*api.EthereumBeaconBlob, len(blobs.Data))
@@ -715,22 +716,22 @@ func (p *nativeParserImpl) parseBlobs(data []byte, metadata *api.BlockMetadata, 
 		blockHeader := blob.SignedBeaconBlockHeader
 
 		if blockHeader == nil {
-			return nil, xerrors.Errorf("missing block header for blob index=%d", blobIndex)
+			return nil, fmt.Errorf("missing block header for blob index=%d", blobIndex)
 		}
 
 		slot := blockHeader.Message.Slot.Value()
 		parentRoot := blockHeader.Message.ParentRoot
 
 		if slot != metadata.Height {
-			return nil, xerrors.Errorf("blob slot=%d does not match metadata {%+v} on blob index=%d", slot, metadata, blobIndex)
+			return nil, fmt.Errorf("blob slot=%d does not match metadata {%+v} on blob index=%d", slot, metadata, blobIndex)
 		}
 
 		if parentRoot != metadata.ParentHash {
-			return nil, xerrors.Errorf("blob parent root=%v does not match metadata {%+v} on blob index=%d", parentRoot, metadata, blobIndex)
+			return nil, fmt.Errorf("blob parent root=%v does not match metadata {%+v} on blob index=%d", parentRoot, metadata, blobIndex)
 		}
 
 		if blobKzgCommitments[i] != blob.KzgCommitment {
-			return nil, xerrors.Errorf("KzgCommitment does not match on blob index=%d, expected=%v, actual=%v", blobIndex, blobKzgCommitments[i], blob.KzgCommitment)
+			return nil, fmt.Errorf("KzgCommitment does not match on blob index=%d, expected=%v, actual=%v", blobIndex, blobKzgCommitments[i], blob.KzgCommitment)
 		}
 
 		result[i] = &api.EthereumBeaconBlob{

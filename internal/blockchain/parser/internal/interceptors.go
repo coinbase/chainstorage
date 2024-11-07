@@ -2,11 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -46,7 +46,7 @@ func newInstrument(method string, scope tally.Scope, logger *zap.Logger) instrum
 		method,
 		instrument.WithLogger(logger, fmt.Sprintf("parser.%v", method)),
 		instrument.WithFilter(func(err error) bool {
-			return xerrors.Is(err, ErrNotImplemented)
+			return errors.Is(err, ErrNotImplemented)
 		}),
 	)
 }
@@ -57,7 +57,7 @@ func newInstrumentWithResult[T any](method string, scope tally.Scope, logger *za
 		method,
 		instrument.WithLogger(logger, fmt.Sprintf("parser.%v", method)),
 		instrument.WithFilter(func(err error) bool {
-			return xerrors.Is(err, ErrNotImplemented)
+			return errors.Is(err, ErrNotImplemented)
 		}),
 	)
 }

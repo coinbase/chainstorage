@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ripemd160"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -211,27 +211,27 @@ func NewBitcoinNativeParser(params internal.ParserParams, opts ...internal.Parse
 func (b *bitcoinNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
-		return nil, xerrors.New("metadata not found")
+		return nil, errors.New("metadata not found")
 	}
 
 	blobdata := rawBlock.GetBitcoin()
 	if blobdata == nil {
-		return nil, xerrors.New("bitcoin blobdata not found")
+		return nil, errors.New("bitcoin blobdata not found")
 	}
 
 	var block BitcoinBlock
 	if err := json.Unmarshal(blobdata.GetHeader(), &block); err != nil {
-		return nil, xerrors.Errorf("failed to parse bitcoin block with %+v: %w", metadata, err)
+		return nil, fmt.Errorf("failed to parse bitcoin block with %+v: %w", metadata, err)
 	}
 
 	if err := b.validateStruct(block); err != nil {
-		return nil, xerrors.Errorf("failed to validate bitcoin block %+v: %w", metadata, err)
+		return nil, fmt.Errorf("failed to validate bitcoin block %+v: %w", metadata, err)
 	}
 
 	header := block.GetApiBitcoinHeader()
 	transactions, err := b.parseTransactions(blobdata, block.Tx)
 	if err != nil {
-		return nil, xerrors.Errorf("parseTransactions failed for %+v: %w", metadata, err)
+		return nil, fmt.Errorf("parseTransactions failed for %+v: %w", metadata, err)
 	}
 
 	return &api.NativeBlock{
@@ -265,15 +265,15 @@ func (b *bitcoinNativeParserImpl) parseTransactions(
 		for j, input := range rawTransaction.GetData() {
 			var inputTx BitcoinInputTransactionLit
 			if err := json.Unmarshal(input, &inputTx); err != nil {
-				return nil, xerrors.Errorf("failed to parse input transaction on [%d][%d]: %w", i, j, err)
+				return nil, fmt.Errorf("failed to parse input transaction on [%d][%d]: %w", i, j, err)
 			}
 
 			if err := b.validateStruct(inputTx); err != nil {
-				return nil, xerrors.Errorf("failed to validate bitcoin input transaction %v: %w", inputTx.TxId, err)
+				return nil, fmt.Errorf("failed to validate bitcoin input transaction %v: %w", inputTx.TxId, err)
 			}
 
 			if len(inputTx.Vout) != 1 {
-				return nil, xerrors.Errorf("unexpected length of input transaction's output (expected=1, len=%d)", len(inputTx.Vout))
+				return nil, fmt.Errorf("unexpected length of input transaction's output (expected=1, len=%d)", len(inputTx.Vout))
 			}
 
 			inputTxId := inputTx.TxId.Value()
@@ -283,7 +283,7 @@ func (b *bitcoinNativeParserImpl) parseTransactions(
 
 			outputTx, err := inputTx.Vout[0].ToApiBitcoinTransactionOutput()
 			if err != nil {
-				return nil, xerrors.Errorf("failed to convert to transaction output: %w", err)
+				return nil, fmt.Errorf("failed to convert to transaction output: %w", err)
 			}
 
 			metadataMap[inputTxId] = append(metadataMap[inputTxId], outputTx)
@@ -415,7 +415,7 @@ func parseVin(vin []*BitcoinTransactionInput, metadataMap map[string][]*api.Bitc
 		if input.TransactionId != "" && metadataMap != nil {
 			outputs, ok := metadataMap[input.TransactionId]
 			if !ok || len(outputs) == 0 {
-				return nil, xerrors.Errorf("parseVin at not found on metadataMap for [%d] with tx: %s", i, input.TransactionId)
+				return nil, fmt.Errorf("parseVin at not found on metadataMap for [%d] with tx: %s", i, input.TransactionId)
 			}
 
 			for _, output := range outputs {
@@ -426,7 +426,7 @@ func parseVin(vin []*BitcoinTransactionInput, metadataMap map[string][]*api.Bitc
 			}
 
 			if input.FromOutput == nil {
-				return nil, xerrors.Errorf("output index not found in input transaction's vout, outputs=%+v, input=%+v", outputs, input)
+				return nil, fmt.Errorf("output index not found in input transaction's vout, outputs=%+v, input=%+v", outputs, input)
 			}
 		}
 
@@ -468,7 +468,7 @@ func parseVout(vout []*BitcoinTransactionOutput) ([]*api.BitcoinTransactionOutpu
 	for i, outputTx := range vout {
 		output, err := outputTx.ToApiBitcoinTransactionOutput()
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert transaction output: %w", err)
+			return nil, fmt.Errorf("failed to convert transaction output: %w", err)
 		}
 
 		outputs[i] = output
@@ -480,12 +480,12 @@ func parseVout(vout []*BitcoinTransactionOutput) ([]*api.BitcoinTransactionOutpu
 func (o *BitcoinTransactionOutput) ToApiBitcoinTransactionOutput() (*api.BitcoinTransactionOutput, error) {
 	value, err := btcutil.NewAmount(o.Value.Value())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to convert value %v to btc amount: %w", o.Value.Value(), err)
+		return nil, fmt.Errorf("failed to convert value %v to btc amount: %w", o.Value.Value(), err)
 	}
 
 	scriptPubKey, err := o.ScriptPubKey.ToApiBitcoinScriptPublicKey()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to convert script public key: %w", err)
+		return nil, fmt.Errorf("failed to convert script public key: %w", err)
 	}
 
 	return &api.BitcoinTransactionOutput{
@@ -568,7 +568,7 @@ func (v *BitcoinTransactionLit) UnmarshalJSON(input []byte) error {
 	// Use a different struct to avoid calling this custom unmarshaler recursively.
 	var out bitcoinTransactionLit
 	if err := json.Unmarshal(input, &out); err != nil {
-		return xerrors.Errorf("failed to unmarshal struct: %w", err)
+		return fmt.Errorf("failed to unmarshal struct: %w", err)
 	}
 
 	v.Identifier = out.Identifier
@@ -602,17 +602,17 @@ func parseAccountFromPubKeyScript(
 	scriptPubKey *api.BitcoinScriptPublicKey,
 ) (string, error) {
 	if scriptPubKey.Type != bitcoinScriptTypePubKey {
-		return "", xerrors.New("not of type pubkey")
+		return "", errors.New("not of type pubkey")
 	}
 
 	match := pubKeyScriptRegexp.FindStringSubmatch(scriptPubKey.GetAssembly())
 	if len(match) == 0 {
-		return "", xerrors.Errorf("could not parse pubkey script: %s", scriptPubKey.GetAssembly())
+		return "", fmt.Errorf("could not parse pubkey script: %s", scriptPubKey.GetAssembly())
 	}
 
 	pubKey, err := hex.DecodeString(match[1])
 	if err != nil {
-		return "", xerrors.Errorf("could not decode pubkey hex: %w", err)
+		return "", fmt.Errorf("could not decode pubkey hex: %w", err)
 	}
 
 	// Hash writes never return errors.

@@ -2,6 +2,8 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -10,7 +12,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
@@ -23,7 +24,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 	"github.com/coinbase/chainstorage/internal/utils/utils"
-	"github.com/coinbase/chainstorage/internal/workflow/activity/errors"
+	workflowerrors "github.com/coinbase/chainstorage/internal/workflow/activity/errors"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -166,7 +167,7 @@ func (a *Syncer) execute(ctx context.Context, request *SyncerRequest) (*SyncerRe
 	if request.Failover {
 		failoverCtx, err := a.failoverManager.WithFailoverContext(ctx, endpoints.MasterSlaveClusters)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create failover context for master and slave client: %w", err)
+			return nil, fmt.Errorf("failed to create failover context for master and slave client: %w", err)
 		}
 		ctx = failoverCtx
 	}
@@ -174,14 +175,14 @@ func (a *Syncer) execute(ctx context.Context, request *SyncerRequest) (*SyncerRe
 	if request.ConsensusFailover {
 		failoverCtx, err := a.failoverManager.WithFailoverContext(ctx, endpoints.ConsensusCluster)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create failover context for consensus client: %w", err)
+			return nil, fmt.Errorf("failed to create failover context for consensus client: %w", err)
 		}
 		ctx = failoverCtx
 	}
 
 	result, err := a.handleReorg(ctx, logger, request.Tag, request.FastSync, request.IrreversibleDistance, request.NumBlocksToSkip)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to handle reorg: %w", err)
+		return nil, fmt.Errorf("failed to handle reorg: %w", err)
 	}
 	if result.forkHeight >= result.canonicalChainTipHeight {
 		// The master block node is behind the local block store.
@@ -220,7 +221,7 @@ func (a *Syncer) execute(ctx context.Context, request *SyncerRequest) (*SyncerRe
 	} else {
 		inMetadatas, err = a.masterBlockchainClient.BatchGetBlockMetadata(ctx, request.Tag, start, end)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get metadata for blocks from %d to %d: %w", start, end-1, err)
+			return nil, fmt.Errorf("failed to get metadata for blocks from %d to %d: %w", start, end-1, err)
 		}
 
 		// Check if the first block to be synced is a valid descendant of the local fork block.
@@ -255,7 +256,7 @@ func (a *Syncer) execute(ctx context.Context, request *SyncerRequest) (*SyncerRe
 
 	outMetadatas, err := a.getBlocks(ctx, logger, inMetadatas, request.Parallelism, request.DataCompression, request.FastSync, request.TransactionsWriteParallelism)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks from %d to %d: %w", start, end, err)
+		return nil, fmt.Errorf("failed to get blocks from %d to %d: %w", start, end, err)
 	}
 
 	var timeSinceLastBlock time.Duration
@@ -274,13 +275,13 @@ func (a *Syncer) execute(ctx context.Context, request *SyncerRequest) (*SyncerRe
 					zap.Error(err),
 				)
 				if !request.ConsensusValidationMuted {
-					return nil, xerrors.Errorf("failed to validate consensus when latestSyncedHeight=%v, irreversibleDistance=%v: %w", latestSyncedHeight, request.IrreversibleDistance, err)
+					return nil, fmt.Errorf("failed to validate consensus when latestSyncedHeight=%v, irreversibleDistance=%v: %w", latestSyncedHeight, request.IrreversibleDistance, err)
 				}
 			}
 		}
 
 		if err := a.metaStorage.PersistBlockMetas(ctx, true, outMetadatas, forkBlock); err != nil {
-			return nil, xerrors.Errorf("failed to upload metadata for blocks from %d to %d: %w", start, end, err)
+			return nil, fmt.Errorf("failed to upload metadata for blocks from %d to %d: %w", start, end, err)
 		}
 
 		// The node may produce blocks in small batches.
@@ -326,33 +327,33 @@ func (a *Syncer) validateConsensus(ctx context.Context, logger *zap.Logger, tag 
 				metadataIndex := blockHeight - int64(myLatest) - 1
 				if metadataIndex >= int64(len(outMetadatas)) {
 					failureReason = consensusValidationInvalidData
-					return xerrors.Errorf("unexpected metadataIndex=%v, outMetadatasSize=%v", metadataIndex, len(outMetadatas))
+					return fmt.Errorf("unexpected metadataIndex=%v, outMetadatasSize=%v", metadataIndex, len(outMetadatas))
 				}
 				actualFinalizedBlock = outMetadatas[metadataIndex]
 			} else {
 				actualFinalizedBlock, err = a.metaStorage.GetBlockByHeight(ctx, tag, uint64(blockHeight))
 				if err != nil {
 					failureReason = consensusValidationDDBMetadataError
-					return xerrors.Errorf("failed to fetch metadata for block %v: %w", blockHeight, err)
+					return fmt.Errorf("failed to fetch metadata for block %v: %w", blockHeight, err)
 				}
 			}
 
 			expectedFinalizedBlocks, err := a.consensusBlockchainClient.BatchGetBlockMetadata(ctx, tag, uint64(blockHeight), uint64(blockHeight)+1)
 			if err != nil {
 				failureReason = consensusValidationNodeError
-				return xerrors.Errorf("failed to fetch metadata from consensus client for block %v: %w", blockHeight, err)
+				return fmt.Errorf("failed to fetch metadata from consensus client for block %v: %w", blockHeight, err)
 			}
 
 			if len(expectedFinalizedBlocks) != 1 {
 				failureReason = consensusValidationNodeError
-				return xerrors.Errorf("unexpected number of block metadata: %v", len(expectedFinalizedBlocks))
+				return fmt.Errorf("unexpected number of block metadata: %v", len(expectedFinalizedBlocks))
 			}
 
 			if actualFinalizedBlock.Skipped && expectedFinalizedBlocks[0].Skipped {
 				blockHeight -= 1
 			} else if actualFinalizedBlock.GetHash() != expectedFinalizedBlocks[0].GetHash() {
 				failureReason = consensusValidationBlockHashMismatch
-				return xerrors.Errorf("detected mismatch block hash for block=%v, expectedBlock={%+v}, actualBlock={%+v}", blockHeight, expectedFinalizedBlocks[0], actualFinalizedBlock)
+				return fmt.Errorf("detected mismatch block hash for block=%v, expectedBlock={%+v}, actualBlock={%+v}", blockHeight, expectedFinalizedBlocks[0], actualFinalizedBlock)
 			} else {
 				return nil
 			}
@@ -370,7 +371,7 @@ func (a *Syncer) validateConsensus(ctx context.Context, logger *zap.Logger, tag 
 		incConsensusValidationCheckMetric(a.metrics.scope, failureReason)
 
 		errType := parseConsensusErrorType(failureReason)
-		return temporal.NewApplicationError(xerrors.Errorf("consensus validation failed: %w", err).Error(), errType)
+		return temporal.NewApplicationError(fmt.Errorf("consensus validation failed: %w", err).Error(), errType)
 	}
 
 	incConsensusValidationCheckMetric(a.metrics.scope, resultTypeSuccess)
@@ -383,7 +384,7 @@ func (a *Syncer) handleReorg(ctx context.Context, logger *zap.Logger, tag uint32
 	return a.metrics.instrumentHandleReorg.Instrument(ctx, func(ctx context.Context) (*reorgResult, error) {
 		theirLatest, err := a.masterBlockchainClient.GetLatestHeight(ctx)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get their latest block: %w", err)
+			return nil, fmt.Errorf("failed to get their latest block: %w", err)
 		}
 		if theirLatest >= numBlocksToSkip {
 			theirLatest -= numBlocksToSkip
@@ -391,7 +392,7 @@ func (a *Syncer) handleReorg(ctx context.Context, logger *zap.Logger, tag uint32
 
 		myLatestBlock, err := a.metaStorage.GetLatestBlock(ctx, tag)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get my latest block: %w", err)
+			return nil, fmt.Errorf("failed to get my latest block: %w", err)
 		}
 
 		myLatest := myLatestBlock.Height
@@ -427,7 +428,7 @@ func (a *Syncer) handleReorg(ctx context.Context, logger *zap.Logger, tag uint32
 				zap.Uint64("to", to-1))
 			forkBlock, err = a.searchForkBlock(ctx, tag, from, to)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to search for fork block from height %d to %d due to: %w", from, to-1, err)
+				return nil, fmt.Errorf("failed to search for fork block from height %d to %d due to: %w", from, to-1, err)
 			}
 			if forkBlock != nil {
 				reorgDistance := myLatest - forkBlock.GetHeight()
@@ -459,7 +460,7 @@ func (a *Syncer) handleReorg(ctx context.Context, logger *zap.Logger, tag uint32
 
 					err = a.metaStorage.PersistBlockMetas(ctx, true, []*api.BlockMetadata{forkBlock}, nil)
 					if err != nil {
-						return nil, xerrors.Errorf("failed to set watermark block for height %d due to: %w", forkBlock.GetHeight(), err)
+						return nil, fmt.Errorf("failed to set watermark block for height %d due to: %w", forkBlock.GetHeight(), err)
 					}
 				}
 				break
@@ -494,7 +495,7 @@ func (a *Syncer) searchForkBlock(ctx context.Context, tag uint32, from, to uint6
 		group.Go(func() error {
 			out, err := a.masterBlockchainClient.BatchGetBlockMetadata(groupCtx, tag, from, to)
 			if err != nil {
-				return xerrors.Errorf("failed to query block range from blockchain client (from=%v, to=%v): %w", from, to, err)
+				return fmt.Errorf("failed to query block range from blockchain client (from=%v, to=%v): %w", from, to, err)
 			}
 
 			theirBlockMetadatas = out
@@ -505,7 +506,7 @@ func (a *Syncer) searchForkBlock(ctx context.Context, tag uint32, from, to uint6
 		group.Go(func() error {
 			out, err := a.metaStorage.GetBlocksByHeightRange(groupCtx, tag, from, to)
 			if err != nil {
-				return xerrors.Errorf("failed to query block range from meta storage (from=%v, to=%v): %w", from, to, err)
+				return fmt.Errorf("failed to query block range from meta storage (from=%v, to=%v): %w", from, to, err)
 			}
 
 			myBlockMetadatas = out
@@ -513,7 +514,7 @@ func (a *Syncer) searchForkBlock(ctx context.Context, tag uint32, from, to uint6
 		})
 
 		if err := group.Wait(); err != nil {
-			return nil, xerrors.Errorf("failed to query block range (from=%v, to=%v): %w", from, to, err)
+			return nil, fmt.Errorf("failed to query block range (from=%v, to=%v): %w", from, to, err)
 		}
 
 		var result *api.BlockMetadata
@@ -568,7 +569,7 @@ func (a *Syncer) getBlocks(
 			return nil, err
 		}
 		if len(failed) > 0 {
-			return nil, xerrors.Errorf("failed to get %d blocks after attempting twice: %+v", len(failed), failed)
+			return nil, fmt.Errorf("failed to get %d blocks after attempting twice: %+v", len(failed), failed)
 		}
 		outMetadatas = append(outMetadatas, reprocessed...)
 	}
@@ -628,7 +629,7 @@ func (a *Syncer) getBlocksInParallel(
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, nil, xerrors.Errorf("failed to get blocks: %w", err)
+		return nil, nil, fmt.Errorf("failed to get blocks: %w", err)
 	}
 	processed := make([]*api.BlockMetadata, 0, batchSize)
 	reprocess := make([]*api.BlockMetadata, 0, batchSize)
@@ -661,13 +662,13 @@ func (a *Syncer) safeGetBlock(
 			// Use master cluster when enabling bestEffort and getting transaction trace
 			outBlock, err = a.getBlockFromClient(ctx, inBlock, fastSync, a.masterBlockchainClient, client.WithBestEffort())
 			if err != nil {
-				return nil, xerrors.Errorf("failed to get block from master (height=%v, hash=%v): %w", inBlock.Height, inBlock.Hash, err)
+				return nil, fmt.Errorf("failed to get block from master (height=%v, hash=%v): %w", inBlock.Height, inBlock.Hash, err)
 			}
 		} else {
 			outBlock, err = a.getBlockFromClient(ctx, inBlock, fastSync, a.slaveBlockchainClient)
 			if err != nil {
-				if !xerrors.Is(err, client.ErrBlockNotFound) {
-					return nil, xerrors.Errorf("failed to get block from slave (height=%v, hash=%v): %w", inBlock.Height, inBlock.Hash, err)
+				if !errors.Is(err, client.ErrBlockNotFound) {
+					return nil, fmt.Errorf("failed to get block from slave (height=%v, hash=%v): %w", inBlock.Height, inBlock.Hash, err)
 				}
 
 				// Fall back to master if the block cannot be found from slave.
@@ -681,7 +682,7 @@ func (a *Syncer) safeGetBlock(
 				)
 				outBlock, err = a.getBlockFromClient(ctx, inBlock, fastSync, a.masterBlockchainClient)
 				if err != nil {
-					return nil, xerrors.Errorf("failed to get block from master (height=%v, hash=%v): %w", inBlock.Height, inBlock.Hash, err)
+					return nil, fmt.Errorf("failed to get block from master (height=%v, hash=%v): %w", inBlock.Height, inBlock.Hash, err)
 				}
 			}
 		}
@@ -701,7 +702,7 @@ func (a *Syncer) safeGetBlock(
 			group.Go(func() error {
 				err := a.addTransactionsInParallel(ctx, logger, outBlock, transactionIndexingParallelism)
 				if err != nil {
-					return xerrors.Errorf("failed to add or update transaction: %w", err)
+					return fmt.Errorf("failed to add or update transaction: %w", err)
 				}
 
 				return nil
@@ -726,7 +727,7 @@ func (a *Syncer) safeGetBlock(
 func (a *Syncer) uploadBlockToBlobStorage(ctx context.Context, outBlock *api.Block, dataCompression api.Compression) error {
 	objectKey, err := a.blobStorage.Upload(ctx, outBlock, dataCompression)
 	if err != nil {
-		return xerrors.Errorf("failed to upload block hash %s to blob storage: %w", outBlock.Metadata.Hash, err)
+		return fmt.Errorf("failed to upload block hash %s to blob storage: %w", outBlock.Metadata.Hash, err)
 	}
 	outBlock.Metadata.ObjectKeyMain = objectKey
 
@@ -744,7 +745,7 @@ func (a *Syncer) addTransactionsInParallel(
 	transactionMetadata := block.GetTransactionMetadata()
 	if transactionMetadata == nil {
 		logger.Error("transaction metadata is nil")
-		return xerrors.New("transaction metadata is nil")
+		return errors.New("transaction metadata is nil")
 	}
 	transactionsHashList := transactionMetadata.Transactions
 	if len(transactionsHashList) == 0 {
@@ -766,7 +767,7 @@ func (a *Syncer) addTransactionsInParallel(
 		err := a.metaStorage.AddTransactions(ctx, transactions, parallelism)
 		if err != nil {
 			logger.Error("failed to add transactions", zap.Error(err))
-			return xerrors.Errorf("failed to add transactions: %w", err)
+			return fmt.Errorf("failed to add transactions: %w", err)
 		}
 
 		return nil
@@ -827,7 +828,7 @@ func incConsensusValidationCheckMetric(metrics tally.Scope, resultType string) {
 
 func parseConsensusErrorType(failureReason string) string {
 	if failureReason == consensusValidationNodeError {
-		return errors.ErrTypeConsensusClusterFailure
+		return workflowerrors.ErrTypeConsensusClusterFailure
 	}
-	return errors.ErrTypeConsensusValidationFailure
+	return workflowerrors.ErrTypeConsensusValidationFailure
 }

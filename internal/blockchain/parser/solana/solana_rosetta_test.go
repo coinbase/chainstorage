@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
@@ -362,7 +361,7 @@ func (s *solanaRosettaParserTestSuite) validateSolanaRosettaTransactionOperation
 			}
 			actualPostTokenBalances[key] = val.Add(val, amount)
 		} else {
-			panic(xerrors.Errorf("unknown symbol=%s", symbol))
+			panic(fmt.Errorf("unknown symbol=%s", symbol))
 		}
 	}
 

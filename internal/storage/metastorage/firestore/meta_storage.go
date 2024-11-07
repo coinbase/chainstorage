@@ -2,10 +2,10 @@ package firestore
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/firestore"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -32,27 +32,27 @@ func NewMetaStorage(params Params) (internal.Result, error) {
 	ctx := context.Background()
 	config := params.Config.GCP
 	if config == nil {
-		return internal.Result{}, xerrors.Errorf("failed to create firestore meta storage: missing GCP config")
+		return internal.Result{}, fmt.Errorf("failed to create firestore meta storage: missing GCP config")
 	}
 
 	client, err := firestore.NewClient(ctx, config.Project)
 	if err != nil {
-		return internal.Result{}, xerrors.Errorf("failed to create firestore client: %w", err)
+		return internal.Result{}, fmt.Errorf("failed to create firestore client: %w", err)
 	}
 
 	blockStorage, err := newBlockStorage(params, client)
 	if err != nil {
-		return internal.Result{}, xerrors.Errorf("failed create new BlockStorage: %w", err)
+		return internal.Result{}, fmt.Errorf("failed create new BlockStorage: %w", err)
 	}
 
 	eventStorage, err := newEventStorage(params, client)
 	if err != nil {
-		return internal.Result{}, xerrors.Errorf("failed create new EventStorage: %w", err)
+		return internal.Result{}, fmt.Errorf("failed create new EventStorage: %w", err)
 	}
 
 	transactionStorage, err := newTransactionStorage(params, client)
 	if err != nil {
-		return internal.Result{}, xerrors.Errorf("failed create new TransactionStorage: %w", err)
+		return internal.Result{}, fmt.Errorf("failed create new TransactionStorage: %w", err)
 	}
 
 	metaStorage := &metaStorageImpl{

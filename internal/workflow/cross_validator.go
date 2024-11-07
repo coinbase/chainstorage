@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -68,7 +68,7 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 	return w.executeWorkflow(ctx, request, func() error {
 		var cfg config.CrossValidatorWorkflowConfig
 		if err := w.readConfig(ctx, &cfg); err != nil {
-			return xerrors.Errorf("failed to read config: %w", err)
+			return fmt.Errorf("failed to read config: %w", err)
 		}
 
 		logger := w.getLogger(ctx).With(
@@ -78,7 +78,7 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 
 		startHeight := request.StartHeight
 		if startHeight < cfg.ValidationStartHeight {
-			return xerrors.Errorf("invalid startHeight=%v, ValidationStartHeight=%v", startHeight, cfg.ValidationStartHeight)
+			return fmt.Errorf("invalid startHeight=%v, ValidationStartHeight=%v", startHeight, cfg.ValidationStartHeight)
 		}
 
 		validationHeightPadding := cfg.IrreversibleDistance * validationHeightPaddingMultiplier
@@ -106,7 +106,7 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 		if request.BackoffInterval != "" {
 			backoffInterval, err = time.ParseDuration(request.BackoffInterval)
 			if err != nil {
-				return xerrors.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
+				return fmt.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
 			}
 		}
 		zeroBackoff := backoffInterval == 0
@@ -134,7 +134,7 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 			}
 			crossValidatorResponse, err := w.crossValidator.Execute(ctx, crossValidatorRequest)
 			if err != nil {
-				return xerrors.Errorf("failed to execute cross validator: %w", err)
+				return fmt.Errorf("failed to execute cross validator: %w", err)
 			}
 
 			logger.Info("validated blocks", zap.Reflect("response", crossValidatorResponse))
@@ -144,7 +144,7 @@ func (w *CrossValidator) execute(ctx workflow.Context, request *CrossValidatorRe
 
 			if !zeroBackoff {
 				if err := backoff.Get(ctx, nil); err != nil {
-					return xerrors.Errorf("failed to sleep: %w", err)
+					return fmt.Errorf("failed to sleep: %w", err)
 				}
 			}
 		}

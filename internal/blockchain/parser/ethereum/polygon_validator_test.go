@@ -3,13 +3,13 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"testing"
 
 	geth "github.com/ethereum/go-ethereum/common"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -82,19 +82,19 @@ func TestPolygonValidator_Failures(t *testing.T) {
 	corrupt_block := proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().TransactionsRoot = "0x14e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b367"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+	require.True(errors.Is(err, ErrInvalidBlockHash))
 
 	// Corrupt the block number (from 1000000 to 1000001)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().Number = 1000001
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+	require.True(errors.Is(err, ErrInvalidBlockHash))
 
 	// Corrupt the miner (change the last char from 0 to 1)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().Miner = "0x0000000000000000000000000000000000000001"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+	require.True(errors.Is(err, ErrInvalidBlockHash))
 
 	// 2. Modify the transactions in different ways and fail the transactions verification.
 	// Note that, this block has the state-sync transction at the end.
@@ -105,19 +105,19 @@ func TestPolygonValidator_Failures(t *testing.T) {
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[0].Gas = 28998
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+	require.True(errors.Is(err, ErrInvalidTransactionsHash))
 
 	// Corrupt the to (modify the first 3 chars).
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[0].To = "0xabcb23fd6bc0add59e62ac25578270cff1b9f619"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+	require.True(errors.Is(err, ErrInvalidTransactionsHash))
 
 	// Corrupt the last state-sync tx (modify the from address to non-nil address).
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[5].From = "0x1000000000000000000000000000000000000000"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+	require.True(errors.Is(err, ErrInvalidTransactionsHash))
 
 	// 3. Modify the receipts in different ways and fail the receipts verification.
 	err = fixtures.UnmarshalPB("parser/polygon/native_block_43200000.json", &block)
@@ -127,7 +127,7 @@ func TestPolygonValidator_Failures(t *testing.T) {
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[1].Receipt.CumulativeGasUsed = 95574
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidReceiptsHash))
+	require.True(errors.Is(err, ErrInvalidReceiptsHash))
 
 	// Corrupt the status (from 1 to 0)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
@@ -135,13 +135,13 @@ func TestPolygonValidator_Failures(t *testing.T) {
 		Status: 0,
 	}
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidReceiptsHash))
+	require.True(errors.Is(err, ErrInvalidReceiptsHash))
 
 	// Corrupt the logs (drop the last 4 bytes of logs[0].data)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[1].Receipt.Logs[0].Data = "0x00000000000000000000000000000000000000000000000000000000002d"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidReceiptsHash))
+	require.True(errors.Is(err, ErrInvalidReceiptsHash))
 }
 
 func TestPolygonValidateAccountState_Success(t *testing.T) {

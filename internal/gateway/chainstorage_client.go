@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -138,13 +138,13 @@ func NewChainstorageClient(params Params) (Client, error) {
 
 	conn, err := grpc.DialContext(ctx, address, opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to dial grpc: %w", err)
+		return nil, fmt.Errorf("failed to dial grpc: %w", err)
 	}
 
 	params.Lifecycle.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			if err := conn.Close(); err != nil {
-				return xerrors.Errorf("failed to close chainstorage connection: %w", err)
+				return fmt.Errorf("failed to close chainstorage connection: %w", err)
 			}
 
 			return nil

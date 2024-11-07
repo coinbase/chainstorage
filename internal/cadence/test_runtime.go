@@ -2,13 +2,14 @@ package cadence
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/timesource"
 )
@@ -53,11 +54,11 @@ func (r *testRuntime) RegisterActivity(a any, options activity.RegisterOptions) 
 func (r *testRuntime) ExecuteWorkflow(ctx context.Context, options client.StartWorkflowOptions, workflow any, request any) (client.WorkflowRun, error) {
 	r.env.ExecuteWorkflow(workflow, request)
 	if !r.env.IsWorkflowCompleted() {
-		return nil, xerrors.New("workflow not completed")
+		return nil, errors.New("workflow not completed")
 	}
 
 	if err := r.env.GetWorkflowError(); err != nil {
-		return nil, xerrors.Errorf("workflow failed: %w", err)
+		return nil, fmt.Errorf("workflow failed: %w", err)
 	}
 
 	return testWorkflowRun{}, nil

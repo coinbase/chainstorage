@@ -1,7 +1,8 @@
 package types
 
 import (
-	"golang.org/x/xerrors"
+	"fmt"
+
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -47,12 +48,12 @@ func ConvertMillisecondsToTimestamp(milliseconds int64) *timestamppb.Timestamp {
 func MarshalToAny(v interface{}) (*anypb.Any, error) {
 	pv, err := structpb.NewValue(v)
 	if err != nil {
-		return nil, xerrors.Errorf("%v cannot convert to structpb.Value: %w", v, err)
+		return nil, fmt.Errorf("%v cannot convert to structpb.Value: %w", v, err)
 	}
 
 	value, err := anypb.New(pv)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal into Any for %v: %w", pv, err)
+		return nil, fmt.Errorf("failed to marshal into Any for %v: %w", pv, err)
 	}
 
 	return value, nil

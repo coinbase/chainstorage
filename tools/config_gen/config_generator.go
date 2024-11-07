@@ -1,12 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -58,7 +57,7 @@ func NewConfigGenerator(chainStorageConfigPath string, writePath string) *Config
 func (c *ConfigGenerator) Run() error {
 	err := c.generateChainStorageConfigs(c.chainStorageConfigPath)
 	if err != nil {
-		return xerrors.Errorf("failed generating ChainStorage configs: %w", err)
+		return fmt.Errorf("failed generating ChainStorage configs: %w", err)
 	}
 	return nil
 }
@@ -77,7 +76,7 @@ func (c *ConfigGenerator) addParentTemplate(parentTemplatePath string, fn walkEn
 		if _, err := fn(parentTemplatePath); err != nil {
 			template, err := NewConfigTemplateFromFile(parentTemplatePath)
 			if err != nil {
-				return xerrors.Errorf("failed to read parent template [%s]: %w", parentTemplatePath, err)
+				return fmt.Errorf("failed to read parent template [%s]: %w", parentTemplatePath, err)
 			}
 			*collection = append(*collection, template)
 		}
@@ -88,7 +87,7 @@ func (c *ConfigGenerator) addParentTemplate(parentTemplatePath string, fn walkEn
 func (c *ConfigGenerator) walk(seedPath string, path string, fn walkEnvFunc, parentTemplates *ParentTemplates) error {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return xerrors.Errorf("unable to read stat for path [%s]: %w", path, err)
+		return fmt.Errorf("unable to read stat for path [%s]: %w", path, err)
 	}
 
 	if fileInfo.IsDir() {
@@ -110,7 +109,7 @@ func (c *ConfigGenerator) walk(seedPath string, path string, fn walkEnvFunc, par
 		}
 		subDirs, err := os.ReadDir(path)
 		if err != nil {
-			return xerrors.Errorf("failed to read directory [%s]: %w", path, err)
+			return fmt.Errorf("failed to read directory [%s]: %w", path, err)
 		}
 		for _, subDir := range subDirs {
 			if err := c.walk(seedPath, filepath.Join(path, subDir.Name()), fn, parentTemplates); err != nil {
@@ -125,7 +124,7 @@ func (c *ConfigGenerator) walk(seedPath string, path string, fn walkEnvFunc, par
 		baseFileName := filepath.Base(path)
 		template, err := NewConfigTemplateFromFile(path)
 		if err != nil {
-			return xerrors.Errorf("unable to load config template [%s]: %w", path, err)
+			return fmt.Errorf("unable to load config template [%s]: %w", path, err)
 		}
 
 		fileToWrite := filepath.Join(filepath.Dir(path), strings.TrimSuffix(baseFileName, templateExt)+".yml")
@@ -133,7 +132,7 @@ func (c *ConfigGenerator) walk(seedPath string, path string, fn walkEnvFunc, par
 
 		err = os.MkdirAll(filepath.Dir(fileToWrite), os.ModePerm)
 		if err != nil {
-			return xerrors.Errorf("failed to prepare directory for config file [%s]: %w", fileToWrite, err)
+			return fmt.Errorf("failed to prepare directory for config file [%s]: %w", fileToWrite, err)
 		}
 
 		baseName := filepath.Base(path)
@@ -155,7 +154,7 @@ func (c *ConfigGenerator) walk(seedPath string, path string, fn walkEnvFunc, par
 
 		err = template.WriteToFile(configVars, fileToWrite)
 		if err != nil {
-			return xerrors.Errorf("failed to write generated config for template [%s]: %w", path, err)
+			return fmt.Errorf("failed to write generated config for template [%s]: %w", path, err)
 		}
 	}
 	return nil
@@ -164,17 +163,17 @@ func (c *ConfigGenerator) walk(seedPath string, path string, fn walkEnvFunc, par
 func (c *ConfigGenerator) getEnvFromCloudConfig(path string) (*ConfigVars, error) {
 	vals := strings.SplitN(filepath.Base(path), ".", 3)
 	if len(vals) != 3 {
-		return nil, xerrors.Errorf("unable to extract configName and Env from path [%s]", path)
+		return nil, fmt.Errorf("unable to extract configName and Env from path [%s]", path)
 	}
 	env := vals[0]
 	configName := vals[1]
 	err := c.validateEnvironment(env)
 	if err != nil {
-		return nil, xerrors.Errorf("unable to extract Env from path [%s]: %w", path, err)
+		return nil, fmt.Errorf("unable to extract Env from path [%s]: %w", path, err)
 	}
 	configSplit := strings.Split(configName, "_")
 	if len(configSplit) < 2 || len(configSplit) > 3 {
-		return nil, xerrors.Errorf("unable to extract blockchain, network and sidechain from config_name [%s]", configName)
+		return nil, fmt.Errorf("unable to extract blockchain, network and sidechain from config_name [%s]", configName)
 	}
 	configVars := &ConfigVars{
 		Blockchain:  configSplit[0],
@@ -191,7 +190,7 @@ func (c *ConfigGenerator) getEnvFromChainStorageConfig(path string) (*ConfigVars
 	env := strings.TrimSuffix(filepath.Base(path), templateExt)
 	err := c.validateEnvironment(env)
 	if err != nil {
-		return nil, xerrors.Errorf("unable to extract Env from path [%s]: %w", path, err)
+		return nil, fmt.Errorf("unable to extract Env from path [%s]: %w", path, err)
 	}
 
 	dir, _ := filepath.Split(path)
@@ -208,7 +207,7 @@ func (c *ConfigGenerator) getEnvFromChainStorageConfig(path string) (*ConfigVars
 
 	err = c.validateBlockchainNetwork(blockchain, network)
 	if err != nil {
-		return nil, xerrors.Errorf("unable to extract configName from path [%s]: %w", path, err)
+		return nil, fmt.Errorf("unable to extract configName from path [%s]: %w", path, err)
 	}
 	configVars := &ConfigVars{
 		Blockchain:  blockchain,
@@ -227,13 +226,13 @@ func (c *ConfigGenerator) validateEnvironment(envString string) error {
 		configEnv == config.EnvProduction {
 		return nil
 	}
-	return xerrors.Errorf("Invalid environment [%s]", envString)
+	return fmt.Errorf("Invalid environment [%s]", envString)
 }
 
 func (c *ConfigGenerator) validateBlockchainNetwork(blockchain string, network string) error {
 	asNetworkValue := "NETWORK_" + strings.ToUpper(blockchain+"_"+network)
 	if _, ok := common.Network_value[asNetworkValue]; !ok {
-		return xerrors.Errorf("Invalid blockchain [%s] or network [%s]", blockchain, network)
+		return fmt.Errorf("Invalid blockchain [%s] or network [%s]", blockchain, network)
 	}
 	return nil
 }

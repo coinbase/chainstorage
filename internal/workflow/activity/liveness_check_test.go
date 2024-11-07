@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
@@ -167,7 +167,7 @@ func (s *LivenessCheckTestSuite) TestLivenessCheck_Failure() {
 
 	s.masterBlockchainClient.EXPECT().
 		GetLatestHeight(gomock.Any()).
-		Return(uint64(0), xerrors.Errorf("master client failure"))
+		Return(uint64(0), fmt.Errorf("master client failure"))
 
 	request := &LivenessCheckRequest{
 		Tag:                    tag,

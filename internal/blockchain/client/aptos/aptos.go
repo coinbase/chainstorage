@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/aptos"
@@ -57,7 +56,7 @@ func NewAptosClientFactory(params internal.RestapiClientParams) internal.ClientF
 
 func (c *aptosClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint32, from uint64, to uint64) ([]*api.BlockMetadata, error) {
 	if from >= to {
-		return nil, xerrors.Errorf("invalid height range range of [%d, %d)", from, to)
+		return nil, fmt.Errorf("invalid height range range of [%d, %d)", from, to)
 	}
 
 	numBlocks := int(to - from)
@@ -68,7 +67,7 @@ func (c *aptosClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint32,
 		// Don't need to include transactions.
 		metadata, _, err := c.getBlock(ctx, tag, height, false)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get block for height=%d due to: %w", height, err)
+			return nil, fmt.Errorf("failed to get block for height=%d due to: %w", height, err)
 		}
 		blocks[i] = metadata
 	}
@@ -79,7 +78,7 @@ func (c *aptosClientImpl) BatchGetBlockMetadata(ctx context.Context, tag uint32,
 func (c *aptosClientImpl) GetBlockByHeight(ctx context.Context, tag uint32, height uint64, _ ...internal.ClientOption) (*api.Block, error) {
 	metadata, header, err := c.getBlock(ctx, tag, height, true)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block (height=%v): %w", height, err)
+		return nil, fmt.Errorf("failed to get block (height=%v): %w", height, err)
 	}
 
 	block := &api.Block{
@@ -95,12 +94,12 @@ func (c *aptosClientImpl) GetBlockByHash(ctx context.Context, tag uint32, height
 	// Aptos doesn't have API to get a block by its hash. Because there is no reorg, we can query the block by its height.
 	block, err := c.GetBlockByHeight(ctx, tag, height, opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block by hash: %w", err)
+		return nil, fmt.Errorf("failed to get block by hash: %w", err)
 	}
 
 	// Double check if the above assumption is correct.
 	if hash != block.Metadata.Hash {
-		return nil, xerrors.Errorf("failed to get block by hash: got unexpected hash (expected=%v, actual=%v)", hash, block.Metadata.Hash)
+		return nil, fmt.Errorf("failed to get block by hash: got unexpected hash (expected=%v, actual=%v)", hash, block.Metadata.Hash)
 	}
 
 	return block, nil
@@ -113,18 +112,18 @@ func (c *aptosClientImpl) GetLatestHeight(ctx context.Context) (uint64, error) {
 	// For the get ledger info, the requestBody is nil.
 	response, err := c.client.Call(ctx, method, nil)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get latest block height: %w", handleCallError(err))
+		return 0, fmt.Errorf("failed to get latest block height: %w", handleCallError(err))
 	}
 
 	// Parse to get the latest block height
 	var ledgerInfo aptos.AptosLedgerInfoLit
 	if err := json.Unmarshal(response, &ledgerInfo); err != nil {
-		return 0, xerrors.Errorf("failed to unmarshal ledger info: %w", err)
+		return 0, fmt.Errorf("failed to unmarshal ledger info: %w", err)
 	}
 
 	blockHeight, err := strconv.ParseUint(ledgerInfo.LatestBlockHeight, 10, 64)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to parse ledgerInfo's block_height=%v: %w", ledgerInfo.LatestBlockHeight, err)
+		return 0, fmt.Errorf("failed to parse ledgerInfo's block_height=%v: %w", ledgerInfo.LatestBlockHeight, err)
 	}
 
 	return blockHeight, nil
@@ -162,17 +161,17 @@ func (c *aptosClientImpl) getBlock(ctx context.Context, tag uint32, height uint6
 	// For the get block request, the requestBody is nil.
 	response, err := c.client.Call(ctx, method, nil)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to call restapi: %w", handleCallError(err))
+		return nil, nil, fmt.Errorf("failed to call restapi: %w", handleCallError(err))
 	}
 
 	header, err := c.parseHeader(response)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse header: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse header: %w", err)
 	}
 
 	time, err := strconv.ParseUint(header.BlockTime, 10, 64)
 	if err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse header's timestamp=%v: %w", header.BlockTime, err)
+		return nil, nil, fmt.Errorf("failed to parse header's timestamp=%v: %w", header.BlockTime, err)
 	}
 
 	return &api.BlockMetadata{
@@ -218,7 +217,7 @@ func handleCallError(callErr error) error {
 
 	errAptos := &AptosError{}
 	if err := json.Unmarshal([]byte(errHTTP.Response), &errAptos); err != nil {
-		return xerrors.Errorf("failed to unmarshal err (%v) with code %v to errAptos due to: %w", callErr, errHTTP.Code, err)
+		return fmt.Errorf("failed to unmarshal err (%v) with code %v to errAptos due to: %w", callErr, errHTTP.Code, err)
 	}
 
 	if errAptos.ErrorCode == aptosErrorCodeBlockNotFound {
@@ -231,15 +230,15 @@ func handleCallError(callErr error) error {
 func (c *aptosClientImpl) parseHeader(response []byte) (*aptos.AptosBlockLit, error) {
 	var header aptos.AptosBlockLit
 	if err := json.Unmarshal(response, &header); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal block: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal block: %w", err)
 	}
 
 	if header.BlockHash == "" {
-		return nil, xerrors.Errorf("block hash is empty: {%+v}", header)
+		return nil, fmt.Errorf("block hash is empty: {%+v}", header)
 	}
 
 	if err := c.validate.Struct(header); err != nil {
-		return nil, xerrors.Errorf("failed to parse block lit: %w", err)
+		return nil, fmt.Errorf("failed to parse block lit: %w", err)
 	}
 
 	return &header, nil

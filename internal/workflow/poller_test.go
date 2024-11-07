@@ -2,6 +2,8 @@ package workflow
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -15,7 +17,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
@@ -29,7 +30,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/internal/workflow/activity"
-	"github.com/coinbase/chainstorage/internal/workflow/activity/errors"
+	workfloworkflowerrors "github.com/coinbase/chainstorage/internal/workflow/activity/errors"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
 
@@ -562,7 +563,7 @@ func (s *pollerTestSuite) TestPollerFailure_ConsensusAutomaticFailover() {
 		Return(testutil.MakeBlockMetadatasFromStartHeight(latestFinalizedHeight, 1, tag)[0], nil)
 	s.consensusBlockchainClient.EXPECT().
 		BatchGetBlockMetadata(gomock.Any(), tag, latestFinalizedHeight, latestFinalizedHeight+1).
-		Return(nil, xerrors.Errorf("failed to fetch metadata"))
+		Return(nil, fmt.Errorf("failed to fetch metadata"))
 
 	_, err := s.poller.Execute(context.Background(), &PollerRequest{
 		Tag: tag,
@@ -609,14 +610,14 @@ func (s *pollerTestSuite) TestPollerFailure_ConsensusValidationFailure() {
 	}
 	latestFinalizedHeight := localHeight + heightGap - s.cfg.Chain.IrreversibleDistance + 1
 	s.metaStorage.EXPECT().GetBlockByHeight(gomock.Any(), tag, latestFinalizedHeight).
-		Return(nil, xerrors.New("failed to fetch metadata from metaStorage"))
+		Return(nil, errors.New("failed to fetch metadata from metaStorage"))
 
 	_, err := s.poller.Execute(context.Background(), &PollerRequest{
 		Tag: tag,
 	})
 	require.Error(err)
 	require.Contains(err.Error(), "failed to execute syncer")
-	require.Contains(err.Error(), errors.ErrTypeConsensusValidationFailure)
+	require.Contains(err.Error(), workfloworkflowerrors.ErrTypeConsensusValidationFailure)
 	require.False(IsContinueAsNewError(err))
 }
 
@@ -838,7 +839,7 @@ func (s *pollerTestSuite) TestPollerSuccessAfterReprocessing() {
 		for k := start; k < end; k++ {
 			s.slaveBlockchainClient.EXPECT().
 				GetBlockByHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, xerrors.Errorf("slave client failure"))
+				Return(nil, fmt.Errorf("slave client failure"))
 		}
 		for k := start; k < end; k++ {
 			s.masterBlockchainClient.EXPECT().
@@ -906,7 +907,7 @@ func (s *pollerTestSuite) TestPollerFailure() {
 	s.masterBlockchainClient.EXPECT().
 		BatchGetBlockMetadata(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		AnyTimes().
-		Return(nil, xerrors.Errorf("master client failure"))
+		Return(nil, fmt.Errorf("master client failure"))
 	_, err := s.poller.Execute(context.Background(), &PollerRequest{
 		Tag: tag,
 	})
@@ -940,7 +941,7 @@ func (s *pollerTestSuite) TestPollerFailure_AutomateFailover() {
 	s.masterBlockchainClient.EXPECT().
 		BatchGetBlockMetadata(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		AnyTimes().
-		Return(nil, xerrors.Errorf("master client failure"))
+		Return(nil, fmt.Errorf("master client failure"))
 	_, err := s.poller.Execute(context.Background(), &PollerRequest{
 		Tag: tag,
 	})

@@ -2,13 +2,13 @@ package cron
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"time"
 
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -134,11 +134,11 @@ func (t *workflowStatusTask) Run(ctx context.Context) error {
 
 	// Mark open workflows twice because sometimes the result misses some workflows due to `ContinueAsNew`
 	if err := t.markOpenWorkflows(ctx, expectedWorkflowRunning); err != nil {
-		return xerrors.Errorf("failed to mark open workflows: %w", err)
+		return fmt.Errorf("failed to mark open workflows: %w", err)
 	}
 	time.Sleep(1 * time.Second)
 	if err := t.markOpenWorkflows(ctx, expectedWorkflowRunning); err != nil {
-		return xerrors.Errorf("failed to mark open workflows: %w", err)
+		return fmt.Errorf("failed to mark open workflows: %w", err)
 	}
 
 	for workflowName, isRunning := range expectedWorkflowRunning {
@@ -157,7 +157,7 @@ func (t *workflowStatusTask) Run(ctx context.Context) error {
 func (t *workflowStatusTask) markOpenWorkflows(ctx context.Context, expectedWorkflowMap map[string]bool) error {
 	openWorkflows, err := t.runtime.ListOpenWorkflows(ctx, t.config.Cadence.Domain, maxPageSize)
 	if err != nil {
-		return xerrors.Errorf("failed to get open workflows: %w", err)
+		return fmt.Errorf("failed to get open workflows: %w", err)
 	}
 	for _, wf := range openWorkflows.Executions {
 		openWorkflow := wf.Execution.WorkflowId

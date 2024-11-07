@@ -2,8 +2,7 @@ package internal
 
 import (
 	"context"
-
-	"golang.org/x/xerrors"
+	"errors"
 )
 
 type nopImpl struct{}
@@ -23,7 +22,7 @@ func (q *nopImpl) ResendMessage(_ context.Context, _ *Message) error {
 }
 
 func (q *nopImpl) ReceiveMessage(_ context.Context) (*Message, error) {
-	return nil, xerrors.New("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (q *nopImpl) DeleteMessage(_ context.Context, _ *Message) error {

@@ -3,7 +3,7 @@ package retry
 import (
 	"fmt"
 
-	"golang.org/x/xerrors"
+	"github.com/cockroachdb/errors"
 )
 
 type (
@@ -17,8 +17,8 @@ type (
 )
 
 var (
-	_ xerrors.Wrapper = (*RetryableError)(nil)
-	_ xerrors.Wrapper = (*RateLimitError)(nil)
+	_ errors.Wrapper = (*RetryableError)(nil)
+	_ errors.Wrapper = (*RateLimitError)(nil)
 )
 
 // Retryable returns an error that indicates that the operation should be retried.
@@ -33,7 +33,7 @@ func (e *RetryableError) Error() string {
 }
 
 func (e *RetryableError) Unwrap() error {
-	// Implement `xerrors.Wrapper` so that the original error can be unwrapped.
+	// Implement `errors.Wrapper` so that the original error can be unwrapped.
 	return e.Err
 }
 
@@ -48,6 +48,6 @@ func (e *RateLimitError) Error() string {
 }
 
 func (e *RateLimitError) Unwrap() error {
-	// Implement `xerrors.Wrapper` so that the original error can be unwrapped.
+	// Implement `errors.Wrapper` so that the original error can be unwrapped.
 	return e.Err
 }

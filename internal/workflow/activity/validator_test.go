@@ -2,9 +2,8 @@ package activity
 
 import (
 	"context"
+	"fmt"
 	"testing"
-
-	"golang.org/x/xerrors"
 
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/sdk/testsuite"
@@ -432,7 +431,7 @@ func (s *ValidatorTestSuite) TestValidator_BlockValidation_Failure() {
 			AnyTimes()
 		s.parser.EXPECT().
 			ValidateBlock(gomock.Any(), gomock.Any()).
-			Return(xerrors.Errorf("mock error"))
+			Return(fmt.Errorf("mock error"))
 	}
 	s.slaveClient.EXPECT().
 		BatchGetBlockMetadata(gomock.Any(), blockTag, startHeight, endHeight+1).

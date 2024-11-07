@@ -2,11 +2,11 @@ package activity
 
 import (
 	"context"
+	"fmt"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
@@ -58,7 +58,7 @@ func (a *Loader) execute(ctx context.Context, request *LoaderRequest) (*LoaderRe
 	logger := a.getLogger(ctx)
 
 	if err := a.metaStorage.PersistBlockMetas(ctx, request.UpdateWatermark, request.Metadata, request.LastBlock); err != nil {
-		return nil, xerrors.Errorf("failed to persist blockMetadata: %w", err)
+		return nil, fmt.Errorf("failed to persist blockMetadata: %w", err)
 	}
 
 	response := &LoaderResponse{}

@@ -3,6 +3,7 @@ package aptos
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -483,7 +483,7 @@ func (v AptosQuantity) MarshalJSON() ([]byte, error) {
 func (v *AptosQuantity) UnmarshalJSON(input []byte) error {
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal AptosQuantity into string: %w", err)
+		return fmt.Errorf("failed to unmarshal AptosQuantity into string: %w", err)
 	}
 
 	if s == "" {
@@ -494,7 +494,7 @@ func (v *AptosQuantity) UnmarshalJSON(input []byte) error {
 	// For Aptos, all the AptosQuantity values are base-10.
 	i, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return xerrors.Errorf("failed to decode AptosQuantity %v: %w", s, err)
+		return fmt.Errorf("failed to decode AptosQuantity %v: %w", s, err)
 	}
 
 	*v = AptosQuantity(i)
@@ -513,7 +513,7 @@ func (v *AptosPublicKey) UnmarshalJSON(input []byte) error {
 	// Use a different struct to avoid calling this custom unmarshaler recursively.
 	var out aptosPublicKey
 	if err := json.Unmarshal(input, &out); err != nil {
-		return xerrors.Errorf("failed to unmarshal struct: %w", err)
+		return fmt.Errorf("failed to unmarshal struct: %w", err)
 	}
 	v.Value = out.Value
 	v.Type = out.Type
@@ -528,7 +528,7 @@ func (v *AptosSignature) UnmarshalJSON(input []byte) error {
 	// Use a different struct to avoid calling this custom unmarshaler recursively.
 	var out aptosSignature
 	if err := json.Unmarshal(input, &out); err != nil {
-		return xerrors.Errorf("failed to unmarshal struct: %w", err)
+		return fmt.Errorf("failed to unmarshal struct: %w", err)
 	}
 	v.Value = out.Value
 	v.Type = out.Type
@@ -538,26 +538,26 @@ func (v *AptosSignature) UnmarshalJSON(input []byte) error {
 func (p *aptosNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
-		return nil, xerrors.New("metadata not found")
+		return nil, errors.New("metadata not found")
 	}
 
 	blobdata := rawBlock.GetAptos()
 	if blobdata == nil {
-		return nil, xerrors.Errorf("blobdata not found (metadata={%+v})", metadata)
+		return nil, fmt.Errorf("blobdata not found (metadata={%+v})", metadata)
 	}
 
 	var block AptosBlock
 	if err := json.Unmarshal(blobdata.Block, &block); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal header (metadata={%+v}: %w", metadata, err)
+		return nil, fmt.Errorf("failed to unmarshal header (metadata={%+v}: %w", metadata, err)
 	}
 
 	if err := p.validate.Struct(block); err != nil {
-		return nil, xerrors.Errorf("failed to parse block header on struct validate: %w", err)
+		return nil, fmt.Errorf("failed to parse block header on struct validate: %w", err)
 	}
 
 	nativeBlock, err := p.parseBlock(&block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block (metadata={%+v}: %w", metadata, err)
+		return nil, fmt.Errorf("failed to parse block (metadata={%+v}: %w", metadata, err)
 	}
 
 	return &api.NativeBlock{
@@ -591,12 +591,12 @@ func (p *aptosNativeParserImpl) parseTimestamp(ts int64) *timestamp.Timestamp {
 func (p *aptosNativeParserImpl) parseBlock(block *AptosBlock) (*api.AptosBlock, error) {
 	header, err := p.parseHeader(block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse header: %w", err)
+		return nil, fmt.Errorf("failed to parse header: %w", err)
 	}
 
 	transactions, err := p.parseTransactions(block.BlockHeight.Value(), block.Transactions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse transactions: %w", err)
 	}
 
 	return &api.AptosBlock{
@@ -620,7 +620,7 @@ func (p *aptosNativeParserImpl) parseTransactions(blockHeight uint64, transactio
 		// know its type, then parse the the whole transaction.
 		var transactionInfo AptosTransactionInfo
 		if err := json.Unmarshal(t, &transactionInfo); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal transaction info: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal transaction info: %w", err)
 		}
 
 		var transaction *api.AptosTransaction
@@ -629,30 +629,30 @@ func (p *aptosNativeParserImpl) parseTransactions(blockHeight uint64, transactio
 		case typeBlockMetadataTransaction:
 			transaction, err = p.parseBlockMetadataTransaction(blockHeight, &transactionInfo, t)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse block metadata transaction with hash=%s: %w", transactionInfo.TransactionHash, err)
+				return nil, fmt.Errorf("failed to parse block metadata transaction with hash=%s: %w", transactionInfo.TransactionHash, err)
 			}
 		case typeStateCheckpointTransaction:
 			transaction, err = p.parseStateCheckpointTransaction(blockHeight, &transactionInfo, t)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse state checkpoint transaction with hash=%s: %w", transactionInfo.TransactionHash, err)
+				return nil, fmt.Errorf("failed to parse state checkpoint transaction with hash=%s: %w", transactionInfo.TransactionHash, err)
 			}
 		case typeGenesisTransaction:
 			transaction, err = p.parseGenesisTransaction(blockHeight, &transactionInfo, t)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse genesis transactions with hash=%s: %w", transactionInfo.TransactionHash, err)
+				return nil, fmt.Errorf("failed to parse genesis transactions with hash=%s: %w", transactionInfo.TransactionHash, err)
 			}
 		case typeUserTransaction:
 			transaction, err = p.parseUserTransaction(blockHeight, &transactionInfo, t)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse user transactions with hash=%s: %w", transactionInfo.TransactionHash, err)
+				return nil, fmt.Errorf("failed to parse user transactions with hash=%s: %w", transactionInfo.TransactionHash, err)
 			}
 		case typeValidatorTransaction:
 			transaction, err = p.parseBlockValidatorTransaction(blockHeight, &transactionInfo, t)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse validator transactions with hash=%s: %w", transactionInfo.TransactionHash, err)
+				return nil, fmt.Errorf("failed to parse validator transactions with hash=%s: %w", transactionInfo.TransactionHash, err)
 			}
 		default:
-			return nil, xerrors.Errorf("failed to parse transaction_hash=%s, unknown type: %w", transactionInfo.TransactionHash, transactionInfo.Type)
+			return nil, fmt.Errorf("failed to parse transaction_hash=%s, unknown type: %w", transactionInfo.TransactionHash, transactionInfo.Type)
 		}
 
 		result[i] = transaction
@@ -664,17 +664,17 @@ func (p *aptosNativeParserImpl) parseTransactions(blockHeight uint64, transactio
 func (p *aptosNativeParserImpl) parseBlockValidatorTransaction(blockHeight uint64, transactionInfo *AptosTransactionInfo, data json.RawMessage) (*api.AptosTransaction, error) {
 	var validatorTx ValidatorTransaction
 	if err := json.Unmarshal(data, &validatorTx); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal validator transaction: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal validator transaction: %w", err)
 	}
 
 	apiTransactionInfo, err := p.parseTransactionInfo(transactionInfo)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction info: %w", err)
+		return nil, fmt.Errorf("failed to parse transaction info: %w", err)
 	}
 
 	events, err := p.parseEvents(validatorTx.Events)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse events: %w", err)
+		return nil, fmt.Errorf("failed to parse events: %w", err)
 	}
 	// Construct the api.AptosTransaction
 	return &api.AptosTransaction{
@@ -695,19 +695,19 @@ func (p *aptosNativeParserImpl) parseBlockValidatorTransaction(blockHeight uint6
 func (p *aptosNativeParserImpl) parseBlockMetadataTransaction(blockHeight uint64, transactionInfo *AptosTransactionInfo, data json.RawMessage) (*api.AptosTransaction, error) {
 	var blockMeta BlockMetadataTransaction
 	if err := json.Unmarshal(data, &blockMeta); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal block metadata transaction: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal block metadata transaction: %w", err)
 	}
 
 	// Parse transactionInfo
 	apiTransactionInfo, err := p.parseTransactionInfo(transactionInfo)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction info: %w", err)
+		return nil, fmt.Errorf("failed to parse transaction info: %w", err)
 	}
 
 	// Parse events
 	events, err := p.parseEvents(blockMeta.Events)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse events: %w", err)
+		return nil, fmt.Errorf("failed to parse events: %w", err)
 	}
 
 	// Construct api.AptosBlockMetadataTransaction
@@ -738,7 +738,7 @@ func (p *aptosNativeParserImpl) parseTransactionInfo(transactionInfo *AptosTrans
 	// Parse write changes
 	apiChanges, err := p.parseChanges(transactionInfo.Changes)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse changes: %w", err)
+		return nil, fmt.Errorf("failed to parse changes: %w", err)
 	}
 
 	// Get api.TransactionInfo
@@ -768,19 +768,19 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 		// parse the data into different types of write set change.
 		var wcType GenericType
 		if err := json.Unmarshal(c, &wcType); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal write set change type: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal write set change type: %w", err)
 		}
 
 		switch wcType.Type {
 		case typeDeleteModuleChange:
 			var change DeleteModuleChange
 			if err := json.Unmarshal(c, &change); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal delete module change: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal delete module change: %w", err)
 			}
 
 			module, err := p.parseMoveModuleId(change.Module)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse delete module change: %w", err)
+				return nil, fmt.Errorf("failed to parse delete module change: %w", err)
 			}
 
 			results[i] = &api.AptosWriteSetChange{
@@ -797,7 +797,7 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 		case typeDeleteResourceChange:
 			var change DeleteResourceChange
 			if err := json.Unmarshal(c, &change); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal delete resource change: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal delete resource change: %w", err)
 			}
 
 			results[i] = &api.AptosWriteSetChange{
@@ -814,7 +814,7 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 		case typeDeleteTableItemChange:
 			var change DeleteTableItemChange
 			if err := json.Unmarshal(c, &change); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal delete table item change: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal delete table item change: %w", err)
 			}
 
 			results[i] = &api.AptosWriteSetChange{
@@ -835,7 +835,7 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 		case typeWriteResourceChange:
 			var change WriteResourceChange
 			if err := json.Unmarshal(c, &change); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal write resource change: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal write resource change: %w", err)
 			}
 
 			results[i] = &api.AptosWriteSetChange{
@@ -852,13 +852,13 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 		case typeWriteModuleChange:
 			var change WriteModuleChange
 			if err := json.Unmarshal(c, &change); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal write module change: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal write module change: %w", err)
 			}
 
 			// Convert into api.AptosMoveModuleBytecode
 			apiBytecode, err := p.parseMoveModuleBytecode(&change.Data)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse move module bytecode: %w", err)
+				return nil, fmt.Errorf("failed to parse move module bytecode: %w", err)
 			}
 
 			results[i] = &api.AptosWriteSetChange{
@@ -875,7 +875,7 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 		case typeWriteTableItemChange:
 			var change WriteTableItemChange
 			if err := json.Unmarshal(c, &change); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal write table item change: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal write table item change: %w", err)
 			}
 
 			results[i] = &api.AptosWriteSetChange{
@@ -897,7 +897,7 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 			}
 
 		default:
-			return nil, xerrors.Errorf("failed to parse change type: %w", wcType.Type)
+			return nil, fmt.Errorf("failed to parse change type: %w", wcType.Type)
 		}
 	}
 
@@ -908,7 +908,7 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 func (p *aptosNativeParserImpl) parseMoveModuleId(name string) (*api.AptosMoveModuleId, error) {
 	results := strings.Split(name, "::")
 	if len(results) != 2 {
-		return nil, xerrors.Errorf("failed to parse module id, input name doesn't have two parts=%s", name)
+		return nil, fmt.Errorf("failed to parse module id, input name doesn't have two parts=%s", name)
 	}
 
 	return &api.AptosMoveModuleId{
@@ -920,7 +920,7 @@ func (p *aptosNativeParserImpl) parseMoveModuleId(name string) (*api.AptosMoveMo
 func (p *aptosNativeParserImpl) parseMoveModuleBytecode(data *MoveModuleBytecode) (*api.AptosMoveModuleBytecode, error) {
 	apiAbi, err := p.parseMoveModule(&data.Abi)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse move module: %w", err)
+		return nil, fmt.Errorf("failed to parse move module: %w", err)
 	}
 
 	return &api.AptosMoveModuleBytecode{
@@ -934,19 +934,19 @@ func (p *aptosNativeParserImpl) parseMoveModule(data *MoveModule) (*api.AptosMov
 	// Get api.AptosMoveModuleId for friends
 	apiFriends, err := p.parseMoveModuleIds(data.Friends)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse move module ids: %w", err)
+		return nil, fmt.Errorf("failed to parse move module ids: %w", err)
 	}
 
 	// Parse move functions.
 	apiMoveFunctions, err := p.parseMoveFunctions(data.ExposedFunctions)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse move module: %w", err)
+		return nil, fmt.Errorf("failed to parse move module: %w", err)
 	}
 
 	// Parse move struct.
 	apiMoveStruct, err := p.parseMoveStruct(data.Structs)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse move module: %w", err)
+		return nil, fmt.Errorf("failed to parse move module: %w", err)
 	}
 
 	return &api.AptosMoveModule{
@@ -963,7 +963,7 @@ func (p *aptosNativeParserImpl) parseMoveModuleIds(modules []string) ([]*api.Apt
 	for i, m := range modules {
 		result, err := p.parseMoveModuleId(m)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse move module id: %w", err)
+			return nil, fmt.Errorf("failed to parse move module id: %w", err)
 		}
 
 		results[i] = result
@@ -978,7 +978,7 @@ func (p *aptosNativeParserImpl) parseMoveFunctions(functions []MoveFunction) ([]
 		f := f
 		result, err := p.parseMoveFunction(&f)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse move function: %w", err)
+			return nil, fmt.Errorf("failed to parse move function: %w", err)
 		}
 		results[i] = result
 	}
@@ -1000,7 +1000,7 @@ func (p *aptosNativeParserImpl) parseMoveFunction(function *MoveFunction) (*api.
 	case "":
 		functionType = api.AptosMoveFunction_UNSPECIFIED
 	default:
-		return nil, xerrors.Errorf("failed to parse function type, type=%s", function.Visibility)
+		return nil, fmt.Errorf("failed to parse function type, type=%s", function.Visibility)
 	}
 
 	apiGenericTypeParams := p.parseMoveFunctionGenericTypeParams(function.GenericTypePramas)
@@ -1088,13 +1088,13 @@ func (p *aptosNativeParserImpl) parseEvents(events []Event) ([]*api.AptosEvent, 
 func (p *aptosNativeParserImpl) parseStateCheckpointTransaction(blockHeight uint64, transactionInfo *AptosTransactionInfo, data json.RawMessage) (*api.AptosTransaction, error) {
 	var stateCheckpointT StateCheckpointTransaction
 	if err := json.Unmarshal(data, &stateCheckpointT); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal state checkpoint transaction: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal state checkpoint transaction: %w", err)
 	}
 
 	// Parse transactionInfo
 	apiTransactionInfo, err := p.parseTransactionInfo(transactionInfo)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction info: %w", err)
+		return nil, fmt.Errorf("failed to parse transaction info: %w", err)
 	}
 
 	// Construct the api.AptosTransaction
@@ -1113,31 +1113,31 @@ func (p *aptosNativeParserImpl) parseStateCheckpointTransaction(blockHeight uint
 func (p *aptosNativeParserImpl) parseUserTransaction(blockHeight uint64, transactionInfo *AptosTransactionInfo, data json.RawMessage) (*api.AptosTransaction, error) {
 	var userT UserTransaction
 	if err := json.Unmarshal(data, &userT); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal user transaction: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal user transaction: %w", err)
 	}
 
 	// Parse transaction info
 	apiTransactionInfo, err := p.parseTransactionInfo(transactionInfo)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction info: %w", err)
+		return nil, fmt.Errorf("failed to parse transaction info: %w", err)
 	}
 
 	// Parse transaction payload
 	apiPayload, err := p.parseTransactionPayload(userT.Payload)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse user transaction payload: %w", err)
+		return nil, fmt.Errorf("failed to parse user transaction payload: %w", err)
 	}
 
 	// Parse transaction signature
 	apiSignature, err := p.parseTransactionSignature(userT.Signature)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse user transaction signature: %w", err)
+		return nil, fmt.Errorf("failed to parse user transaction signature: %w", err)
 	}
 
 	// Parse events
 	events, err := p.parseEvents(userT.Events)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse events: %w", err)
+		return nil, fmt.Errorf("failed to parse events: %w", err)
 	}
 
 	// Construct api.AptosUserTransaction
@@ -1172,7 +1172,7 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 	// transaction payloads.
 	var payloadType GenericType
 	if err := json.Unmarshal(payload, &payloadType); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal transaction payload type: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal transaction payload type: %w", err)
 	}
 
 	var apiPayload *api.AptosTransactionPayload
@@ -1180,13 +1180,13 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 	case typeEntryFunctionPayload:
 		var result EntryFunctionPayload
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal entry function payload: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal entry function payload: %w", err)
 		}
 
 		// Parse the entry function Id from the input string.
 		apiEntryFunctionId, err := p.parseEntryFunctionId(result.Function)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse entry function id: %w", err)
+			return nil, fmt.Errorf("failed to parse entry function id: %w", err)
 		}
 
 		apiPayload = &api.AptosTransactionPayload{
@@ -1203,12 +1203,12 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 	case typeScriptPayload:
 		var result ScriptPayload
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal script payload: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal script payload: %w", err)
 		}
 
 		apiScriptPayload, err := p.parseScriptPayload(&result)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse script payload: %w", err)
+			return nil, fmt.Errorf("failed to parse script payload: %w", err)
 		}
 
 		apiPayload = &api.AptosTransactionPayload{
@@ -1221,12 +1221,12 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 	case typeModuleBundlePayload:
 		var result ModuleBundlePayload
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal move bundle payload: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal move bundle payload: %w", err)
 		}
 
 		apiMoveModuleBytecodes, err := p.parseMoveModuleBytecodes(result.Modules)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse move module bytecodes: %w", err)
+			return nil, fmt.Errorf("failed to parse move module bytecodes: %w", err)
 		}
 
 		apiPayload = &api.AptosTransactionPayload{
@@ -1241,7 +1241,7 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 	case typeMultisigPayload:
 		var result MultisigPayload
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal multisig payload: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal multisig payload: %w", err)
 		}
 
 		apiMultisigPayload := &api.AptosMultisigPayload{
@@ -1252,7 +1252,7 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 			// Parse the entry function Id from the input string.
 			apiEntryFunctionId, err := p.parseEntryFunctionId(result.TransactionPayload.Function)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse entry function id: %w", err)
+				return nil, fmt.Errorf("failed to parse entry function id: %w", err)
 			}
 
 			apiMultisigPayload.OptionalTransactionPayload = &api.AptosMultisigPayload_TransactionPayload{
@@ -1279,12 +1279,12 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 	case typeWriteSetPayload:
 		var result WriteSetPayload
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal write set payload: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal write set payload: %w", err)
 		}
 
 		apiWriteSet, err := p.parseWriteSet(result.Payload)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse write set: %w", err)
+			return nil, fmt.Errorf("failed to parse write set: %w", err)
 		}
 
 		apiPayload = &api.AptosTransactionPayload{
@@ -1297,7 +1297,7 @@ func (p *aptosNativeParserImpl) parseTransactionPayload(payload json.RawMessage)
 		}
 
 	default:
-		return nil, xerrors.Errorf("failed to parse unknown transaction type=%s", payloadType.Type)
+		return nil, fmt.Errorf("failed to parse unknown transaction type=%s", payloadType.Type)
 	}
 
 	return apiPayload, nil
@@ -1315,7 +1315,7 @@ func ConverRawMessageToBytes(inputs []json.RawMessage) [][]byte {
 func (p *aptosNativeParserImpl) parseEntryFunctionId(name string) (*api.AptosEntryFunctionId, error) {
 	results := strings.Split(name, "::")
 	if len(results) != 3 {
-		return nil, xerrors.Errorf("failed to parse entry function id, input name doesn't have three parts=%s", name)
+		return nil, fmt.Errorf("failed to parse entry function id, input name doesn't have three parts=%s", name)
 	}
 
 	return &api.AptosEntryFunctionId{
@@ -1330,7 +1330,7 @@ func (p *aptosNativeParserImpl) parseEntryFunctionId(name string) (*api.AptosEnt
 func (p *aptosNativeParserImpl) parseMoveScriptBytecode(code *MoveScriptBytecode) (*api.AptosMoveScriptBytecode, error) {
 	apiAbi, err := p.parseMoveFunction(&code.Abi)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse move function: %w", err)
+		return nil, fmt.Errorf("failed to parse move function: %w", err)
 	}
 
 	return &api.AptosMoveScriptBytecode{
@@ -1345,7 +1345,7 @@ func (p *aptosNativeParserImpl) parseMoveModuleBytecodes(codes []MoveModuleBytec
 		c := c
 		result, err := p.parseMoveModuleBytecode(&c)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse move module bytecode: %w", err)
+			return nil, fmt.Errorf("failed to parse move module bytecode: %w", err)
 		}
 
 		results[i] = result
@@ -1359,7 +1359,7 @@ func (p *aptosNativeParserImpl) parseWriteSet(payload json.RawMessage) (*api.Apt
 	// write sets.
 	var wsType GenericType
 	if err := json.Unmarshal(payload, &wsType); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal write set type: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal write set type: %w", err)
 	}
 
 	var apiWriteSet *api.AptosWriteSet
@@ -1367,12 +1367,12 @@ func (p *aptosNativeParserImpl) parseWriteSet(payload json.RawMessage) (*api.Apt
 	case typeScriptWriteSet:
 		var result ScriptWriteSet
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal script write set: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal script write set: %w", err)
 		}
 
 		apiScriptPayload, err := p.parseScriptPayload(&result.Payload)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse script payload: %w", err)
+			return nil, fmt.Errorf("failed to parse script payload: %w", err)
 		}
 
 		apiWriteSet = &api.AptosWriteSet{
@@ -1388,17 +1388,17 @@ func (p *aptosNativeParserImpl) parseWriteSet(payload json.RawMessage) (*api.Apt
 	case typeDirectWriteSet:
 		var result DirectWriteSet
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal direct write set: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal direct write set: %w", err)
 		}
 
 		apiWriteSetChanges, err := p.parseChanges(result.Changes)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse changes: %w", err)
+			return nil, fmt.Errorf("failed to parse changes: %w", err)
 		}
 
 		apiEvents, err := p.parseEvents(result.Events)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse events: %w", err)
+			return nil, fmt.Errorf("failed to parse events: %w", err)
 		}
 
 		apiWriteSet = &api.AptosWriteSet{
@@ -1412,7 +1412,7 @@ func (p *aptosNativeParserImpl) parseWriteSet(payload json.RawMessage) (*api.Apt
 		}
 
 	default:
-		return nil, xerrors.Errorf("failed to parse unknown write set type: %s", wsType.Type)
+		return nil, fmt.Errorf("failed to parse unknown write set type: %s", wsType.Type)
 	}
 
 	return apiWriteSet, nil
@@ -1421,7 +1421,7 @@ func (p *aptosNativeParserImpl) parseWriteSet(payload json.RawMessage) (*api.Apt
 func (p *aptosNativeParserImpl) parseScriptPayload(payload *ScriptPayload) (*api.AptosScriptPayload, error) {
 	apiCode, err := p.parseMoveScriptBytecode(&payload.Code)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse move script bytecode: %w", err)
+		return nil, fmt.Errorf("failed to parse move script bytecode: %w", err)
 	}
 
 	return &api.AptosScriptPayload{
@@ -1435,7 +1435,7 @@ func (p *aptosNativeParserImpl) parseTransactionSignature(payload json.RawMessag
 	// We need to first parse the signature type, then we can parse the data into different types of signatures.
 	var sType GenericType
 	if err := json.Unmarshal(payload, &sType); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal signature type: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal signature type: %w", err)
 	}
 
 	var apiSignature *api.AptosSignature
@@ -1443,7 +1443,7 @@ func (p *aptosNativeParserImpl) parseTransactionSignature(payload json.RawMessag
 	case typeEd25519Signature:
 		var result AptosEd25519Signature
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal ed25519 signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ed25519 signature: %w", err)
 		}
 
 		apiSignature = &api.AptosSignature{
@@ -1459,7 +1459,7 @@ func (p *aptosNativeParserImpl) parseTransactionSignature(payload json.RawMessag
 	case typeMultiEd25519Signature:
 		var result AptosMultiEd25519Signature
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal multi ed25519 signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal multi ed25519 signature: %w", err)
 		}
 		apiSignature = &api.AptosSignature{
 			Type: api.AptosSignature_MULTI_ED25519,
@@ -1476,19 +1476,19 @@ func (p *aptosNativeParserImpl) parseTransactionSignature(payload json.RawMessag
 	case typeMultiAgentSignature:
 		var result AptosMultiAgentSignature
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal multi agent signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal multi agent signature: %w", err)
 		}
 
 		// Parse the sender.
 		apiSender, err := p.parseAccountSignature(result.Sender)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse sender account signature: %w", err)
+			return nil, fmt.Errorf("failed to parse sender account signature: %w", err)
 		}
 
 		// Parse the secondary signers.
 		apiSecondarySigners, err := p.parseAccountSignatures(result.SecondarySigners)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse secondary signers: %w", err)
+			return nil, fmt.Errorf("failed to parse secondary signers: %w", err)
 		}
 
 		apiSignature = &api.AptosSignature{
@@ -1505,25 +1505,25 @@ func (p *aptosNativeParserImpl) parseTransactionSignature(payload json.RawMessag
 	case typeFeePayerSignature:
 		var result AptosFeePayerSignature
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal fee payer signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal fee payer signature: %w", err)
 		}
 
 		// Parse the sender.
 		apiSender, err := p.parseAccountSignature(result.Sender)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse sender account signature: %w", err)
+			return nil, fmt.Errorf("failed to parse sender account signature: %w", err)
 		}
 
 		// Parse the secondary signers.
 		apiSecondarySigners, err := p.parseAccountSignatures(result.SecondarySigners)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse secondary signers: %w", err)
+			return nil, fmt.Errorf("failed to parse secondary signers: %w", err)
 		}
 
 		// Parse the fee payer.
 		feePayerSender, err := p.parseAccountSignature(result.FeePayerSigner)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse fee payer account signature: %w", err)
+			return nil, fmt.Errorf("failed to parse fee payer account signature: %w", err)
 		}
 
 		apiSignature = &api.AptosSignature{
@@ -1542,7 +1542,7 @@ func (p *aptosNativeParserImpl) parseTransactionSignature(payload json.RawMessag
 	case typeSingleSenderSignature:
 		var result AptosSingleSignature
 		if err := json.Unmarshal(payload, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal single sender signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal single sender signature: %w", err)
 		}
 
 		apiSignature = &api.AptosSignature{
@@ -1556,7 +1556,7 @@ func (p *aptosNativeParserImpl) parseTransactionSignature(payload json.RawMessag
 		}
 
 	default:
-		return nil, xerrors.Errorf("failed to parse unknown transaction signature type: %s", sType.Type)
+		return nil, fmt.Errorf("failed to parse unknown transaction signature type: %s", sType.Type)
 	}
 
 	return apiSignature, nil
@@ -1566,7 +1566,7 @@ func (p *aptosNativeParserImpl) parseAccountSignature(signature json.RawMessage)
 	// We need to first parse the signature type, then we can parse the data into different types of signatures.
 	var sType GenericType
 	if err := json.Unmarshal(signature, &sType); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal signature type: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal signature type: %w", err)
 	}
 
 	// Note that, account signature only has two types:
@@ -1575,7 +1575,7 @@ func (p *aptosNativeParserImpl) parseAccountSignature(signature json.RawMessage)
 	case typeEd25519Signature:
 		var result AptosEd25519Signature
 		if err := json.Unmarshal(signature, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal ed25519 signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal ed25519 signature: %w", err)
 		}
 		apiAccountSignature = &api.AptosAccountSignature{
 			Type: api.AptosAccountSignature_ED25519,
@@ -1589,7 +1589,7 @@ func (p *aptosNativeParserImpl) parseAccountSignature(signature json.RawMessage)
 	case typeSingleKeySignature:
 		var result AptosSingleKeySignature
 		if err := json.Unmarshal(signature, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal single key signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal single key signature: %w", err)
 		}
 		apiAccountSignature = &api.AptosAccountSignature{
 			Type: api.AptosAccountSignature_SINGLE_KEY,
@@ -1603,7 +1603,7 @@ func (p *aptosNativeParserImpl) parseAccountSignature(signature json.RawMessage)
 	case typeMultiEd25519Signature:
 		var result AptosMultiEd25519Signature
 		if err := json.Unmarshal(signature, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal multi ed25519 signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal multi ed25519 signature: %w", err)
 		}
 		apiAccountSignature = &api.AptosAccountSignature{
 			Type: api.AptosAccountSignature_MULTI_ED25519,
@@ -1619,7 +1619,7 @@ func (p *aptosNativeParserImpl) parseAccountSignature(signature json.RawMessage)
 	case typeMultiKeySignature:
 		var result AptosMultiKeySignature
 		if err := json.Unmarshal(signature, &result); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal multi ed25519 signature: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal multi ed25519 signature: %w", err)
 		}
 
 		apiAccountSignature = &api.AptosAccountSignature{
@@ -1633,7 +1633,7 @@ func (p *aptosNativeParserImpl) parseAccountSignature(signature json.RawMessage)
 			},
 		}
 	default:
-		return nil, xerrors.Errorf("failed to parse unknown account signature type: %s", sType.Type)
+		return nil, fmt.Errorf("failed to parse unknown account signature type: %s", sType.Type)
 	}
 
 	return apiAccountSignature, nil
@@ -1660,7 +1660,7 @@ func (p *aptosNativeParserImpl) parseAccountSignatures(signatures []json.RawMess
 	for i, s := range signatures {
 		result, err := p.parseAccountSignature(s)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse account signature: %w", err)
+			return nil, fmt.Errorf("failed to parse account signature: %w", err)
 		}
 
 		results[i] = result
@@ -1672,30 +1672,30 @@ func (p *aptosNativeParserImpl) parseAccountSignatures(signatures []json.RawMess
 func (p *aptosNativeParserImpl) parseGenesisTransaction(blockHeight uint64, transactionInfo *AptosTransactionInfo, data json.RawMessage) (*api.AptosTransaction, error) {
 	var genesisT GenesisTransaction
 	if err := json.Unmarshal(data, &genesisT); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal genesis transaction: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal genesis transaction: %w", err)
 	}
 
 	// Parse transaction info
 	apiTransactionInfo, err := p.parseTransactionInfo(transactionInfo)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse transaction info: %w", err)
+		return nil, fmt.Errorf("failed to parse transaction info: %w", err)
 	}
 
 	// Genesis transaction's type has to be typeWriteSetPayload. Verify this.
 	if genesisT.Payload.Type != typeWriteSetPayload {
-		return nil, xerrors.Errorf("failed to parse genesis transaction payload, the type is: %s", genesisT.Payload.Type)
+		return nil, fmt.Errorf("failed to parse genesis transaction payload, the type is: %s", genesisT.Payload.Type)
 	}
 
 	// Parse the write set payload
 	apiPayload, err := p.parseWriteSet(genesisT.Payload.WriteSet)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse write set payload: %w", err)
+		return nil, fmt.Errorf("failed to parse write set payload: %w", err)
 	}
 
 	// Parse events
 	events, err := p.parseEvents(genesisT.Events)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse events: %w", err)
+		return nil, fmt.Errorf("failed to parse events: %w", err)
 	}
 
 	// Construct api.AptosGenesisTransaction

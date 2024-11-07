@@ -2,10 +2,10 @@ package sdk
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 
 	"github.com/coinbase/chainstorage/internal/gateway"
@@ -187,12 +187,12 @@ func intercept[T any](ctx context.Context, logger *zap.Logger, operation retry.O
 }
 
 func isRetryableError(err error) bool {
-	if xerrors.Is(err, context.DeadlineExceeded) {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
 
 	var grpcErr gateway.GrpcError
-	if xerrors.As(err, &grpcErr) && grpcErr.GRPCStatus().Code() == codes.DeadlineExceeded {
+	if errors.As(err, &grpcErr) && grpcErr.GRPCStatus().Code() == codes.DeadlineExceeded {
 		return true
 	}
 

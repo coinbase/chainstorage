@@ -2,12 +2,12 @@ package fantom_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -229,9 +229,9 @@ func (s *fantomIntegrationTestSuite) TestFantomGetBlock_NotFound() {
 
 	_, err := s.client.GetBlockByHeight(context.Background(), fantomTag, heightNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 
 	_, err = s.client.GetBlockByHash(context.Background(), fantomTag, heightNotFound, hashNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 }

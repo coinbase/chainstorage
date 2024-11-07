@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -9,7 +10,6 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	errParser          = xerrors.New("parser error")
-	errBlockValidation = xerrors.New("block validation failed")
+	errParser          = errors.New("parser error")
+	errBlockValidation = errors.New("block validation failed")
 )
 
 func TestParserInterceptor(t *testing.T) {
@@ -127,11 +127,11 @@ func TestParserInterceptor_ParserError(t *testing.T) {
 	ctx := context.Background()
 	_, err = newclt.GetBlockByHeight(ctx, tag, height)
 	require.Error(err)
-	require.True(xerrors.Is(err, errParser))
+	require.True(errors.Is(err, errParser))
 
 	_, err = newclt.GetBlockByHash(ctx, tag, height, hash)
 	require.Error(err)
-	require.True(xerrors.Is(err, errParser))
+	require.True(errors.Is(err, errParser))
 
 	_, err = newclt.UpgradeBlock(ctx, expected, newTag)
 	require.Error(err)

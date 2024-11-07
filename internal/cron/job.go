@@ -2,13 +2,13 @@ package cron
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/robfig/cron/v3"
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap"
 	"golang.org/x/sync/semaphore"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
@@ -36,12 +36,12 @@ var _ cron.Job = (*Job)(nil)
 func NewJob(ctx context.Context, cfg *config.Config, logger *zap.Logger, metrics tally.Scope, task Task) (*Job, error) {
 	parallelism := task.Parallelism()
 	if parallelism <= 0 {
-		return nil, xerrors.Errorf("invalid parallelism: %v", parallelism)
+		return nil, fmt.Errorf("invalid parallelism: %v", parallelism)
 	}
 
 	sem := semaphore.NewWeighted(parallelism)
 	if err := sem.Acquire(ctx, parallelism); err != nil {
-		return nil, xerrors.Errorf("failed to acquire the semaphore: %w", err)
+		return nil, fmt.Errorf("failed to acquire the semaphore: %w", err)
 	}
 
 	taskName := task.Name()

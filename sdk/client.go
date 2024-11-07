@@ -2,13 +2,14 @@ package sdk
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
@@ -176,7 +177,7 @@ func (c *clientImpl) GetLatestBlockWithTag(ctx context.Context, tag uint32) (uin
 		Tag: tag,
 	})
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get latest block height (tag=%v): %w", tag, err)
+		return 0, fmt.Errorf("failed to get latest block height (tag=%v): %w", tag, err)
 	}
 	return resp.Height, nil
 }
@@ -201,10 +202,10 @@ func (c *clientImpl) GetBlocksByRangeWithTag(ctx context.Context, tag uint32, st
 	})
 
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block file metadata (tag=%d, startHeight=%d, endHeight=%d): %w", tag, startHeight, endHeight, err)
+		return nil, fmt.Errorf("failed to get block file metadata (tag=%d, startHeight=%d, endHeight=%d): %w", tag, startHeight, endHeight, err)
 	}
 	if len(resp.GetFiles()) == 0 {
-		return nil, xerrors.Errorf("no block file metadata found")
+		return nil, fmt.Errorf("no block file metadata found")
 	}
 	blockFiles := resp.GetFiles()
 
@@ -222,13 +223,13 @@ func (c *clientImpl) GetBlocksByRangeWithTag(ctx context.Context, tag uint32, st
 			)
 			rawBlock, err := c.blockDownloader.Download(ctx, blockFile)
 			if err != nil {
-				return xerrors.Errorf("failed download blockFile from %s: %w", blockFile.GetFileUrl(), err)
+				return fmt.Errorf("failed download blockFile from %s: %w", blockFile.GetFileUrl(), err)
 			}
 
 			if c.blockValidation {
 				err := c.validateBlock(ctx, rawBlock)
 				if err != nil {
-					return xerrors.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", blockFile.Height, blockFile.Hash, err)
+					return fmt.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", blockFile.Height, blockFile.Hash, err)
 				}
 			}
 
@@ -238,7 +239,7 @@ func (c *clientImpl) GetBlocksByRangeWithTag(ctx context.Context, tag uint32, st
 	}
 
 	if err := group.Wait(); err != nil {
-		return nil, xerrors.Errorf("failed to download block files: %w", err)
+		return nil, fmt.Errorf("failed to download block files: %w", err)
 	}
 
 	return blocks, nil
@@ -250,13 +251,13 @@ func (c *clientImpl) GetBlocksByRange(ctx context.Context, startHeight uint64, e
 
 func (c *clientImpl) StreamChainEvents(ctx context.Context, cfg StreamingConfiguration) (<-chan *ChainEventResult, error) {
 	if err := c.validate.Struct(cfg); err != nil {
-		return nil, xerrors.Errorf("invalid config: %w", err)
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	// initiate streaming API call
 	stream, err := c.client.StreamChainEvents(ctx, cfg.ChainEventsRequest)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to call StreamChainEvents (cfg={%+v}): %w", cfg, err)
+		return nil, fmt.Errorf("failed to call StreamChainEvents (cfg={%+v}): %w", cfg, err)
 	}
 
 	// defaults to 1 if not set
@@ -327,14 +328,14 @@ func (c *clientImpl) streamBlocks(
 			return nil
 		}); err != nil {
 			c.sendBlockResult(ctx, ch, &ChainEventResult{
-				Error: xerrors.Errorf("failed to receive from event stream (cfg={%+v}, request={%+v}): %w", cfg, request, err),
+				Error: fmt.Errorf("failed to receive from event stream (cfg={%+v}, request={%+v}): %w", cfg, request, err),
 			})
 			return
 		}
 
 		if event == nil {
 			c.sendBlockResult(ctx, ch, &ChainEventResult{
-				Error: xerrors.Errorf("received null event (cfg={%+v}, request={%+v})", cfg, request),
+				Error: fmt.Errorf("received null event (cfg={%+v}, request={%+v})", cfg, request),
 			})
 			return
 		}
@@ -347,7 +348,7 @@ func (c *clientImpl) streamBlocks(
 			block, err = c.downloadBlock(ctx, blockID.GetTag(), blockID.GetHeight(), blockID.GetHash())
 			if err != nil {
 				c.sendBlockResult(ctx, ch, &ChainEventResult{
-					Error: xerrors.Errorf("failed to download block (cfg={%+v}, request={%+v}, event={%+v}): %w", cfg, request, event, err),
+					Error: fmt.Errorf("failed to download block (cfg={%+v}, request={%+v}, event={%+v}): %w", cfg, request, event, err),
 				})
 				return
 			}
@@ -393,18 +394,18 @@ func (c *clientImpl) downloadBlock(ctx context.Context, tag uint32, height uint6
 		Hash:   hash,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to query block file (tag=%v, height=%v, hash=%v): %w", tag, height, hash, err)
+		return nil, fmt.Errorf("failed to query block file (tag=%v, height=%v, hash=%v): %w", tag, height, hash, err)
 	}
 
 	rawBlock, err := c.blockDownloader.Download(ctx, blockFile.File)
 	if err != nil {
-		return nil, xerrors.Errorf("failed download blockFile (blockFile={%+v}): %w", blockFile.File, err)
+		return nil, fmt.Errorf("failed download blockFile (blockFile={%+v}): %w", blockFile.File, err)
 	}
 
 	if c.blockValidation {
 		err = c.validateBlock(ctx, rawBlock)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
+			return nil, fmt.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
 		}
 	}
 
@@ -430,7 +431,7 @@ func (c *clientImpl) isTransientStreamError(err error) bool {
 func (c *clientImpl) GetChainEvents(ctx context.Context, req *api.GetChainEventsRequest) ([]*api.BlockchainEvent, error) {
 	resp, err := c.client.GetChainEvents(ctx, req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain events (req={%+v}): %w", req, err)
+		return nil, fmt.Errorf("failed to get chain events (req={%+v}): %w", req, err)
 	}
 
 	return resp.Events, nil
@@ -439,7 +440,7 @@ func (c *clientImpl) GetChainEvents(ctx context.Context, req *api.GetChainEvents
 func (c *clientImpl) GetChainMetadata(ctx context.Context, req *api.GetChainMetadataRequest) (*api.GetChainMetadataResponse, error) {
 	resp, err := c.client.GetChainMetadata(ctx, req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain metadata (req={%+v}): %w", req, err)
+		return nil, fmt.Errorf("failed to get chain metadata (req={%+v}): %w", req, err)
 	}
 
 	return resp, nil
@@ -456,11 +457,11 @@ func (c *clientImpl) GetBlockByTransaction(ctx context.Context, tag uint32, tran
 	})
 	if err != nil {
 		var grpcErr gateway.GrpcError
-		if xerrors.As(err, &grpcErr) && grpcErr.GRPCStatus().Code() == codes.NotFound {
+		if errors.As(err, &grpcErr) && grpcErr.GRPCStatus().Code() == codes.NotFound {
 			return []*api.Block{}, nil
 		}
 
-		return nil, xerrors.Errorf("failed to find blocks by transaction (%v): %w", transactionHash, err)
+		return nil, fmt.Errorf("failed to find blocks by transaction (%v): %w", transactionHash, err)
 	}
 
 	blockIds := resp.Blocks
@@ -474,7 +475,7 @@ func (c *clientImpl) GetBlockByTransaction(ctx context.Context, tag uint32, tran
 	for i, blockId := range blockIds {
 		block, err := c.downloadBlock(ctx, blockId.Tag, blockId.Height, blockId.Hash)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to download block data: %w", err)
+			return nil, fmt.Errorf("failed to download block data: %w", err)
 		}
 
 		blocks[i] = block
@@ -489,12 +490,12 @@ func (c *clientImpl) validateBlock(ctx context.Context, rawBlock *api.Block) err
 
 	nativeBlock, err := c.parser.ParseNativeBlock(ctx, rawBlock)
 	if err != nil {
-		return xerrors.Errorf("failed to parse native format for block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
+		return fmt.Errorf("failed to parse native format for block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
 	}
 
 	err = c.parser.ValidateBlock(ctx, nativeBlock)
 	if err != nil {
-		return xerrors.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
+		return fmt.Errorf("failed to validate block (blockHeight=%v, blockHash=%v): %w", height, hash, err)
 	}
 
 	return nil

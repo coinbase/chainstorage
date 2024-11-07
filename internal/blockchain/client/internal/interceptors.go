@@ -2,11 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -89,7 +89,7 @@ func (p *parserInterceptor) UpgradeBlock(ctx context.Context, block *api.Block, 
 	}
 
 	if newTag != newBlock.Metadata.Tag {
-		return nil, xerrors.Errorf("unexpected tag: expected=%v, actual=%v", newTag, block.Metadata.Tag)
+		return nil, fmt.Errorf("unexpected tag: expected=%v, actual=%v", newTag, block.Metadata.Tag)
 	}
 
 	return newBlock, nil
@@ -106,24 +106,24 @@ func (p *parserInterceptor) GetAccountProof(ctx context.Context, req *api.GetVer
 func (p *parserInterceptor) validateBlock(ctx context.Context, block *api.Block, tag uint32, height uint64, hash string) error {
 	metadata := block.Metadata
 	if metadata == nil {
-		return xerrors.New("block metadata is null")
+		return errors.New("block metadata is null")
 	}
 
 	if metadata.Tag != tag {
-		return xerrors.Errorf("expected tag %v in metadata: {%+v}", tag, metadata)
+		return fmt.Errorf("expected tag %v in metadata: {%+v}", tag, metadata)
 	}
 
 	if metadata.Height != height {
-		return xerrors.Errorf("expected height %v in metadata: {%+v}", height, metadata)
+		return fmt.Errorf("expected height %v in metadata: {%+v}", height, metadata)
 	}
 
 	if hash != "" && metadata.Hash != hash {
-		return xerrors.Errorf("expected hash %v in metadata: {%+v}", hash, metadata)
+		return fmt.Errorf("expected hash %v in metadata: {%+v}", hash, metadata)
 	}
 
 	nativeBlock, err := p.parser.ParseNativeBlock(ctx, block)
 	if err != nil {
-		return xerrors.Errorf("failed to parse block to native format {%+v}: %w", metadata, err)
+		return fmt.Errorf("failed to parse block to native format {%+v}: %w", metadata, err)
 	}
 
 	if p.config.Chain.Feature.BlockValidationEnabled {
@@ -136,7 +136,7 @@ func (p *parserInterceptor) validateBlock(ctx context.Context, block *api.Block,
 			if p.config.Chain.Feature.BlockValidationMuted {
 				return nil
 			}
-			return xerrors.Errorf("failed to validate block {%+v}: %w", metadata, err)
+			return fmt.Errorf("failed to validate block {%+v}: %w", metadata, err)
 		}
 	}
 

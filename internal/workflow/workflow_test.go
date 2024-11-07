@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -9,10 +10,9 @@ import (
 	"go.temporal.io/api/failure/v1"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
-	"github.com/coinbase/chainstorage/internal/workflow/activity/errors"
+	workflowerrors "github.com/coinbase/chainstorage/internal/workflow/activity/errors"
 )
 
 type (
@@ -61,8 +61,8 @@ func TestIsErrSessionFailed(t *testing.T) {
 	activityErr := &activityError{
 		cause: temporal.NewApplicationError(workflow.ErrSessionFailed.Error(), ""),
 	}
-	err := xerrors.Errorf("fake activity error: %w", activityErr)
-	require.False(xerrors.Is(err, workflow.ErrSessionFailed))
+	err := fmt.Errorf("fake activity error: %w", activityErr)
+	require.False(errors.Is(err, workflow.ErrSessionFailed))
 	require.True(IsErrSessionFailed(nil, err))
 }
 
@@ -80,14 +80,14 @@ func TestIsNodeProviderFailed(t *testing.T) {
 	require := testutil.Require(t)
 
 	activityErr := &activityError{
-		cause: temporal.NewApplicationError(xerrors.New("Error Test").Error(), errors.ErrTypeNodeProvider),
+		cause: temporal.NewApplicationError(errors.New("Error Test").Error(), workflowerrors.ErrTypeNodeProvider),
 	}
-	err := xerrors.Errorf("fake activity error: %w", activityErr)
+	err := fmt.Errorf("fake activity error: %w", activityErr)
 	require.True(IsNodeProviderFailed(err))
 
 	activityErr = &activityError{
-		cause: temporal.NewApplicationError(xerrors.New("Error Test").Error(), xerrors.New("Random Error").Error()),
+		cause: temporal.NewApplicationError(errors.New("Error Test").Error(), errors.New("Random Error").Error()),
 	}
-	err = xerrors.Errorf("fake activity error: %w", activityErr)
+	err = fmt.Errorf("fake activity error: %w", activityErr)
 	require.False(IsNodeProviderFailed(err))
 }

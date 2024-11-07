@@ -2,10 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -40,7 +41,7 @@ type (
 )
 
 var (
-	ErrNotFound = xerrors.New("not found")
+	ErrNotFound = errors.New("not found")
 )
 
 func WithDLQFactory(params DLQFactoryParams) (DLQ, error) {
@@ -53,15 +54,15 @@ func WithDLQFactory(params DLQFactoryParams) (DLQ, error) {
 		factory = params.Firestore
 	}
 	if factory == nil {
-		return nil, xerrors.Errorf("dlq type is not implemented: %v", dlqType)
+		return nil, fmt.Errorf("dlq type is not implemented: %v", dlqType)
 	}
 	dlq, err := factory.Create()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create dlq of type %v, error: %w", dlqType, err)
+		return nil, fmt.Errorf("failed to create dlq of type %v, error: %w", dlqType, err)
 	}
 	return dlq, nil
 }
 
 func FilterError(err error) bool {
-	return xerrors.Is(err, ErrNotFound)
+	return errors.Is(err, ErrNotFound)
 }

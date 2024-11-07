@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -12,7 +13,6 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
@@ -489,7 +489,7 @@ func (s *backfillerTestSuite) TestBackfiller_Reprocess() {
 			if request.Heights[0] == blockNumber {
 				numCallsForReprocessedBlock += 1
 				if numCallsForReprocessedBlock <= maximumAttempts+1 {
-					return nil, xerrors.New("transient error")
+					return nil, errors.New("transient error")
 				}
 
 				require.True(request.WithBestEffort)

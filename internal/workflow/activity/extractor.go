@@ -2,11 +2,12 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
@@ -78,13 +79,13 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 	logger := a.getLogger(ctx).With(zap.Reflect("request", request))
 
 	if request.RehydrateFromTag != nil && request.UpgradeFromTag != nil {
-		return nil, xerrors.Errorf("RehydrateFromTag and UpgradeFromTag cannot exist simultaneously")
+		return nil, fmt.Errorf("RehydrateFromTag and UpgradeFromTag cannot exist simultaneously")
 	}
 
 	if request.Failover {
 		failoverCtx, err := a.failoverManager.WithFailoverContext(ctx, endpoints.MasterSlaveClusters)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create failover context: %w", err)
+			return nil, fmt.Errorf("failed to create failover context: %w", err)
 		}
 		ctx = failoverCtx
 	}
@@ -101,13 +102,13 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 				block, err = a.upgradeBlock(ctx, height, request, logger)
 				if err != nil {
 					logger.Error("failed to upgrade block", zap.Error(err))
-					return xerrors.Errorf("failed to upgrade block: %w", err)
+					return fmt.Errorf("failed to upgrade block: %w", err)
 				}
 			} else if request.RehydrateFromTag != nil {
 				block, err = a.rehydrateBlock(ctx, height, request, logger)
 				if err != nil {
 					logger.Error("failed to rehydrate block", zap.Error(err))
-					return xerrors.Errorf("failed to rehydrate block: %w", err)
+					return fmt.Errorf("failed to rehydrate block: %w", err)
 				}
 			}
 
@@ -122,14 +123,14 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 				block, err = a.blockchainClient.GetBlockByHeight(ctx, request.Tag, height, opts...)
 				if err != nil {
 					logger.Error("failed to extract block", zap.Error(err))
-					return xerrors.Errorf("failed to extract block %v: %w", height, err)
+					return fmt.Errorf("failed to extract block %v: %w", height, err)
 				}
 			}
 
 			objectKey, err := a.blobStorage.Upload(ctx, block, request.DataCompression)
 			if err != nil {
 				logger.Error("failed to upload to blob store", zap.Error(err))
-				return xerrors.Errorf("failed to upload to blob store: %w", err)
+				return fmt.Errorf("failed to upload to blob store: %w", err)
 			}
 
 			block.Metadata.ObjectKeyMain = objectKey
@@ -139,7 +140,7 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 	}
 
 	if err := group.Wait(); err != nil {
-		return nil, xerrors.Errorf("failed to finish extractor: %w", err)
+		return nil, fmt.Errorf("failed to finish extractor: %w", err)
 	}
 
 	response := &ExtractorResponse{
@@ -158,25 +159,25 @@ func (a *Extractor) upgradeBlock(ctx context.Context, height uint64, request *Ex
 	newTag := request.Tag
 
 	if oldTag > newTag {
-		return nil, xerrors.Errorf("invalid UpgradeFromTag (oldTag=%v, newTag=%v)", oldTag, newTag)
+		return nil, fmt.Errorf("invalid UpgradeFromTag (oldTag=%v, newTag=%v)", oldTag, newTag)
 	}
 
 	block, err := a.downloadBlock(ctx, oldTag, height)
 	if err != nil {
-		if xerrors.Is(err, storage.ErrItemNotFound) {
+		if errors.Is(err, storage.ErrItemNotFound) {
 			return nil, nil
 		}
-		return nil, xerrors.Errorf("failed to get original block: %w", err)
+		return nil, fmt.Errorf("failed to get original block: %w", err)
 	}
 
 	block, err = a.blockchainClient.UpgradeBlock(ctx, block, newTag)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to upgrade block: %w", err)
+		return nil, fmt.Errorf("failed to upgrade block: %w", err)
 	}
 
 	tag := block.GetMetadata().GetTag()
 	if tag != newTag {
-		return nil, xerrors.Errorf("unexpected block tag, expect=%v, actual=%v", newTag, tag)
+		return nil, fmt.Errorf("unexpected block tag, expect=%v, actual=%v", newTag, tag)
 	}
 
 	logger.Info(
@@ -193,15 +194,15 @@ func (a *Extractor) rehydrateBlock(ctx context.Context, height uint64, request *
 	newTag := request.Tag
 
 	if oldTag >= newTag {
-		return nil, xerrors.Errorf("invalid RehydrateFromTag (oldTag=%v, newTag=%v)", oldTag, newTag)
+		return nil, fmt.Errorf("invalid RehydrateFromTag (oldTag=%v, newTag=%v)", oldTag, newTag)
 	}
 
 	block, err := a.downloadBlock(ctx, oldTag, height)
 	if err != nil {
-		if xerrors.Is(err, storage.ErrItemNotFound) {
+		if errors.Is(err, storage.ErrItemNotFound) {
 			return nil, nil
 		}
-		return nil, xerrors.Errorf("failed to get original block: %w", err)
+		return nil, fmt.Errorf("failed to get original block: %w", err)
 	}
 
 	block.Metadata.Tag = newTag
@@ -218,12 +219,12 @@ func (a *Extractor) rehydrateBlock(ctx context.Context, height uint64, request *
 func (a *Extractor) downloadBlock(ctx context.Context, tag uint32, height uint64) (*api.Block, error) {
 	metadata, err := a.metaStorage.GetBlockByHeight(ctx, tag, height)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get block from meta storage: %w", err)
 	}
 
 	block, err := a.blobStorage.Download(ctx, metadata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block from blob storage: %w", err)
+		return nil, fmt.Errorf("failed to get block from blob storage: %w", err)
 	}
 
 	return block, nil

@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -1698,7 +1697,7 @@ func (s *handlerTestSuite) TestStreamChainEventsErrorOnGetMaxEventId() {
 		events: make([]*api.BlockchainEvent, 0),
 		ctx:    context.Background(),
 	}
-	s.metaStorage.EXPECT().GetMaxEventId(gomock.Any(), s.eventTagForTestEvents).Times(1).Return(int64(0), xerrors.New("blah"))
+	s.metaStorage.EXPECT().GetMaxEventId(gomock.Any(), s.eventTagForTestEvents).Times(1).Return(int64(0), errors.New("blah"))
 	err := s.server.StreamChainEvents(&api.ChainEventsRequest{
 		InitialPositionInStream: InitialPositionLatest,
 	}, mockServer)
@@ -1730,7 +1729,7 @@ func (s *handlerTestSuite) TestStreamChainEventsErrorOnGetFirstEventIdByBlockHei
 		events: make([]*api.BlockchainEvent, 0),
 		ctx:    context.Background(),
 	}
-	s.metaStorage.EXPECT().GetFirstEventIdByBlockHeight(gomock.Any(), s.eventTagForTestEvents, startHeight).Return(int64(0), xerrors.New("blah"))
+	s.metaStorage.EXPECT().GetFirstEventIdByBlockHeight(gomock.Any(), s.eventTagForTestEvents, startHeight).Return(int64(0), errors.New("blah"))
 	err := s.server.StreamChainEvents(&api.ChainEventsRequest{
 		InitialPositionInStream: strconv.FormatUint(startHeight, 10),
 	}, mockServer)
@@ -2122,7 +2121,7 @@ func (s *handlerTestSuite) TestGetChainEventsWithPositionLatest() {
 func (s *handlerTestSuite) TestGetChainEventsWithPositionLatestError() {
 	require := testutil.Require(s.T())
 	maxNumEvents := int64(s.config.Api.StreamingBatchSize) // this is required to use setupMetaStorageForEvents
-	SampleErr := xerrors.New("test error")
+	SampleErr := errors.New("test error")
 	s.metaStorage.EXPECT().GetMaxEventId(gomock.Any(), s.eventTagForTestEvents).Times(1).Return(int64(0), SampleErr)
 
 	resp, err := s.server.GetChainEvents(context.Background(), &api.GetChainEventsRequest{
@@ -2131,7 +2130,7 @@ func (s *handlerTestSuite) TestGetChainEventsWithPositionLatestError() {
 	})
 	require.Error(err)
 	require.Nil(resp)
-	require.True(xerrors.Is(err, SampleErr))
+	require.True(errors.Is(err, SampleErr))
 }
 
 func (s *handlerTestSuite) TestGetChainEventsNotEnoughEvents() {
@@ -2577,7 +2576,7 @@ func (s *handlerTestSuite) TestGetBlockByTransaction_TxNotFound() {
 	transactionHash := "foo"
 
 	s.transactionStorage.EXPECT().GetTransaction(gomock.Any(), stableTag, transactionHash).Times(1).
-		Return(nil, xerrors.New("failed to get transaction"))
+		Return(nil, errors.New("failed to get transaction"))
 
 	resp, err := s.server.GetBlockByTransaction(context.Background(), &api.GetBlockByTransactionRequest{
 		TransactionHash: transactionHash,
@@ -2605,7 +2604,7 @@ func (s *handlerTestSuite) TestGetBlockByTransaction_ErrGetBlockByHeight() {
 		DoAndReturn(func(ctx context.Context, tag uint32, heights []uint64) ([]*api.BlockMetadata, error) {
 			require.Len(heights, 1)
 			require.Equal([]uint64{100}, heights)
-			return nil, xerrors.New("failed to get blockMetadata")
+			return nil, errors.New("failed to get blockMetadata")
 		})
 
 	resp, err := s.server.GetBlockByTransaction(context.Background(), &api.GetBlockByTransactionRequest{

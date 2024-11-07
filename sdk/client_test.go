@@ -2,13 +2,13 @@ package sdk
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -319,7 +319,7 @@ func (s *clientTestSuite) TestStreamBlocks_WithSkippedBlocks() {
 }
 
 func (s *clientTestSuite) TestStreamBlocks_ErrStreamChainEvents() {
-	mockError := xerrors.New("some mock error")
+	mockError := errors.New("some mock error")
 	s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), gomock.Any()).Return(nil, mockError)
 	ch, err := s.client.StreamChainEvents(context.Background(), StreamingConfiguration{
 		ChainEventsRequest: &api.ChainEventsRequest{},
@@ -334,7 +334,7 @@ func (s *clientTestSuite) TestStreamBlocks_ErrStreamChainEvents() {
 }
 
 func (s *clientTestSuite) TestStreamBlocks_ErrRecv() {
-	mockError := xerrors.New("some mock error")
+	mockError := errors.New("some mock error")
 	s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), gomock.Any()).Return(s.streamClient, nil)
 	s.streamClient.EXPECT().Recv().Return(nil, mockError)
 
@@ -432,7 +432,7 @@ func (s *clientTestSuite) TestStreamBlocks_RecvPermanentErr() {
 		})).Return(s.streamClient, nil),
 		s.gatewayClient.EXPECT().StreamChainEvents(gomock.Any(), testutil.MatchProto(&api.ChainEventsRequest{
 			SequenceNum: 109,
-		})).Return(s.streamClient, xerrors.New("some mock error")),
+		})).Return(s.streamClient, errors.New("some mock error")),
 	)
 	s.gatewayClient.EXPECT().GetBlockFile(gomock.Any(), gomock.Any()).Return(&api.GetBlockFileResponse{}, nil).AnyTimes()
 	s.downloaderClient.EXPECT().Download(gomock.Any(), gomock.Any()).Return(&api.Block{}, nil).AnyTimes()

@@ -13,7 +13,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -105,7 +104,7 @@ func initializeChainInfoFromFlags() error {
 	var err error
 	blockchain, network, sidechain, err = parseChainInfo(commonFlags.blockchain, commonFlags.network, commonFlags.sidechain)
 	if err != nil {
-		return xerrors.Errorf("failed to parse blockchain and network: %w", err)
+		return fmt.Errorf("failed to parse blockchain and network: %w", err)
 	}
 	env = config.Env(commonFlags.env)
 	return nil
@@ -116,7 +115,7 @@ func startApp(opts ...fx.Option) CmdApp {
 
 	err := initializeChainInfoFromFlags()
 	if err != nil {
-		panic(xerrors.Errorf("failed to initialize blockchain, network, env from flags: %w", err))
+		panic(fmt.Errorf("failed to initialize blockchain, network, env from flags: %w", err))
 	}
 
 	cfg, err := config.New(
@@ -126,7 +125,7 @@ func startApp(opts ...fx.Option) CmdApp {
 		config.WithEnvironment(env),
 	)
 	if err != nil {
-		panic(xerrors.Errorf("failed to create service config: %w", err))
+		panic(fmt.Errorf("failed to create service config: %w", err))
 	}
 
 	finalOpts := []fx.Option{
@@ -177,7 +176,7 @@ func (a *cmdAppImpl) Config() *config.Config {
 func printBlock(parser sdk.Parser, rawBlock *api.Block, outputWithHeight bool) error {
 	block, err := parseBlock(parser, rawBlock)
 	if err != nil {
-		return xerrors.Errorf("failed to parse block: %w", err)
+		return fmt.Errorf("failed to parse block: %w", err)
 	}
 
 	out := commonFlags.out
@@ -194,7 +193,7 @@ func printBlock(parser sdk.Parser, rawBlock *api.Block, outputWithHeight bool) e
 	}
 
 	if err := logBlock(rawBlock.Metadata, block, out); err != nil {
-		return xerrors.Errorf("failed to log block: %w", err)
+		return fmt.Errorf("failed to log block: %w", err)
 	}
 
 	return nil
@@ -209,7 +208,7 @@ func parseBlock(parser sdk.Parser, rawBlock *api.Block) (proto.Message, error) {
 	case parserRosetta:
 		return parser.ParseRosettaBlock(context.Background(), rawBlock)
 	default:
-		return nil, xerrors.Errorf("unknown parser: %v", commonFlags.parser)
+		return nil, fmt.Errorf("unknown parser: %v", commonFlags.parser)
 	}
 }
 
@@ -228,19 +227,19 @@ func logBlock(metadata *api.BlockMetadata, block proto.Message, out string) erro
 	if extension == protobufExtension {
 		data, err = proto.Marshal(block)
 		if err != nil {
-			return xerrors.Errorf("failed to marshal block in protobuf format: %w", err)
+			return fmt.Errorf("failed to marshal block in protobuf format: %w", err)
 		}
 	} else {
 		// Defaults to json format.
 		marshaler := protojson.MarshalOptions{Indent: "  "}
 		data, err = marshaler.Marshal(block)
 		if err != nil {
-			return xerrors.Errorf("failed to marshal block in json format: %w", err)
+			return fmt.Errorf("failed to marshal block in json format: %w", err)
 		}
 	}
 
 	if err := ioutil.WriteFile(out, data, 0644); /* #nosec G306 */ err != nil {
-		return xerrors.Errorf("failed to write output file: %w", err)
+		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
 	logger.Info("fetched block", zap.Reflect("metadata", metadata), zap.String("out", out))
@@ -254,20 +253,20 @@ func parseChainInfo(
 ) (*common.Blockchain, *common.Network, api.SideChain, error) {
 	blockchain, err := utils.ParseBlockchain(blockchainFlag)
 	if err != nil {
-		return nil, nil, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse blockchain name: %s", blockchain)
+		return nil, nil, api.SideChain_SIDECHAIN_NONE, fmt.Errorf("failed to parse blockchain name: %s", blockchain)
 	}
 
 	networkName := fmt.Sprintf("%v_%v", blockchainFlag, networkFlag)
 	network, err := utils.ParseNetwork(networkName)
 	if err != nil {
-		return nil, nil, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse network name: %s", networkName)
+		return nil, nil, api.SideChain_SIDECHAIN_NONE, fmt.Errorf("failed to parse network name: %s", networkName)
 	}
 
 	if sidechainFlag != "" {
 		sidechainName := fmt.Sprintf("%v_%v_%v", blockchainFlag, networkFlag, sidechainFlag)
 		sidechain, err := utils.ParseSidechain(sidechainName)
 		if err != nil {
-			return nil, nil, api.SideChain_SIDECHAIN_NONE, xerrors.Errorf("failed to parse sidechain name: %s", sidechainName)
+			return nil, nil, api.SideChain_SIDECHAIN_NONE, fmt.Errorf("failed to parse sidechain name: %s", sidechainName)
 		}
 
 		return &blockchain, &network, sidechain, nil

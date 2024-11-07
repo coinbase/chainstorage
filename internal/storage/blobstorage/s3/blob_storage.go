@@ -16,7 +16,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -124,7 +123,7 @@ func (s *blobStorageImpl) getObjectKey(blockchain common.Blockchain, sidechain a
 	}
 	key, err = storage_utils.GetObjectKey(key, compression)
 	if err != nil {
-		return "", xerrors.Errorf("failed to get object key: %w", err)
+		return "", fmt.Errorf("failed to get object key: %w", err)
 	}
 	return key, nil
 }
@@ -139,7 +138,7 @@ func (s *blobStorageImpl) uploadRaw(ctx context.Context, rawBlockData *internal.
 	h := md5.New()
 	size, err := h.Write(rawBlockData.BlockData)
 	if err != nil {
-		return "", xerrors.Errorf("failed to compute checksum: %w", err)
+		return "", fmt.Errorf("failed to compute checksum: %w", err)
 	}
 
 	checksum := base64.StdEncoding.EncodeToString(h.Sum(nil))
@@ -151,7 +150,7 @@ func (s *blobStorageImpl) uploadRaw(ctx context.Context, rawBlockData *internal.
 		ContentMD5: aws.String(checksum),
 		ACL:        aws.String(bucketOwnerFullControl),
 	}); err != nil {
-		return "", xerrors.Errorf("failed to upload to s3: %w", err)
+		return "", fmt.Errorf("failed to upload to s3: %w", err)
 	}
 
 	// a workaround to use timer
@@ -183,12 +182,12 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 
 		data, err := proto.Marshal(block)
 		if err != nil {
-			return "", xerrors.Errorf("failed to marshal block: %w", err)
+			return "", fmt.Errorf("failed to marshal block: %w", err)
 		}
 
 		data, err = storage_utils.Compress(data, compression)
 		if err != nil {
-			return "", xerrors.Errorf("failed to compress data with type %v: %w", compression.String(), err)
+			return "", fmt.Errorf("failed to compress data with type %v: %w", compression.String(), err)
 		}
 		return s.uploadRaw(ctx, &internal.RawBlockData{
 			Blockchain:           block.Blockchain,
@@ -227,7 +226,7 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
 				return nil, errors.ErrRequestCanceled
 			}
-			return nil, xerrors.Errorf("failed to download from s3 (bucket=%s, key=%s): %w", s.bucket, key, err)
+			return nil, fmt.Errorf("failed to download from s3 (bucket=%s, key=%s): %w", s.bucket, key, err)
 		}
 
 		// a workaround to use timer
@@ -236,13 +235,13 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 		compression := storage_utils.GetCompressionType(key)
 		blockData, err := storage_utils.Decompress(buf.Bytes(), compression)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", compression.String(), err)
+			return nil, fmt.Errorf("failed to decompress block data with type %v: %w", compression.String(), err)
 		}
 
 		var block api.Block
 		err = proto.Unmarshal(blockData, &block)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal data downloaded from s3 bucket %s key %s: %w", s.bucket, key, err)
+			return nil, fmt.Errorf("failed to unmarshal data downloaded from s3 bucket %s key %s: %w", s.bucket, key, err)
 		}
 
 		// When metadata is loaded from meta storage,
@@ -260,7 +259,7 @@ func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string
 	})
 	fileUrl, err := getObjectReq.Presign(s.config.AWS.PresignedUrlExpiration)
 	if err != nil {
-		return "", xerrors.Errorf("failed to generate presigned url: %w", err)
+		return "", fmt.Errorf("failed to generate presigned url: %w", err)
 	}
 	return fileUrl, nil
 }

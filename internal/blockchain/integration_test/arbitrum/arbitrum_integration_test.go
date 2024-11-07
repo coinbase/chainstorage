@@ -2,13 +2,13 @@ package arbitrum_test
 
 import (
 	"context"
+	"errors"
 	"math"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -279,11 +279,11 @@ func (s *arbitrumIntegrationTestSuite) TestArbitrumGetBlock_NotFound() {
 
 	_, err := s.client.GetBlockByHeight(context.Background(), arbitrumTag, uint64(math.MaxInt64))
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 
 	_, err = s.client.GetBlockByHash(context.Background(), arbitrumTag, uint64(math.MaxInt64), hashNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 }
 
 func (s *arbitrumIntegrationTestSuite) TestArbitrumGetBlock_AfterNitroUpgrade_GethNestedTraces() {

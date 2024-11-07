@@ -2,10 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -101,8 +102,8 @@ const (
 )
 
 var (
-	ErrBlockNotFound  = xerrors.New("block not found")
-	ErrNotImplemented = xerrors.New("not implemented")
+	ErrBlockNotFound  = errors.New("block not found")
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 func NewClient(params Params) (Result, error) {
@@ -145,7 +146,7 @@ func NewClient(params Params) (Result, error) {
 		}
 	}
 	if factory == nil {
-		return Result{}, xerrors.Errorf("client is not implemented: blockchain(%v)-sidechain(%v)", blockchain, sidechain)
+		return Result{}, fmt.Errorf("client is not implemented: blockchain(%v)-sidechain(%v)", blockchain, sidechain)
 	}
 
 	scope := params.Metrics

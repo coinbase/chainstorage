@@ -2,11 +2,11 @@ package activity
 
 import (
 	"context"
+	"fmt"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/cadence"
@@ -72,7 +72,7 @@ func (a *UpdateWatermark) execute(ctx context.Context, request *UpdateWatermarkR
 	validateStart := request.BlockHeight - 1
 	if request.ValidateStart > 0 {
 		if request.ValidateStart >= request.BlockHeight {
-			return nil, xerrors.Errorf("ValidateSince %d should be smaller than BlockHeight %d",
+			return nil, fmt.Errorf("ValidateSince %d should be smaller than BlockHeight %d",
 				request.ValidateStart, request.BlockHeight)
 		}
 		validateStart = request.ValidateStart
@@ -82,16 +82,16 @@ func (a *UpdateWatermark) execute(ctx context.Context, request *UpdateWatermarkR
 	}
 	blocks, err := a.metaStorage.GetBlocksByHeightRange(ctx, tag, validateStart, request.BlockHeight+1)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks by tag %d: %w", tag, err)
+		return nil, fmt.Errorf("failed to get blocks by tag %d: %w", tag, err)
 	}
 	if len(blocks) > 1 {
 		if err := parser.ValidateChain(blocks[1:], blocks[0]); err != nil {
-			return nil, xerrors.Errorf("failed to validate chain: %w", err)
+			return nil, fmt.Errorf("failed to validate chain: %w", err)
 		}
 	}
 	err = a.metaStorage.PersistBlockMetas(ctx, true, []*api.BlockMetadata{blocks[len(blocks)-1]}, nil)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to set watermark: %w", err)
+		return nil, fmt.Errorf("failed to set watermark: %w", err)
 	}
 
 	return &UpdateWatermarkResponse{BlockHeight: request.BlockHeight}, nil

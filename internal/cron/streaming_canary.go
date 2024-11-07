@@ -2,11 +2,12 @@ package cron
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -76,12 +77,12 @@ func (t *streamingCanaryTask) Run(ctx context.Context) error {
 	eventTag := t.eventTag
 	maxEventId, err := t.eventStorage.GetMaxEventId(ctx, eventTag)
 	if err != nil {
-		if xerrors.Is(err, storage.ErrNoEventHistory) {
+		if errors.Is(err, storage.ErrNoEventHistory) {
 			t.logger.Info("no event history")
 			return nil
 		}
 
-		return xerrors.Errorf("failed to get max event id: %w", err)
+		return fmt.Errorf("failed to get max event id: %w", err)
 	}
 
 	if maxEventId < streamingPadding+storage.EventIdStartValue {
@@ -112,25 +113,25 @@ func (t *streamingCanaryTask) Run(ctx context.Context) error {
 			return nil
 		}
 
-		return xerrors.Errorf("failed to call StreamChainEvents (sequenceNum=%v, eventTag=%v): %w", sequenceNum, eventTag, err)
+		return fmt.Errorf("failed to call StreamChainEvents (sequenceNum=%v, eventTag=%v): %w", sequenceNum, eventTag, err)
 	}
 
 	for i := 0; i < streamingNumEvents; i++ {
 		resp, ok := <-stream
 		if !ok {
-			return xerrors.Errorf("unable to read event from closed stream (sequenceNum=%v, i=%v): %w", sequenceNum, i, err)
+			return fmt.Errorf("unable to read event from closed stream (sequenceNum=%v, i=%v): %w", sequenceNum, i, err)
 		}
 
 		if resp.Error != nil {
 			if t.isAbortedError(resp.Error) {
 				return nil
 			}
-			return xerrors.Errorf("received error from event stream (sequenceNum=%v, i=%v): %w", sequenceNum, i, resp.Error)
+			return fmt.Errorf("received error from event stream (sequenceNum=%v, i=%v): %w", sequenceNum, i, resp.Error)
 		}
 
 		event := resp.BlockchainEvent
 		if event == nil {
-			return xerrors.Errorf("received null event (sequenceNum=%v, i=%v)", sequenceNum, i)
+			return fmt.Errorf("received null event (sequenceNum=%v, i=%v)", sequenceNum, i)
 		}
 
 		t.logger.Debug("received event", zap.Int("i", i), zap.Reflect("event", event))
@@ -145,5 +146,5 @@ func (t *streamingCanaryTask) isAbortedError(err error) bool {
 	// Since the SLA alerts are already monitoring the data freshness,
 	// this particular error should be ignored by the canary task.
 	var grpcerr gateway.GrpcError
-	return xerrors.As(err, &grpcerr) && grpcerr.GRPCStatus().Code() == codes.Aborted
+	return errors.As(err, &grpcerr) && grpcerr.GRPCStatus().Code() == codes.Aborted
 }

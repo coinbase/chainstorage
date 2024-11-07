@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"golang.org/x/xerrors"
-
 	"github.com/coinbase/chainstorage/internal/utils/ratelimiter"
 )
 
@@ -18,7 +16,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	err := rt.rateLimiter.WaitN(req.Context(), 1)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to wait for rate limiting: %w", err)
+		return nil, fmt.Errorf("failed to wait for rate limiting: %w", err)
 	}
 	res, err := rt.base.RoundTrip(req)
 	return res, err

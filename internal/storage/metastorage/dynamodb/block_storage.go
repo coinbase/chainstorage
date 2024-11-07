@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
@@ -70,7 +69,7 @@ func newBlockStorage(params Params) (internal.BlockStorage, error) {
 		params,
 	)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create metadata accessor: %w", err)
+		return nil, fmt.Errorf("failed to create metadata accessor: %w", err)
 	}
 
 	metrics := params.Metrics.SubScope("block_storage").Tagged(map[string]string{
@@ -123,11 +122,11 @@ func (a *blockStorageImpl) getBlockByKeys(
 	blockKeyMap := getBlockKeyMap(blockPid, blockRid)
 	outputItem, err := a.blockTable.GetItem(ctx, blockKeyMap)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block metadata with GetBlock: %w", err)
+		return nil, fmt.Errorf("failed to get block metadata with GetBlock: %w", err)
 	}
 	blockDDBEntry, ok := outputItem.(*model.BlockMetaDataDDBEntry)
 	if !ok {
-		return nil, xerrors.Errorf("failed to cast to blockDDBEntry: %v", outputItem)
+		return nil, fmt.Errorf("failed to cast to blockDDBEntry: %v", outputItem)
 	}
 	return model.BlockMetadataToProto(blockDDBEntry), nil
 }
@@ -142,14 +141,14 @@ func (a *blockStorageImpl) getBlocksByKeys(ctx context.Context, blockPids []stri
 
 	outputEntries, err := a.blockTable.GetItems(ctx, keys)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block metadata with GetItems: %w", err)
+		return nil, fmt.Errorf("failed to get block metadata with GetItems: %w", err)
 	}
 
 	blocks := make([]*api.BlockMetadata, len(outputEntries))
 	for i := 0; i < len(outputEntries); i++ {
 		outputEntry, ok := outputEntries[i].(*model.BlockMetaDataDDBEntry)
 		if !ok {
-			return nil, xerrors.Errorf("failed to cast to blockDDBEntry: %v", outputEntries[i])
+			return nil, fmt.Errorf("failed to cast to blockDDBEntry: %v", outputEntries[i])
 		}
 		blocks[i] = model.BlockMetadataToProto(outputEntry)
 	}
@@ -181,7 +180,7 @@ func (a *blockStorageImpl) GetBlockByHeight(
 func (a *blockStorageImpl) GetBlocksByHeightRange(
 	ctx context.Context, tag uint32, startHeight, endHeight uint64) ([]*api.BlockMetadata, error) {
 	if startHeight >= endHeight {
-		return nil, xerrors.Errorf(
+		return nil, fmt.Errorf(
 			"startHeight(%d) should be less than endHeight(%d): %w",
 			startHeight, endHeight, errors.ErrOutOfRange)
 	}
@@ -198,14 +197,14 @@ func (a *blockStorageImpl) GetBlocksByHeightRange(
 		blockRid := getCanonicalBlockRid()
 		blocks, err := a.getBlocksByKeys(ctx, blockPids, blockRid)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get blocks by keys: %w", err)
+			return nil, fmt.Errorf("failed to get blocks by keys: %w", err)
 		}
 
 		sort.Slice(blocks, func(i, j int) bool {
 			return blocks[i].Height < blocks[j].Height
 		})
 		if err = parser.ValidateChain(blocks, nil); err != nil {
-			return nil, xerrors.Errorf("failed to validate chain: %w", err)
+			return nil, fmt.Errorf("failed to validate chain: %w", err)
 		}
 
 		return blocks, nil
@@ -265,7 +264,7 @@ func (a *blockStorageImpl) GetBlockByHash(
 
 func (a *blockStorageImpl) validateHeight(height uint64) error {
 	if height < a.blockStartHeight {
-		return xerrors.Errorf(
+		return fmt.Errorf(
 			"height(%d) should be no less than blockStartHeight(%d): %w",
 			height, a.blockStartHeight, errors.ErrInvalidHeight)
 	}
@@ -298,7 +297,7 @@ func (a *blockStorageImpl) PersistBlockMetas(
 			return blocks[i].Height < blocks[j].Height
 		})
 		if err := parser.ValidateChain(blocks, lastBlock); err != nil {
-			return xerrors.Errorf("failed to validate chain: %w", err)
+			return fmt.Errorf("failed to validate chain: %w", err)
 		}
 		// cut blocks into two chunks, the second chunk is updated with TransactWriteItems such that the watermark will be
 		// updated within it
@@ -308,14 +307,14 @@ func (a *blockStorageImpl) PersistBlockMetas(
 			blockEntries := a.makeBlockMetaDataDDBEntries(false, blocks[:startIndex])
 			err := a.blockTable.WriteItems(ctx, blockEntries)
 			if err != nil {
-				return xerrors.Errorf("failed to persist block metadatas with WriteItems: %w", err)
+				return fmt.Errorf("failed to persist block metadatas with WriteItems: %w", err)
 			}
 		}
 
 		blockEntries := a.makeBlockMetaDataDDBEntries(updateWatermark, blocks[startIndex:])
 		err := a.blockTable.TransactWriteItems(ctx, blockEntries)
 		if err != nil {
-			return xerrors.Errorf("failed to persist block metadatas with TransactWriteItems: %w", err)
+			return fmt.Errorf("failed to persist block metadatas with TransactWriteItems: %w", err)
 		}
 
 		return nil

@@ -3,11 +3,12 @@ package bitcoin
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -84,7 +85,7 @@ func NewBitcoinClientFactory(params internal.JsonrpcClientParams) internal.Clien
 
 func (b *bitcoinClient) BatchGetBlockMetadata(ctx context.Context, tag uint32, from uint64, to uint64) ([]*api.BlockMetadata, error) {
 	if from >= to {
-		return nil, xerrors.Errorf("invalid height range range of [%d, %d)", from, to)
+		return nil, fmt.Errorf("invalid height range range of [%d, %d)", from, to)
 	}
 
 	numBlocks := int(to - from)
@@ -103,11 +104,11 @@ func (b *bitcoinClient) BatchGetBlockMetadata(ctx context.Context, tag uint32, f
 
 	responses, err := b.client.BatchCall(ctx, bitcoinGetBlockByHashMethod, params)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block for blockhashes: %w", err)
+		return nil, fmt.Errorf("failed to get block for blockhashes: %w", err)
 	}
 
 	if len(responses) != numBlocks {
-		return nil, xerrors.Errorf("missing blocks in BatchCall to %s", bitcoinGetBlockByHashMethod.Name)
+		return nil, fmt.Errorf("missing blocks in BatchCall to %s", bitcoinGetBlockByHashMethod.Name)
 	}
 
 	results := make([]*api.BlockMetadata, len(responses))
@@ -116,17 +117,17 @@ func (b *bitcoinClient) BatchGetBlockMetadata(ctx context.Context, tag uint32, f
 		height := from + uint64(i)
 		headerResult, err := b.getBlockHeader(response)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get block hash %s: %w", hash, err)
+			return nil, fmt.Errorf("failed to get block hash %s: %w", hash, err)
 		}
 
 		actualHash := headerResult.header.Hash.Value()
 		if actualHash != hash {
-			return nil, xerrors.Errorf("failed to get block due to inconsistent hash values, expected: %s, actual: %s", hash, actualHash)
+			return nil, fmt.Errorf("failed to get block due to inconsistent hash values, expected: %s, actual: %s", hash, actualHash)
 		}
 
 		actualHeight := headerResult.header.Height.Value()
 		if actualHeight != height {
-			return nil, xerrors.Errorf("failed to get block due to inconsistent height, expected: %v, actual: %v", height, actualHeight)
+			return nil, fmt.Errorf("failed to get block due to inconsistent height, expected: %v, actual: %v", height, actualHeight)
 		}
 
 		results[i] = &api.BlockMetadata{
@@ -148,27 +149,27 @@ func (b *bitcoinClient) GetBlockByHeight(ctx context.Context, tag uint32, height
 	response, err := b.client.Call(ctx, bitcoinGetBlockHashMethod, params)
 	if err != nil {
 		var rpcErr *jsonrpc.RPCError
-		if xerrors.As(err, &rpcErr) &&
+		if errors.As(err, &rpcErr) &&
 			rpcErr.Code == bitcoinErrCodeInvalidParameter &&
 			rpcErr.Message == bitcoinErrMessageBlockOutOfRange {
-			return nil, xerrors.Errorf("block not found by height %v: %w", height, internal.ErrBlockNotFound)
+			return nil, fmt.Errorf("block not found by height %v: %w", height, internal.ErrBlockNotFound)
 		}
-		return nil, xerrors.Errorf("failed to make a call for block %v: %w", height, err)
+		return nil, fmt.Errorf("failed to make a call for block %v: %w", height, err)
 	}
 
 	var hash bitcoin.BitcoinHexString
 	if err := response.Unmarshal(&hash); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal block hash: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal block hash: %w", err)
 	}
 
 	block, err := b.GetBlockByHash(ctx, tag, height, hash.Value(), opts...)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block by hash: %s for height: %v, %w", hash, height, err)
+		return nil, fmt.Errorf("failed to get block by hash: %s for height: %v, %w", hash, height, err)
 	}
 
 	actualHeight := block.Metadata.Height
 	if actualHeight != height {
-		return nil, xerrors.Errorf("failed to get block due to inconsistent height values, expected: %v, actual: %v", height, actualHeight)
+		return nil, fmt.Errorf("failed to get block due to inconsistent height values, expected: %v, actual: %v", height, actualHeight)
 	}
 
 	return block, nil
@@ -184,22 +185,22 @@ func (b *bitcoinClient) GetBlockByHash(ctx context.Context, tag uint32, height u
 	response, err := b.client.Call(ctx, bitcoinGetBlockByHashMethod, params)
 	if err != nil {
 		var rpcErr *jsonrpc.RPCError
-		if xerrors.As(err, &rpcErr) &&
+		if errors.As(err, &rpcErr) &&
 			rpcErr.Code == bitcoinErrCodeInvalidAddressOrKey &&
 			rpcErr.Message == bitcoinErrMessageBlockNotFound {
-			return nil, xerrors.Errorf("block not found by hash %s: %w", hash, internal.ErrBlockNotFound)
+			return nil, fmt.Errorf("block not found by hash %s: %w", hash, internal.ErrBlockNotFound)
 		}
-		return nil, xerrors.Errorf("failed to make a call for block hash %s: %w", hash, err)
+		return nil, fmt.Errorf("failed to make a call for block hash %s: %w", hash, err)
 	}
 
 	headerResult, err := b.getBlockHeader(response)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block hash %s: %w", hash, err)
+		return nil, fmt.Errorf("failed to get block hash %s: %w", hash, err)
 	}
 
 	actualHash := headerResult.header.Hash.Value()
 	if actualHash != hash {
-		return nil, xerrors.Errorf("failed to get block due to inconsistent hash values, expected: %s, actual: %s", hash, actualHash)
+		return nil, fmt.Errorf("failed to get block due to inconsistent hash values, expected: %s, actual: %s", hash, actualHash)
 	}
 
 	return b.getBlockFromHeader(ctx, tag, headerResult)
@@ -210,12 +211,12 @@ func (b *bitcoinClient) GetLatestHeight(ctx context.Context) (uint64, error) {
 
 	response, err := b.client.Call(ctx, bitcoinGetBlockCountMethod, params)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get the height of the most-work fully-validated chain: %w", err)
+		return 0, fmt.Errorf("failed to get the height of the most-work fully-validated chain: %w", err)
 	}
 
 	var height uint64
 	if err := response.Unmarshal(&height); err != nil {
-		return 0, xerrors.Errorf("failed to unmarshal latest height: %w", err)
+		return 0, fmt.Errorf("failed to unmarshal latest height: %w", err)
 	}
 	return height, nil
 }
@@ -235,11 +236,11 @@ func (b *bitcoinClient) GetAccountProof(ctx context.Context, req *api.GetVerifie
 func (b *bitcoinClient) getBlockHeader(response *jsonrpc.Response) (*bitcoinBlockHeaderResultHolder, error) {
 	var header bitcoin.BitcoinBlockLit
 	if err := response.Unmarshal(&header); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal block header: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal block header: %w", err)
 	}
 
 	if err := b.validate.Struct(header); err != nil {
-		return nil, xerrors.Errorf("failed to validate block: %w", err)
+		return nil, fmt.Errorf("failed to validate block: %w", err)
 	}
 
 	return &bitcoinBlockHeaderResultHolder{
@@ -257,7 +258,7 @@ func (b *bitcoinClient) getBlockFromHeader(
 
 	inputTransactionsData, err := b.getInputTransactions(ctx, headerResult.header)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get previous transactions for block %s: %w", blockHash, err)
+		return nil, fmt.Errorf("failed to get previous transactions for block %s: %w", blockHash, err)
 	}
 
 	inputTransactions := make([]*api.RepeatedBytes, len(inputTransactionsData))
@@ -331,7 +332,7 @@ func (b *bitcoinClient) getInputTransactions(
 
 		batchResponses, err := b.client.BatchCall(ctx, bitcoinGetRawTransactionMethod, batchParams)
 		if err != nil {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"failed to call %s for subset of (blockHash=%s, startTransactionID=%v, batchSize=%v): %w",
 				bitcoinGetRawTransactionMethod.Name,
 				blockHash,
@@ -360,7 +361,7 @@ func (b *bitcoinClient) getInputTransactions(
 				inputID := input.Identifier.Value()
 				rawTransaction, ok := inputTransactionsMap[inputID]
 				if !ok {
-					return nil, xerrors.Errorf(
+					return nil, fmt.Errorf(
 						"input transaction id not found in map (blockHash=%s, transactionID=%v, inputTransactionID=%v)",
 						blockHash,
 						tx.Identifier,
@@ -370,7 +371,7 @@ func (b *bitcoinClient) getInputTransactions(
 
 				data, err := b.processInputTransactionRawData(rawTransaction, input.Vout.Value())
 				if err != nil {
-					return nil, xerrors.Errorf(
+					return nil, fmt.Errorf(
 						"error processing input transaction data (blockHash=%s, transactionID=%v, inputTransactionID=%v): %w",
 						blockHash,
 						tx.Identifier,
@@ -397,18 +398,18 @@ func (b *bitcoinClient) getBlockHashesByHeights(ctx context.Context, from uint64
 
 	responses, err := b.client.BatchCall(ctx, bitcoinGetBlockHashMethod, params)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block hashes for heights: %w", err)
+		return nil, fmt.Errorf("failed to get block hashes for heights: %w", err)
 	}
 
 	if numBlocks != len(responses) {
-		return nil, xerrors.Errorf("missing block hashes in BatchCall to %s", bitcoinGetBlockHashMethod.Name)
+		return nil, fmt.Errorf("missing block hashes in BatchCall to %s", bitcoinGetBlockHashMethod.Name)
 	}
 
 	blockHashes := make([]string, len(responses))
 	for i, response := range responses {
 		var hash bitcoin.BitcoinHexString
 		if err := response.Unmarshal(&hash); err != nil {
-			return nil, xerrors.Errorf("failed to get block hash for request %v: %w", params[i], err)
+			return nil, fmt.Errorf("failed to get block hash for request %v: %w", params[i], err)
 		}
 		blockHashes[i] = hash.Value()
 	}
@@ -418,15 +419,15 @@ func (b *bitcoinClient) getBlockHashesByHeights(ctx context.Context, from uint64
 func (b *bitcoinClient) processInputTransactionRawData(data json.RawMessage, voutIndex uint64) ([]byte, error) {
 	var transaction bitcoin.BitcoinInputTransactionLit
 	if err := json.Unmarshal(data, &transaction); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal data into bitcoin input transaction lite: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal data into bitcoin input transaction lite: %w", err)
 	}
 
 	if err := b.validate.Struct(transaction); err != nil {
-		return nil, xerrors.Errorf("failed to validate bitcoin input transaction lite %+v: %w", transaction, err)
+		return nil, fmt.Errorf("failed to validate bitcoin input transaction lite %+v: %w", transaction, err)
 	}
 
 	if voutIndex >= uint64(len(transaction.Vout)) {
-		return nil, xerrors.Errorf("vout index out of bound (index=%d, len=%d)", voutIndex, len(transaction.Vout))
+		return nil, fmt.Errorf("vout index out of bound (index=%d, len=%d)", voutIndex, len(transaction.Vout))
 	}
 
 	var output *bitcoin.BitcoinTransactionOutput
@@ -438,7 +439,7 @@ func (b *bitcoinClient) processInputTransactionRawData(data json.RawMessage, vou
 	}
 
 	if output == nil {
-		return nil, xerrors.Errorf("vout not found for index: %d", voutIndex)
+		return nil, fmt.Errorf("vout not found for index: %d", voutIndex)
 	}
 
 	// ignore other outputs
@@ -446,7 +447,7 @@ func (b *bitcoinClient) processInputTransactionRawData(data json.RawMessage, vou
 
 	result, err := json.Marshal(&transaction)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal input transaction data %v: %w", transaction, err)
+		return nil, fmt.Errorf("failed to marshal input transaction data %v: %w", transaction, err)
 	}
 	return result, nil
 }

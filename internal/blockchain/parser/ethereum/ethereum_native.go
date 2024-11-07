@@ -3,6 +3,7 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -15,7 +16,6 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/ethereum/types"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -298,7 +298,7 @@ func (v EthereumHexString) MarshalJSON() ([]byte, error) {
 func (v *EthereumHexString) UnmarshalJSON(input []byte) error {
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal EthereumHexString: %w", err)
+		return fmt.Errorf("failed to unmarshal EthereumHexString: %w", err)
 	}
 	s = strings.ToLower(s)
 
@@ -319,7 +319,7 @@ func (v *EthereumQuantity) UnmarshalJSON(input []byte) error {
 	if len(input) > 0 && input[0] != '"' {
 		var i uint64
 		if err := json.Unmarshal(input, &i); err != nil {
-			return xerrors.Errorf("failed to unmarshal EthereumQuantity into uint64: %w", err)
+			return fmt.Errorf("failed to unmarshal EthereumQuantity into uint64: %w", err)
 		}
 
 		*v = EthereumQuantity(i)
@@ -328,7 +328,7 @@ func (v *EthereumQuantity) UnmarshalJSON(input []byte) error {
 
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal EthereumQuantity into string: %w", err)
+		return fmt.Errorf("failed to unmarshal EthereumQuantity into string: %w", err)
 	}
 
 	if s == "" {
@@ -338,7 +338,7 @@ func (v *EthereumQuantity) UnmarshalJSON(input []byte) error {
 
 	i, err := hexutil.DecodeUint64(s)
 	if err != nil {
-		return xerrors.Errorf("failed to decode EthereumQuantity %v: %w", s, err)
+		return fmt.Errorf("failed to decode EthereumQuantity %v: %w", s, err)
 	}
 
 	*v = EthereumQuantity(i)
@@ -358,7 +358,7 @@ func (v EthereumBigQuantity) MarshalJSON() ([]byte, error) {
 func (v *EthereumBigQuantity) UnmarshalJSON(input []byte) error {
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal EthereumBigQuantity: %w", err)
+		return fmt.Errorf("failed to unmarshal EthereumBigQuantity: %w", err)
 	}
 
 	if s == "" {
@@ -368,7 +368,7 @@ func (v *EthereumBigQuantity) UnmarshalJSON(input []byte) error {
 
 	i, err := hexutil.DecodeBig(s)
 	if err != nil {
-		return xerrors.Errorf("failed to decode EthereumBigQuantity %v: %w", s, err)
+		return fmt.Errorf("failed to decode EthereumBigQuantity %v: %w", s, err)
 	}
 
 	*v = EthereumBigQuantity(*i)
@@ -383,7 +383,7 @@ func (v EthereumBigQuantity) Value() string {
 func (v EthereumBigQuantity) Uint64() (uint64, error) {
 	i := big.Int(v)
 	if !i.IsUint64() {
-		return 0, xerrors.Errorf("failed to parse EthereumBigQuantity to uint64 %v", v.Value())
+		return 0, fmt.Errorf("failed to parse EthereumBigQuantity to uint64 %v", v.Value())
 	}
 	return i.Uint64(), nil
 }
@@ -397,7 +397,7 @@ func (v EthereumBigFloat) MarshalJSON() ([]byte, error) {
 func (v *EthereumBigFloat) UnmarshalJSON(input []byte) error {
 	var s string
 	if err := json.Unmarshal(input, &s); err != nil {
-		return xerrors.Errorf("failed to unmarshal EthereumBigFloat: %w", err)
+		return fmt.Errorf("failed to unmarshal EthereumBigFloat: %w", err)
 	}
 
 	if s == "" {
@@ -408,7 +408,7 @@ func (v *EthereumBigFloat) UnmarshalJSON(input []byte) error {
 	scalar := new(big.Float)
 	scalar, ok := scalar.SetString(s)
 	if !ok {
-		return xerrors.Errorf("cannot parse EthereumBigFloat")
+		return fmt.Errorf("cannot parse EthereumBigFloat")
 	}
 
 	*v = EthereumBigFloat(*scalar)
@@ -429,7 +429,7 @@ func (v *EthereumTransactionLit) UnmarshalJSON(input []byte) error {
 	// Use a different struct to avoid calling this custom unmarshaler recursively.
 	var out ethereumTransactionLit
 	if err := json.Unmarshal(input, &out); err != nil {
-		return xerrors.Errorf("failed to unmarshal struct: %w", err)
+		return fmt.Errorf("failed to unmarshal struct: %w", err)
 	}
 
 	v.Hash = out.Hash
@@ -495,32 +495,32 @@ func WithEthereumChecksumAddress() internal.ParserFactoryOption {
 func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
-		return nil, xerrors.New("metadata not found")
+		return nil, errors.New("metadata not found")
 	}
 
 	blobdata := rawBlock.GetEthereum()
 	if blobdata == nil {
-		return nil, xerrors.New("blobdata not found")
+		return nil, errors.New("blobdata not found")
 	}
 
 	header, transactions, err := p.parseHeader(blobdata.Header)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse header: %w", err)
+		return nil, fmt.Errorf("failed to parse header: %w", err)
 	}
 
 	numTransactions := len(header.Transactions)
 	if numTransactions != len(transactions) {
-		return nil, xerrors.Errorf("unexpected number of transactions: expected=%v actual=%v", numTransactions, len(transactions))
+		return nil, fmt.Errorf("unexpected number of transactions: expected=%v actual=%v", numTransactions, len(transactions))
 	}
 
 	var transactionReceipts []*api.EthereumTransactionReceipt
 	if p.nodeType.ReceiptsEnabled() {
 		transactionReceipts, err = p.parseTransactionReceipts(blobdata, transactions)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction receipts: %w", err)
+			return nil, fmt.Errorf("failed to parse transaction receipts: %w", err)
 		}
 		if numTransactions != len(transactionReceipts) {
-			return nil, xerrors.Errorf("unexpected number of transaction receipts: expected=%v actual=%v", numTransactions, len(transactionReceipts))
+			return nil, fmt.Errorf("unexpected number of transaction receipts: expected=%v actual=%v", numTransactions, len(transactionReceipts))
 		}
 
 		for i, transactionReceipt := range transactionReceipts {
@@ -530,7 +530,7 @@ func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 				transactionReceipt.TransactionIndex != transaction.Index ||
 				transactionReceipt.BlockHash != header.Hash ||
 				transactionReceipt.BlockNumber != header.Number {
-				return nil, xerrors.Errorf("unexpected transaction receipt: transactionReceipt={%+v} transaction={%+v} block={%+v}", transactionReceipt, transaction, header)
+				return nil, fmt.Errorf("unexpected transaction receipt: transactionReceipt={%+v} transaction={%+v} block={%+v}", transactionReceipt, transaction, header)
 			}
 		}
 	} else {
@@ -553,28 +553,28 @@ func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 	if p.nodeType.TracesEnabled() && !isParityTrace {
 		transactionTraces, err = p.parseTransactionTraces(blobdata, transactions)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction traces: %w", err)
+			return nil, fmt.Errorf("failed to parse transaction traces: %w", err)
 		}
 	} else {
 		transactionTraces = make([]*api.EthereumTransactionTrace, numTransactions)
 	}
 
 	if numTransactions != len(transactionTraces) {
-		return nil, xerrors.Errorf("unexpected number of transaction traces: expected=%v actual=%v", numTransactions, len(transactionTraces))
+		return nil, fmt.Errorf("unexpected number of transaction traces: expected=%v actual=%v", numTransactions, len(transactionTraces))
 	}
 
 	tokenTransfers, err := p.parseTokenTransfers(transactionReceipts)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse token transfer: %w", err)
+		return nil, fmt.Errorf("failed to parse token transfer: %w", err)
 	}
 	if numTransactions != len(tokenTransfers) {
-		return nil, xerrors.Errorf("unexpected number of token transfers: expected=%v actual=%v", numTransactions, len(tokenTransfers))
+		return nil, fmt.Errorf("unexpected number of token transfers: expected=%v actual=%v", numTransactions, len(tokenTransfers))
 	}
 
 	transactionToFlattenedTracesMap := make(map[string][]*api.EthereumTransactionFlattenedTrace, 0)
 	if isParityTrace {
 		if err := p.parseTransactionFlattenedParityTraces(blobdata, transactionToFlattenedTracesMap); err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction parity traces: %w", err)
+			return nil, fmt.Errorf("failed to parse transaction parity traces: %w", err)
 		}
 	}
 
@@ -599,7 +599,7 @@ func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 
 	uncles, err := p.parseUncles(blobdata)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse uncles from block blobdata: %w", err)
+		return nil, fmt.Errorf("failed to parse uncles from block blobdata: %w", err)
 	}
 
 	nativeBlock := &api.NativeBlock{
@@ -631,7 +631,7 @@ func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 
 		var author string
 		if err := json.Unmarshal(authorData.Author, &author); err != nil {
-			return nil, xerrors.Errorf("failed to parse polygon author data on unmarshal: %w", err)
+			return nil, fmt.Errorf("failed to parse polygon author data on unmarshal: %w", err)
 		}
 
 		ethereumBlock.Header.OptionalPolygonAuthor = &api.EthereumHeader_Author{
@@ -649,11 +649,11 @@ func (p *ethereumNativeParserImpl) GetTransaction(ctx context.Context, nativeBlo
 func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader, []*api.EthereumTransaction, error) {
 	var block EthereumBlock
 	if err := json.Unmarshal(data, &block); err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse block header on unmarshal: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse block header on unmarshal: %w", err)
 	}
 
 	if err := p.validate.Struct(block); err != nil {
-		return nil, nil, xerrors.Errorf("failed to parse block header on struct validate: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse block header on struct validate: %w", err)
 	}
 
 	network := p.config.Chain.Network
@@ -695,7 +695,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 					zap.String("transaction hash", transaction.Hash.Value()),
 				)
 			} else {
-				return nil, nil, xerrors.Errorf("failed to parse transaction GasPrice to uint64 %v", transaction.GasPrice.Value())
+				return nil, nil, fmt.Errorf("failed to parse transaction GasPrice to uint64 %v", transaction.GasPrice.Value())
 			}
 		}
 		outTransaction.GasPrice = gasPrice
@@ -815,14 +815,14 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.EthereumBlobdata, transactions []*api.EthereumTransaction) ([]*api.EthereumTransactionReceipt, error) {
 	numReceipts := len(blobdata.TransactionReceipts)
 	if numReceipts != len(transactions) {
-		return nil, xerrors.Errorf("number of receipts and transactions do not match expected=%v actual=%v", len(transactions), numReceipts)
+		return nil, fmt.Errorf("number of receipts and transactions do not match expected=%v actual=%v", len(transactions), numReceipts)
 	}
 
 	receipts := make([]*api.EthereumTransactionReceipt, numReceipts)
 	for i, rawReceipt := range blobdata.TransactionReceipts {
 		var receipt EthereumTransactionReceipt
 		if err := json.Unmarshal(rawReceipt, &receipt); err != nil {
-			return nil, xerrors.Errorf("failed to parse receipt: %w", err)
+			return nil, fmt.Errorf("failed to parse receipt: %w", err)
 		}
 
 		receipts[i] = &api.EthereumTransactionReceipt{
@@ -852,7 +852,7 @@ func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.Ethere
 		if receipt.L1GasUsed != nil {
 			l1GasUsed, err := receipt.L1GasUsed.Uint64()
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse receipt L1GasUsed to uint64 %v", receipt.L1GasUsed.Value())
+				return nil, fmt.Errorf("failed to parse receipt L1GasUsed to uint64 %v", receipt.L1GasUsed.Value())
 			}
 
 			feeScalar := ""
@@ -871,7 +871,7 @@ func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.Ethere
 			if receipt.L1GasPrice != nil {
 				l1GasPrice, err := receipt.L1GasPrice.Uint64()
 				if err != nil {
-					return nil, xerrors.Errorf("failed to parse receipt L1GasPrice to uint64 %v", receipt.L1GasPrice.Value())
+					return nil, fmt.Errorf("failed to parse receipt L1GasPrice to uint64 %v", receipt.L1GasPrice.Value())
 				}
 
 				optionalL1FeeInfo.L1FeeInfo.L1GasPrice = l1GasPrice
@@ -880,7 +880,7 @@ func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.Ethere
 			if receipt.L1Fee != nil {
 				l1Fee, err := receipt.L1Fee.Uint64()
 				if err != nil {
-					return nil, xerrors.Errorf("failed to parse receipt L1Fee to uint64 %v", receipt.L1Fee.Value())
+					return nil, fmt.Errorf("failed to parse receipt L1Fee to uint64 %v", receipt.L1Fee.Value())
 				}
 
 				optionalL1FeeInfo.L1FeeInfo.L1Fee = l1Fee
@@ -983,13 +983,13 @@ func (p *ethereumNativeParserImpl) parseEventLogs(receipt *EthereumTransactionRe
 func (p *ethereumNativeParserImpl) parseTransactionTraces(blobdata *api.EthereumBlobdata, transactions []*api.EthereumTransaction) ([]*api.EthereumTransactionTrace, error) {
 	numTransactions := len(transactions)
 	if len(blobdata.TransactionTraces) > numTransactions {
-		return nil, xerrors.Errorf("wrong number of traces (# traces=%d, #transactions=%d)", len(blobdata.TransactionTraces), numTransactions)
+		return nil, fmt.Errorf("wrong number of traces (# traces=%d, #transactions=%d)", len(blobdata.TransactionTraces), numTransactions)
 	}
 	traces := make([]*api.EthereumTransactionTrace, numTransactions)
 	for i, rawTrace := range blobdata.TransactionTraces {
 		var trace EthereumTransactionTrace
 		if err := json.Unmarshal(rawTrace, &trace); err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction trace: %w", err)
+			return nil, fmt.Errorf("failed to parse transaction trace: %w", err)
 		}
 
 		traces[i] = p.copyEthereumTransactionTrace(&trace)
@@ -1013,7 +1013,7 @@ func (p *ethereumNativeParserImpl) parseTransactionTraces(blobdata *api.Ethereum
 		}
 		fallthrough
 	default:
-		return nil, xerrors.Errorf("wrong number of traces (# traces=%d, #transactions=%d)", len(blobdata.TransactionTraces), numTransactions)
+		return nil, fmt.Errorf("wrong number of traces (# traces=%d, #transactions=%d)", len(blobdata.TransactionTraces), numTransactions)
 	}
 }
 
@@ -1112,7 +1112,7 @@ func (p *ethereumNativeParserImpl) parseTransactionFlattenedParityTraces(blobDat
 	for _, rawTrace := range blobData.TransactionTraces {
 		var trace ParityTransactionTrace
 		if err := json.Unmarshal(rawTrace, &trace); err != nil {
-			return xerrors.Errorf("failed to parse transaction trace: %w", err)
+			return fmt.Errorf("failed to parse transaction trace: %w", err)
 		}
 		traceTransactionHash := trace.TransactionHash.Value()
 
@@ -1156,7 +1156,7 @@ func (p *ethereumNativeParserImpl) parseTransactionFlattenedParityTraces(blobDat
 	// Reprocess the traces since error(e.g. Revert) information is only in parent trace.
 	// So we need to populate the error information on all children traces.
 	if err := p.processParityTraceError(transactionToFlattenedTracesMap); err != nil {
-		return xerrors.Errorf("Error processing parity trace: %w", err)
+		return fmt.Errorf("Error processing parity trace: %w", err)
 	}
 
 	return nil
@@ -1247,7 +1247,7 @@ func (p *ethereumNativeParserImpl) parseTokenTransfers(transactionReceipts []*ap
 
 				tokenTransfer, err := p.parseERC20TokenTransfer(eventLog)
 				if err != nil {
-					return nil, xerrors.Errorf("failed to parse erc20 token transfer: %w", err)
+					return nil, fmt.Errorf("failed to parse erc20 token transfer: %w", err)
 				}
 				if tokenTransfer != nil {
 					tokenTransfers = append(tokenTransfers, tokenTransfer)
@@ -1257,7 +1257,7 @@ func (p *ethereumNativeParserImpl) parseTokenTransfers(transactionReceipts []*ap
 				// https://ethereum.org/en/developers/docs/standards/tokens/erc-721/
 				tokenTransfer, err := p.parseERC721TokenTransfer(eventLog)
 				if err != nil {
-					return nil, xerrors.Errorf("failed to parse erc721 token transfer: %w", err)
+					return nil, fmt.Errorf("failed to parse erc721 token transfer: %w", err)
 				}
 				if tokenTransfer != nil {
 					tokenTransfers = append(tokenTransfers, tokenTransfer)
@@ -1279,27 +1279,27 @@ func (p *ethereumNativeParserImpl) parseERC20TokenTransfer(eventLog *api.Ethereu
 	// Index 2 - to
 
 	if len(eventLog.Topics) != 3 || eventLog.Topics[0] != TransferEventTopic {
-		return nil, xerrors.Errorf("invalid erc20 token transfer")
+		return nil, fmt.Errorf("invalid erc20 token transfer")
 	}
 
 	tokenAddress, err := internal.CleanAddress(eventLog.Address)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode token address for erc20 %v: %w", eventLog.Address, err)
+		return nil, fmt.Errorf("failed to decode token address for erc20 %v: %w", eventLog.Address, err)
 	}
 
 	fromAddress, err := internal.CleanAddress(eventLog.Topics[1])
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode from address for erc20 %v: %w", eventLog.Topics[1], err)
+		return nil, fmt.Errorf("failed to decode from address for erc20 %v: %w", eventLog.Topics[1], err)
 	}
 
 	toAddress, err := internal.CleanAddress(eventLog.Topics[2])
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode to address for erc20 %v: %w", eventLog.Topics[2], err)
+		return nil, fmt.Errorf("failed to decode to address for erc20 %v: %w", eventLog.Topics[2], err)
 	}
 
 	value, err := internal.HexToBig(eventLog.Data)
 	if err != nil {
-		if xerrors.Is(err, hexutil.ErrBig256Range) {
+		if errors.Is(err, hexutil.ErrBig256Range) {
 			p.Logger.Warn("event log data hex value larger than 256 bits",
 				zap.Uint64("height", eventLog.BlockNumber),
 				zap.String("transaction_hash", eventLog.TransactionHash),
@@ -1307,7 +1307,7 @@ func (p *ethereumNativeParserImpl) parseERC20TokenTransfer(eventLog *api.Ethereu
 			)
 			return nil, nil
 		}
-		return nil, xerrors.Errorf("failed to decode from value for erc20 %v: %w", eventLog.Data, err)
+		return nil, fmt.Errorf("failed to decode from value for erc20 %v: %w", eventLog.Data, err)
 	}
 
 	return &api.EthereumTokenTransfer{
@@ -1339,22 +1339,22 @@ func (p *ethereumNativeParserImpl) parseERC721TokenTransfer(eventLog *api.Ethere
 	// Index 3 - tokenID
 
 	if len(eventLog.Topics) != 4 || eventLog.Topics[0] != TransferEventTopic {
-		return nil, xerrors.Errorf("invalid erc721 token transfer")
+		return nil, fmt.Errorf("invalid erc721 token transfer")
 	}
 
 	tokenAddress, err := internal.CleanAddress(eventLog.Address)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode token address for erc721 %v: %w", eventLog.Address, err)
+		return nil, fmt.Errorf("failed to decode token address for erc721 %v: %w", eventLog.Address, err)
 	}
 
 	fromAddress, err := internal.CleanAddress(eventLog.Topics[1])
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode from address for erc721 %v: %w", eventLog.Topics[1], err)
+		return nil, fmt.Errorf("failed to decode from address for erc721 %v: %w", eventLog.Topics[1], err)
 	}
 
 	toAddress, err := internal.CleanAddress(eventLog.Topics[2])
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode to address for erc721 %v: %w", eventLog.Topics[2], err)
+		return nil, fmt.Errorf("failed to decode to address for erc721 %v: %w", eventLog.Topics[2], err)
 	}
 
 	encodedTokenID := eventLog.Topics[3]
@@ -1366,7 +1366,7 @@ func (p *ethereumNativeParserImpl) parseERC721TokenTransfer(eventLog *api.Ethere
 
 	tokenID, err := internal.HexToBig(encodedTokenID)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to decode tokenID for erc721 %v: %w", eventLog.Topics[3], err)
+		return nil, fmt.Errorf("failed to decode tokenID for erc721 %v: %w", eventLog.Topics[3], err)
 	}
 
 	// No value field for erc721
@@ -1394,7 +1394,7 @@ func (p *ethereumNativeParserImpl) parseUncles(blobdata *api.EthereumBlobdata) (
 	for i, rawUncle := range blobdata.Uncles {
 		uncle, _, err := p.parseHeader(rawUncle)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse uncle: %w", err)
+			return nil, fmt.Errorf("failed to parse uncle: %w", err)
 		}
 
 		uncles[i] = uncle

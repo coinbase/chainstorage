@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -13,13 +14,12 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/zap/zaptest"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/config"
-	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	storage_errors "github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -92,7 +92,7 @@ func (s *blockStorageTestSuite) TestPersistBlockMetasByInvalidChain() {
 	blocks[73].Hash = "0xdeadbeef"
 	err := s.accessor.PersistBlockMetas(context.Background(), true, blocks, nil)
 	require.Error(err)
-	require.True(xerrors.Is(err, parser.ErrInvalidChain))
+	require.True(errors.Is(err, parser.ErrInvalidChain))
 }
 
 func (s *blockStorageTestSuite) TestPersistBlockMetasByInvalidLastBlock() {
@@ -102,7 +102,7 @@ func (s *blockStorageTestSuite) TestPersistBlockMetasByInvalidLastBlock() {
 	lastBlock.Hash = "0xdeadbeef"
 	err := s.accessor.PersistBlockMetas(context.Background(), true, blocks, lastBlock)
 	require.Error(err)
-	require.True(xerrors.Is(err, parser.ErrInvalidChain))
+	require.True(errors.Is(err, parser.ErrInvalidChain))
 }
 
 func (s *blockStorageTestSuite) TestPersistBlockMetasNotUpdatingWatermark() {
@@ -167,7 +167,7 @@ func (s *blockStorageTestSuite) runTestPersistBlockMetas(totalBlocks int) {
 	// fetch range with missing item
 	_, err = s.accessor.GetBlocksByHeightRange(ctx, tag, startHeight, startHeight+uint64(totalBlocks+100))
 	require.Error(err)
-	require.True(xerrors.Is(err, errors.ErrItemNotFound))
+	require.True(errors.Is(err, storage_errors.ErrItemNotFound))
 
 	// fetch valid range
 	fetchedBlocks, err := s.accessor.GetBlocksByHeightRange(ctx, tag, startHeight, startHeight+uint64(totalBlocks))
@@ -248,7 +248,7 @@ func (s *blockStorageTestSuite) TestPersistBlockMetasNotUpdateWatermark() {
 	}
 
 	_, err = s.accessor.GetLatestBlock(ctx, tag)
-	assert.True(s.T(), xerrors.Is(err, errors.ErrItemNotFound))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrItemNotFound))
 }
 
 func (s *blockStorageTestSuite) TestPersistBlockMetasNotContinuous() {
@@ -267,35 +267,35 @@ func (s *blockStorageTestSuite) TestPersistBlockMetasDuplicatedHeights() {
 
 func (s *blockStorageTestSuite) TestGetBlocksNotExist() {
 	_, err := s.accessor.GetLatestBlock(context.TODO(), tag)
-	assert.True(s.T(), xerrors.Is(err, errors.ErrItemNotFound))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrItemNotFound))
 }
 
 func (s *blockStorageTestSuite) TestGetBlockByHeightInvalidHeight() {
 	_, err := s.accessor.GetBlockByHeight(context.TODO(), tag, 0)
-	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrInvalidHeight))
 }
 
 func (s *blockStorageTestSuite) TestGetBlocksByHeightsInvalidHeight() {
 	_, err := s.accessor.GetBlocksByHeights(context.TODO(), tag, []uint64{0})
-	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrInvalidHeight))
 }
 
 func (s *blockStorageTestSuite) TestGetBlocksByHeightsBlockNotFound() {
 	_, err := s.accessor.GetBlocksByHeights(context.TODO(), tag, []uint64{15})
-	assert.True(s.T(), xerrors.Is(err, errors.ErrItemNotFound))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrItemNotFound))
 }
 
 func (s *blockStorageTestSuite) TestGetBlockByHashInvalidHeight() {
 	_, err := s.accessor.GetBlockByHash(context.TODO(), tag, 0, "0x0")
-	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrInvalidHeight))
 }
 
 func (s *blockStorageTestSuite) TestGetBlocksByHeightRangeInvalidRange() {
 	_, err := s.accessor.GetBlocksByHeightRange(context.TODO(), tag, 100, 100)
-	assert.True(s.T(), xerrors.Is(err, errors.ErrOutOfRange))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrOutOfRange))
 
 	_, err = s.accessor.GetBlocksByHeightRange(context.TODO(), tag, 0, s.config.Chain.BlockStartHeight)
-	assert.True(s.T(), xerrors.Is(err, errors.ErrInvalidHeight))
+	assert.True(s.T(), errors.Is(err, storage_errors.ErrInvalidHeight))
 }
 
 func (s *blockStorageTestSuite) equalProto(x, y any) {

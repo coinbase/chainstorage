@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -13,7 +14,6 @@ import (
 
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/restapi"
 	restapimocks "github.com/coinbase/chainstorage/internal/blockchain/restapi/mocks"
@@ -289,7 +289,7 @@ func TestCall_URLError(t *testing.T) {
 	urlError := &url.Error{
 		Op:  "Post",
 		URL: "foo.com",
-		Err: xerrors.Errorf("a test error"),
+		Err: fmt.Errorf("a test error"),
 	}
 	httpClient.EXPECT().Do(gomock.Any()).Return(nil, urlError).Times(retry.DefaultMaxAttempts)
 

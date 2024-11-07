@@ -8,7 +8,6 @@ import (
 	rt "github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
@@ -47,7 +46,7 @@ func LoadRosettaRaw(
 	network common.Network) (*api.Block, error) {
 	header, err := json.Marshal(block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to marshal test rosetta block: %w", err)
+		return nil, fmt.Errorf("failed to marshal test rosetta block: %w", err)
 	}
 
 	rosettaRaw := &api.Block{
@@ -69,7 +68,7 @@ func LoadRosettaRaw(
 	if transactions != nil {
 		txData, err := json.Marshal(transactions)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to marshal test rosetta transaction: %w", err)
+			return nil, fmt.Errorf("failed to marshal test rosetta transaction: %w", err)
 		}
 		rosettaRaw.GetRosetta().OtherTransactions = [][]byte{txData}
 	}

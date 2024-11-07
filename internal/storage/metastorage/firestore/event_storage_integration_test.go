@@ -2,6 +2,7 @@ package firestore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,10 +10,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
-	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	storage_errors "github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/model"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
@@ -71,7 +71,7 @@ func (s *eventStorageTestSuite) verifyEvents(eventTag uint32, numEvents uint64, 
 	// fetch range with missing item
 	_, err = s.storage.GetEventsByEventIdRange(ctx, eventTag, model.EventIdStartValue, model.EventIdStartValue+int64(numEvents+100))
 	require.Error(err)
-	require.True(xerrors.Is(err, errors.ErrItemNotFound))
+	require.True(errors.Is(err, storage_errors.ErrItemNotFound))
 
 	// fetch valid range
 	fetchedEvents, err := s.storage.GetEventsByEventIdRange(ctx, eventTag, model.EventIdStartValue, model.EventIdStartValue+int64(numEvents))
@@ -135,7 +135,7 @@ func (s *eventStorageTestSuite) TestSetMaxEventId() {
 	require.NoError(err)
 	_, err = s.storage.GetMaxEventId(ctx, s.eventTag)
 	require.Error(err)
-	require.Equal(errors.ErrNoEventHistory, err)
+	require.Equal(storage_errors.ErrNoEventHistory, err)
 }
 
 func (s *eventStorageTestSuite) TestSetMaxEventIdNonDefaultEventTag() {
@@ -171,7 +171,7 @@ func (s *eventStorageTestSuite) TestSetMaxEventIdNonDefaultEventTag() {
 	require.NoError(err)
 	_, err = s.storage.GetMaxEventId(ctx, eventTag)
 	require.Error(err)
-	require.Equal(errors.ErrNoEventHistory, err)
+	require.Equal(storage_errors.ErrNoEventHistory, err)
 }
 
 func (s *eventStorageTestSuite) TestAddEvents() {

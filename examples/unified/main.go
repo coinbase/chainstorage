@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
@@ -100,7 +100,7 @@ func (s *KeyValueStore) GetBlock(height uint64) (*Block, error) {
 	// )
 	blocks, ok := s.blocksByHeight[height]
 	if !ok {
-		return nil, xerrors.Errorf("not found: %v", height)
+		return nil, fmt.Errorf("not found: %v", height)
 	}
 
 	for i := len(blocks) - 1; i >= 0; i-- {
@@ -110,7 +110,7 @@ func (s *KeyValueStore) GetBlock(height uint64) (*Block, error) {
 		}
 	}
 
-	return nil, xerrors.Errorf("not found: %v", height)
+	return nil, fmt.Errorf("not found: %v", height)
 }
 
 func (s *KeyValueStore) SetBlock(height uint64, block *Block) {
@@ -142,7 +142,7 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 		Env:        sdk.EnvProduction,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create session: %w", err)
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	ctx := manager.ServiceContext()
@@ -150,12 +150,12 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 
 	chainMetadata, err := client.GetChainMetadata(ctx, &api.GetChainMetadataRequest{})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain metadata: %w", err)
+		return nil, fmt.Errorf("failed to get chain metadata: %w", err)
 	}
 
 	backoffInterval, err := time.ParseDuration(chainMetadata.BlockTime)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block time: %w", err)
+		return nil, fmt.Errorf("failed to parse block time: %w", err)
 	}
 
 	events, err := client.GetChainEvents(ctx, &api.GetChainEventsRequest{
@@ -163,11 +163,11 @@ func NewWorker(manager sdk.SystemManager) (*Worker, error) {
 		MaxNumEvents:            1,
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get chain events: %w", err)
+		return nil, fmt.Errorf("failed to get chain events: %w", err)
 	}
 
 	if len(events) != 1 {
-		return nil, xerrors.Errorf("got unexpected number of events: %v", len(events))
+		return nil, fmt.Errorf("got unexpected number of events: %v", len(events))
 	}
 
 	checkpoint := events[0].SequenceNum - startDistance
@@ -195,7 +195,7 @@ func (w *Worker) Run() error {
 		sequence := w.store.GetCheckpoint()
 		nextSequence, err := w.processBatch(ctx, sequence, batchSize)
 		if err != nil {
-			return xerrors.Errorf("failed to process batch [%v, %v): %w", sequence, sequence+batchSize, err)
+			return fmt.Errorf("failed to process batch [%v, %v): %w", sequence, sequence+batchSize, err)
 		}
 
 		w.store.SetCheckpoint(nextSequence)
@@ -208,7 +208,7 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 		MaxNumEvents: batchSize,
 	})
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get chain events: %w", err)
+		return 0, fmt.Errorf("failed to get chain events: %w", err)
 	}
 
 	if len(events) == 0 {
@@ -250,12 +250,12 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 
 			block, err := w.session.Client().GetBlockWithTag(ctx, blockID.Tag, blockID.Height, blockID.Hash)
 			if err != nil {
-				return xerrors.Errorf("failed to get block {%+v}: %w", blockID, err)
+				return fmt.Errorf("failed to get block {%+v}: %w", blockID, err)
 			}
 
 			nativeBlock, err := w.session.Parser().ParseNativeBlock(ctx, block)
 			if err != nil {
-				return xerrors.Errorf("failed to parse block {%+v}: %w", blockID, err)
+				return fmt.Errorf("failed to parse block {%+v}: %w", blockID, err)
 			}
 
 			w.store.SetBlock(blockID.Height, &Block{
@@ -268,7 +268,7 @@ func (w *Worker) processBatch(ctx context.Context, sequence int64, batchSize uin
 	}
 
 	if err := group.Wait(); err != nil {
-		return 0, xerrors.Errorf("failed to get blocks: %w", err)
+		return 0, fmt.Errorf("failed to get blocks: %w", err)
 	}
 
 	w.numBatches += 1

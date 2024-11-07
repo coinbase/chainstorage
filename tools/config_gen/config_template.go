@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/valyala/fasttemplate"
-	"golang.org/x/xerrors"
 	"gopkg.in/yaml.v2"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -61,7 +61,7 @@ func NewConfigTemplateFromFile(pathToConfig string) (*ConfigTemplate, error) {
 func NewConfigTemplateFromString(templateString string) (*ConfigTemplate, error) {
 	template, err := fasttemplate.NewTemplate(templateString, "{{", "}}")
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse template: %w", err)
+		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
 	return NewConfigTemplate(template, []*ConfigTemplate{}), nil
 }
@@ -73,7 +73,7 @@ func (c *ConfigTemplate) Inherit(parentTemplates ...*ConfigTemplate) {
 func (c *ConfigTemplate) WriteToFile(configVars *ConfigVars, path string) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(0644))
 	if err != nil {
-		return xerrors.Errorf("failed to open file: %w", err)
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 
 	finalizer := finalizer.WithCloser(f)
@@ -81,20 +81,20 @@ func (c *ConfigTemplate) WriteToFile(configVars *ConfigVars, path string) error 
 
 	viperConfig, err := c.toViper(configVars)
 	if err != nil {
-		return xerrors.Errorf("failed to write config to file to path [%s]: %w", path, err)
+		return fmt.Errorf("failed to write config to file to path [%s]: %w", path, err)
 	}
 
 	if _, err := f.WriteString(generatedComment); err != nil {
-		return xerrors.Errorf("failed to write comment: %w", err)
+		return fmt.Errorf("failed to write comment: %w", err)
 	}
 
 	contents, err := yaml.Marshal(viperConfig.AllSettings())
 	if err != nil {
-		return xerrors.Errorf("failed to marshal settings into a string: %w", err)
+		return fmt.Errorf("failed to marshal settings into a string: %w", err)
 	}
 
 	if _, err := f.Write(contents); err != nil {
-		return xerrors.Errorf("failed to write contents: %w", err)
+		return fmt.Errorf("failed to write contents: %w", err)
 	}
 
 	return finalizer.Close()
@@ -106,27 +106,27 @@ func (c *ConfigTemplate) toViper(configVars *ConfigVars) (*viper.Viper, error) {
 
 	err := c.setAWSAccount(configVars)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to set aws account value: %w", err)
+		return nil, fmt.Errorf("failed to set aws account value: %w", err)
 	}
 
 	for _, parentTemplate := range c.parentTemplates {
 		b, err := parentTemplate.executeTemplate(configVars)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to compile template: %w", err)
+			return nil, fmt.Errorf("failed to compile template: %w", err)
 		}
 		err = viperConfig.MergeConfig(b)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to merge config: %w", err)
+			return nil, fmt.Errorf("failed to merge config: %w", err)
 		}
 	}
 
 	b, err := c.executeTemplate(configVars)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to execute template: %w", err)
+		return nil, fmt.Errorf("failed to execute template: %w", err)
 	}
 	err = viperConfig.MergeConfig(b)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to merge config: %w", err)
+		return nil, fmt.Errorf("failed to merge config: %w", err)
 	}
 
 	return viperConfig, nil
@@ -140,11 +140,11 @@ func (c *ConfigTemplate) setAWSAccount(configVars *ConfigVars) error {
 
 	templateConfig, err := c.executeTemplate(configVars)
 	if err != nil {
-		return xerrors.Errorf("failed to execute template file: %w", err)
+		return fmt.Errorf("failed to execute template file: %w", err)
 	}
 	err = tempViperConfig.ReadConfig(templateConfig)
 	if err != nil {
-		return xerrors.Errorf("failed to read template file: %w", err)
+		return fmt.Errorf("failed to read template file: %w", err)
 	}
 
 	awsAccount := tempViperConfig.GetString(awsAccountKey)
@@ -169,15 +169,15 @@ func (c *ConfigTemplate) executeTemplate(configVars *ConfigVars) (*bytes.Buffer,
 			if val, exists := config.AWSAccountShortMap[config.AWSAccount(configVars.AWSAccount)]; exists {
 				n, err := w.Write([]byte(val))
 				if err != nil {
-					return 0, xerrors.Errorf("failed to write short-environment tag: %w", err)
+					return 0, fmt.Errorf("failed to write short-environment tag: %w", err)
 				}
 				return n, nil
 			}
-			return 0, xerrors.Errorf("short environment tag for aws account[%s] not found", configVars.AWSAccount)
+			return 0, fmt.Errorf("short environment tag for aws account[%s] not found", configVars.AWSAccount)
 		}),
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("failed to execute template: %w", err)
+		return nil, fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return &b, nil

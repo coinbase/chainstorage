@@ -2,12 +2,12 @@ package internal
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -96,13 +96,13 @@ func (p *checkerImpl) CompareNativeBlocks(ctx context.Context, height uint64, ex
 	actualBlock.Timestamp = expectedBlock.Timestamp
 
 	if err := p.PreProcessor.PreProcessNativeBlock(expectedBlock, actualBlock); err != nil {
-		return xerrors.Errorf("failed to preprocess blocks: %w", err)
+		return fmt.Errorf("failed to preprocess blocks: %w", err)
 	}
 
 	if !proto.Equal(expectedBlock, actualBlock) {
 		diff := cmp.Diff(expectedBlock, actualBlock, protocmp.Transform())
 		return &ParityCheckFailedError{
-			Err:  xerrors.Errorf("parity issue detected with native blocks: height=%v", height),
+			Err:  fmt.Errorf("parity issue detected with native blocks: height=%v", height),
 			Diff: diff,
 		}
 	}

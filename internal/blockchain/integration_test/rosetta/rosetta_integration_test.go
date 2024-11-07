@@ -2,6 +2,7 @@ package rosetta_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync/atomic"
@@ -10,7 +11,6 @@ import (
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -229,11 +229,11 @@ func testGetRosettaBlock_NotFound(t *testing.T, asset rosettaTestAsset) {
 
 	_, err := deps.Client.GetBlockByHeight(context.Background(), asset.Tag, asset.InvalidBlockHeight)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 
 	_, err = deps.Client.GetBlockByHash(context.Background(), asset.Tag, asset.InvalidBlockHeight, asset.InvalidBlockHash)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 }
 
 func BenchmarkDogecoinRosettaGetBlockByHeight(b *testing.B) {
@@ -292,21 +292,21 @@ func BenchmarkDogecoinRosettaGetBlockByHeight(b *testing.B) {
 				app.Logger().Info("processing block", zap.Uint64("height", height))
 				rawBlock, err := deps.Client.GetBlockByHeight(context.Background(), 0, height)
 				if err != nil {
-					return xerrors.Errorf("failed to get block for height %d", height)
+					return fmt.Errorf("failed to get block for height %d", height)
 				}
 				if height != rawBlock.Metadata.Height {
-					return xerrors.Errorf(
+					return fmt.Errorf(
 						"rosetta block has the wrong height, expected: %d, actual: %d",
 						height,
 						rawBlock.Metadata.Height)
 				}
 				nativeBlock, err := deps.Parser.ParseNativeBlock(context.Background(), rawBlock)
 				if err != nil {
-					return xerrors.Errorf("failed to parse rosetta block to a native block %w", err)
+					return fmt.Errorf("failed to parse rosetta block to a native block %w", err)
 				}
 				block := nativeBlock.GetRosetta()
 				if block == nil {
-					return xerrors.Errorf("native block misses rosetta blob")
+					return fmt.Errorf("native block misses rosetta blob")
 				}
 				atomic.AddInt32(&processed, 1)
 			}

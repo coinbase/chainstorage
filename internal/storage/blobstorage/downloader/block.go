@@ -2,13 +2,13 @@ package downloader
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 	tracehttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 
@@ -88,12 +88,12 @@ func (d *blockDownloaderImpl) Download(ctx context.Context, blockFile *api.Block
 	return d.retry.Retry(ctx, func(ctx context.Context) (*api.Block, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, blockFile.FileUrl, nil)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create download request: %w", err)
+			return nil, fmt.Errorf("failed to create download request: %w", err)
 		}
 
 		httpResp, err := d.httpClient.Do(req)
 		if err != nil {
-			return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
+			return nil, retry.Retryable(fmt.Errorf("failed to download block file: %w", err))
 		}
 
 		finalizer := finalizer.WithCloser(httpResp.Body)
@@ -103,25 +103,25 @@ func (d *blockDownloaderImpl) Download(ctx context.Context, blockFile *api.Block
 			if statusCode == http.StatusRequestTimeout ||
 				statusCode == http.StatusTooManyRequests ||
 				statusCode >= http.StatusInternalServerError {
-				return nil, retry.Retryable(xerrors.Errorf("received %d status code: %w", statusCode, errors.ErrDownloadFailure))
+				return nil, retry.Retryable(fmt.Errorf("received %d status code: %w", statusCode, errors.ErrDownloadFailure))
 			} else {
-				return nil, xerrors.Errorf("received non-retryable %d status code: %w", statusCode, errors.ErrDownloadFailure)
+				return nil, fmt.Errorf("received non-retryable %d status code: %w", statusCode, errors.ErrDownloadFailure)
 			}
 		}
 
 		bodyBytes, err := ioutil.ReadAll(httpResp.Body)
 		if err != nil {
-			return nil, retry.Retryable(xerrors.Errorf("failed to read body: %w", err))
+			return nil, retry.Retryable(fmt.Errorf("failed to read body: %w", err))
 		}
 
 		block := new(api.Block)
 		blockData, err := storage_utils.Decompress(bodyBytes, blockFile.Compression)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+			return nil, fmt.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
 		}
 
 		if err := proto.Unmarshal(blockData, block); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal file contents: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal file contents: %w", err)
 		}
 
 		return block, finalizer.Close()

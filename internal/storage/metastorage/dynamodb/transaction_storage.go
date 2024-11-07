@@ -2,12 +2,12 @@ package dynamodb
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
-	"golang.org/x/xerrors"
 
 	ddbmodel "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
@@ -54,7 +54,7 @@ func newTransactionStorage(params Params) (internal.TransactionStorage, error) {
 		params,
 	)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create transaction table accessor: %w", err)
+		return nil, fmt.Errorf("failed to create transaction table accessor: %w", err)
 	}
 
 	metrics := params.Metrics.SubScope("transaction_storage").Tagged(map[string]string{
@@ -81,7 +81,7 @@ func (t *transactionStorageImpl) AddTransactions(ctx context.Context, transactio
 		}
 
 		if err := t.transactionTable.BatchWriteItems(ctx, entries, parallelism); err != nil {
-			return xerrors.Errorf("failed to add transactions: %w", err)
+			return fmt.Errorf("failed to add transactions: %w", err)
 		}
 
 		return nil
@@ -96,7 +96,7 @@ func (t *transactionStorageImpl) GetTransaction(ctx context.Context, tag uint32,
 		builder := expression.NewBuilder().WithKeyCondition(pkCondition)
 		expr, err := builder.Build()
 		if err != nil {
-			return nil, xerrors.Errorf("failed to build expression for GetTransaction - QueryItems: %w", err)
+			return nil, fmt.Errorf("failed to build expression for GetTransaction - QueryItems: %w", err)
 		}
 
 		outputItems, err := t.transactionTable.QueryItems(ctx, &QueryItemsRequest{
@@ -106,19 +106,19 @@ func (t *transactionStorageImpl) GetTransaction(ctx context.Context, tag uint32,
 			ConsistentRead:            true,
 		})
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get transaction: %w", err)
+			return nil, fmt.Errorf("failed to get transaction: %w", err)
 		}
 
 		transactionToBlocks := make([]*model.Transaction, len(outputItems))
 		for i, item := range outputItems {
 			transactionDDBEntry, ok := item.(*ddbmodel.TransactionDDBEntry)
 			if !ok {
-				return nil, xerrors.Errorf("failed to convert output (%+v) to TransactionDDBEntry", item)
+				return nil, fmt.Errorf("failed to convert output (%+v) to TransactionDDBEntry", item)
 			}
 
 			transaction, err := ddbmodel.TransformToTransaction(transactionDDBEntry)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to transform ddb entry (%+v) to transaction", transactionDDBEntry)
+				return nil, fmt.Errorf("failed to transform ddb entry (%+v) to transaction", transactionDDBEntry)
 			}
 			transactionToBlocks[i] = transaction
 		}

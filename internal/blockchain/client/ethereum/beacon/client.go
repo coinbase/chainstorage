@@ -3,6 +3,7 @@ package beacon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	parser "github.com/coinbase/chainstorage/internal/blockchain/parser/ethereum/beacon"
@@ -79,7 +79,7 @@ func NewClientFactory(params internal.RestapiClientParams) internal.ClientFactor
 
 func (c *Client) BatchGetBlockMetadata(ctx context.Context, tag uint32, from uint64, to uint64) ([]*api.BlockMetadata, error) {
 	if from >= to {
-		return nil, xerrors.Errorf("invalid height range range of [%d, %d)", from, to)
+		return nil, fmt.Errorf("invalid height range range of [%d, %d)", from, to)
 	}
 
 	numBlocks := int(to - from)
@@ -90,7 +90,7 @@ func (c *Client) BatchGetBlockMetadata(ctx context.Context, tag uint32, from uin
 
 		headerResult, err := c.getHeaderByHeight(ctx, tag, height)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get block header (height=%d) in BatchGetBlockMetadata: %w", height, err)
+			return nil, fmt.Errorf("failed to get block header (height=%d) in BatchGetBlockMetadata: %w", height, err)
 		}
 
 		blockMetadatas[i] = headerResult.metadata
@@ -108,7 +108,7 @@ func (c *Client) getHeaderByHeight(ctx context.Context, tag uint32, height uint6
 
 	result, err := c.getHeader(ctx, tag, height, getBlockHeaderMethod)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block header by height (height=%d): %w", height, err)
+		return nil, fmt.Errorf("failed to get block header by height (height=%d): %w", height, err)
 	}
 	return result, nil
 }
@@ -122,7 +122,7 @@ func (c *Client) getHeaderByHash(ctx context.Context, tag uint32, height uint64,
 
 	result, err := c.getHeader(ctx, tag, height, getBlockHeaderMethod)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block header by hash (height=%d, hash=%v): %w", height, hash, err)
+		return nil, fmt.Errorf("failed to get block header by hash (height=%d, hash=%v): %w", height, hash, err)
 	}
 	return result, nil
 }
@@ -132,13 +132,13 @@ func (c *Client) getHeader(ctx context.Context, tag uint32, height uint64, metho
 	if err != nil {
 		callErr := handleCallError(err)
 		// Beacon client returns `NOT_FOUND` error when query a missed/orphaned block
-		if !xerrors.Is(callErr, internal.ErrBlockNotFound) {
-			return nil, xerrors.Errorf("failed to get header for block=%d: %w", height, err)
+		if !errors.Is(callErr, internal.ErrBlockNotFound) {
+			return nil, fmt.Errorf("failed to get header for block=%d: %w", height, err)
 		}
 
 		blockTimestamp, err := c.getBlockTimestamp(height)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get timestamp of block=%d: %w", height, err)
+			return nil, fmt.Errorf("failed to get timestamp of block=%d: %w", height, err)
 		}
 
 		return &blockHeaderResultHolder{
@@ -154,16 +154,16 @@ func (c *Client) getHeader(ctx context.Context, tag uint32, height uint64, metho
 
 	var header parser.BlockHeader
 	if err := json.Unmarshal(response, &header); err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal header result for block=%d: %w", height, err)
+		return nil, fmt.Errorf("failed to unmarshal header result for block=%d: %w", height, err)
 	}
 
 	if err := c.validate.Struct(header); err != nil {
-		return nil, xerrors.Errorf("failed to parse block=%d header: %w", height, err)
+		return nil, fmt.Errorf("failed to parse block=%d header: %w", height, err)
 	}
 
 	metadata, err := c.parseHeader(tag, height, &header)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block header for height=%d: %w", height, err)
+		return nil, fmt.Errorf("failed to parse block header for height=%d: %w", height, err)
 	}
 
 	return &blockHeaderResultHolder{
@@ -177,7 +177,7 @@ func (c *Client) GetBlockByHeight(ctx context.Context, tag uint32, height uint64
 
 	header, err := c.getHeaderByHeight(ctx, tag, height)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block header (height=%d) in GetBlockByHeight: %w", height, err)
+		return nil, fmt.Errorf("failed to get block header (height=%d) in GetBlockByHeight: %w", height, err)
 	}
 
 	// Skip the `getBlock` call if it is a skipped block and return `Blobdata` as `nil`.
@@ -192,20 +192,20 @@ func (c *Client) GetBlockByHeight(ctx context.Context, tag uint32, height uint64
 	}
 
 	if header.metadata.Height != height {
-		return nil, xerrors.Errorf("get inconsistent block heights, expected: %v, actual: %v", height, header.metadata.Height)
+		return nil, fmt.Errorf("get inconsistent block heights, expected: %v, actual: %v", height, header.metadata.Height)
 	}
 
 	hash := header.metadata.Hash
 	// Get the block data by hash.
 	block, err := c.getBlock(ctx, hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block (height=%d, hash=%v) in GetBlockByHeight: %w", height, hash, err)
+		return nil, fmt.Errorf("failed to get block (height=%d, hash=%v) in GetBlockByHeight: %w", height, hash, err)
 	}
 
 	// Get the blob data by hash.
 	blobs, err := c.getBlobs(ctx, hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block blobs (height=%d, hash=%v) in GetBlockByHeight: %w", height, hash, err)
+		return nil, fmt.Errorf("failed to get block blobs (height=%d, hash=%v) in GetBlockByHeight: %w", height, hash, err)
 	}
 
 	return &api.Block{
@@ -231,7 +231,7 @@ func (c *Client) GetBlockByHash(ctx context.Context, tag uint32, height uint64, 
 	if hash == "" {
 		blockTimestamp, err := c.getBlockTimestamp(height)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to calculate timestamp of block=%d: %w", height, err)
+			return nil, fmt.Errorf("failed to calculate timestamp of block=%d: %w", height, err)
 		}
 
 		return &api.Block{
@@ -251,31 +251,31 @@ func (c *Client) GetBlockByHash(ctx context.Context, tag uint32, height uint64, 
 	// Get the block header by hash.
 	header, err := c.getHeaderByHash(ctx, tag, height, hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block header (height=%d, hash=%v) in GetBlockByHash: %w", height, hash, err)
+		return nil, fmt.Errorf("failed to get block header (height=%d, hash=%v) in GetBlockByHash: %w", height, hash, err)
 	}
 
 	if header.metadata.Skipped {
 		// Convert this error into internal.ErrBlockNotFound so that the syncer could fall back to the master client.
-		return nil, xerrors.Errorf("block header (height=%d, hash=%v) not found: %w", height, hash, internal.ErrBlockNotFound)
+		return nil, fmt.Errorf("block header (height=%d, hash=%v) not found: %w", height, hash, internal.ErrBlockNotFound)
 	}
 
 	if header.metadata.Hash != hash {
-		return nil, xerrors.Errorf("get inconsistent block hashes, expected: %v, actual: %v", hash, header.metadata.Hash)
+		return nil, fmt.Errorf("get inconsistent block hashes, expected: %v, actual: %v", hash, header.metadata.Hash)
 	}
 
 	if header.metadata.Height != height {
-		return nil, xerrors.Errorf("get inconsistent block heights, expected: %v, actual: %v", height, header.metadata.Height)
+		return nil, fmt.Errorf("get inconsistent block heights, expected: %v, actual: %v", height, header.metadata.Height)
 	}
 
 	// Get the block data by hash.
 	block, err := c.getBlock(ctx, hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block (height=%d, hash=%v) in GetBlockByHash: %w", height, hash, err)
+		return nil, fmt.Errorf("failed to get block (height=%d, hash=%v) in GetBlockByHash: %w", height, hash, err)
 	}
 
 	blobs, err := c.getBlobs(ctx, hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block blobs (height=%d, hash=%v) in GetBlockByHash: %w", height, hash, err)
+		return nil, fmt.Errorf("failed to get block blobs (height=%d, hash=%v) in GetBlockByHash: %w", height, hash, err)
 	}
 
 	return &api.Block{
@@ -302,16 +302,16 @@ func (c *Client) GetLatestHeight(ctx context.Context) (uint64, error) {
 
 	response, err := c.client.Call(ctx, latestBlockHeaderRequest, nil)
 	if err != nil {
-		return 0, xerrors.Errorf("failed to get latest block header: %w", err)
+		return 0, fmt.Errorf("failed to get latest block header: %w", err)
 	}
 
 	var result parser.BlockHeader
 	if err := json.Unmarshal(response, &result); err != nil {
-		return 0, xerrors.Errorf("failed to unmarshal beacon header result: %w", err)
+		return 0, fmt.Errorf("failed to unmarshal beacon header result: %w", err)
 	}
 
 	if err := c.validate.Struct(result); err != nil {
-		return 0, xerrors.Errorf("failed to parse latest block header: %w", err)
+		return 0, fmt.Errorf("failed to parse latest block header: %w", err)
 	}
 
 	blockHeader := result.Data.Header
@@ -325,12 +325,12 @@ func (c *Client) parseHeader(tag uint32, height uint64, header *parser.BlockHead
 
 	slot := blockHeaderMessage.Slot.Value()
 	if height != slot {
-		return nil, xerrors.Errorf("get inconsistent block heights, expected: %v, actual: %v", height, slot)
+		return nil, fmt.Errorf("get inconsistent block heights, expected: %v, actual: %v", height, slot)
 	}
 
 	blockTimestamp, err := c.getBlockTimestamp(height)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get timestamp of block=%d: %w", height, err)
+		return nil, fmt.Errorf("failed to get timestamp of block=%d: %w", height, err)
 	}
 
 	return &api.BlockMetadata{
@@ -346,7 +346,7 @@ func (c *Client) parseHeader(tag uint32, height uint64, header *parser.BlockHead
 
 func (c *Client) getBlock(ctx context.Context, hash string) (json.RawMessage, error) {
 	if hash == "" {
-		return nil, xerrors.Errorf("unexpected empty block hash")
+		return nil, fmt.Errorf("unexpected empty block hash")
 	}
 
 	ethBeaconGetBlockMethod := &restapi.RequestMethod{
@@ -359,11 +359,11 @@ func (c *Client) getBlock(ctx context.Context, hash string) (json.RawMessage, er
 		response, err := c.client.Call(ctx, ethBeaconGetBlockMethod, nil)
 		if err != nil {
 			callErr := handleCallError(err)
-			if xerrors.Is(callErr, internal.ErrBlockNotFound) {
-				return nil, retry.Retryable(xerrors.Errorf("failed to get block of blockHash=%v: %w", hash, callErr))
+			if errors.Is(callErr, internal.ErrBlockNotFound) {
+				return nil, retry.Retryable(fmt.Errorf("failed to get block of blockHash=%v: %w", hash, callErr))
 			}
 
-			return nil, xerrors.Errorf("failed to get block of blockHash=%v: %w", hash, err)
+			return nil, fmt.Errorf("failed to get block of blockHash=%v: %w", hash, err)
 		}
 
 		return response, nil
@@ -377,7 +377,7 @@ func (c *Client) getBlock(ctx context.Context, hash string) (json.RawMessage, er
 
 func (c *Client) getBlobs(ctx context.Context, hash string) (json.RawMessage, error) {
 	if hash == "" {
-		return nil, xerrors.Errorf("unexpected empty block hash")
+		return nil, fmt.Errorf("unexpected empty block hash")
 	}
 
 	ethBeaconGetBlockBlobsMethod := &restapi.RequestMethod{
@@ -395,11 +395,11 @@ func (c *Client) getBlobs(ctx context.Context, hash string) (json.RawMessage, er
 		response, err := c.client.Call(ctx, ethBeaconGetBlockBlobsMethod, nil)
 		if err != nil {
 			callErr := handleCallError(err)
-			if xerrors.Is(callErr, internal.ErrBlockNotFound) {
-				return nil, retry.Retryable(xerrors.Errorf("failed to get blob data of blockHash=%v: %w", hash, callErr))
+			if errors.Is(callErr, internal.ErrBlockNotFound) {
+				return nil, retry.Retryable(fmt.Errorf("failed to get blob data of blockHash=%v: %w", hash, callErr))
 			}
 
-			return nil, xerrors.Errorf("failed to get blob data of blockHash=%v: %w", hash, err)
+			return nil, fmt.Errorf("failed to get blob data of blockHash=%v: %w", hash, err)
 		}
 
 		return response, nil
@@ -425,7 +425,7 @@ func (c *Client) GetAccountProof(ctx context.Context, req *api.GetVerifiedAccoun
 
 func handleCallError(callErr error) error {
 	var errHTTP *restapi.HTTPError
-	if !xerrors.As(callErr, &errHTTP) {
+	if !errors.As(callErr, &errHTTP) {
 		return callErr
 	}
 
@@ -441,12 +441,12 @@ func (c *Client) getBlockTimestamp(height uint64) (*timestamp.Timestamp, error) 
 	blockTime := uint64(c.config.Chain.BlockTime.Seconds())
 	genesis, ok := genesisBlockTimestamp[network]
 	if !ok {
-		return nil, xerrors.Errorf("failed to get genesis block timestamp for network=%v", network)
+		return nil, fmt.Errorf("failed to get genesis block timestamp for network=%v", network)
 	}
 
 	timeDelta := height * blockTime
 	if timeDelta > uint64(math.MaxInt64)-uint64(genesis) {
-		return nil, xerrors.Errorf("block timestamp overflow, network=%v, height=%v", network, height)
+		return nil, fmt.Errorf("block timestamp overflow, network=%v, height=%v", network, height)
 	}
 
 	t := genesis + int64(blockTime)*int64(height)

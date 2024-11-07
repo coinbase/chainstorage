@@ -2,9 +2,9 @@ package endpoints
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 )
 
 type ClusterIdentity int
@@ -55,25 +55,25 @@ func (m *failoverManager) WithFailoverContext(ctx context.Context, cluster Clust
 	if cluster&MasterCluster != 0 {
 		ctx, err = m.master.WithFailoverContext(ctx)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to failover the master endpoint group: %w", err)
+			return nil, fmt.Errorf("failed to failover the master endpoint group: %w", err)
 		}
 	}
 	if cluster&SlaveCluster != 0 {
 		ctx, err = m.slave.WithFailoverContext(ctx)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to failover the slave endpoint group: %w", err)
+			return nil, fmt.Errorf("failed to failover the slave endpoint group: %w", err)
 		}
 	}
 	if cluster&ValidatorCluster != 0 {
 		ctx, err = m.validator.WithFailoverContext(ctx)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to failover the validator endpoint group: %w", err)
+			return nil, fmt.Errorf("failed to failover the validator endpoint group: %w", err)
 		}
 	}
 	if cluster&ConsensusCluster != 0 {
 		ctx, err = m.consensus.WithFailoverContext(ctx)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to failover the consensus endpoint group: %w", err)
+			return nil, fmt.Errorf("failed to failover the consensus endpoint group: %w", err)
 		}
 	}
 

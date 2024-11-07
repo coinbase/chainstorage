@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -9,7 +10,6 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
@@ -325,7 +325,7 @@ func (s *monitorTestSuite) TestMonitor_AutomatedTriggerFailover() {
 	s.cfg.Workflows.Monitor.FailoverEnabled = true
 	s.masterClient.EXPECT().GetLatestHeight(gomock.Any()).AnyTimes().
 		DoAndReturn(func(ctx context.Context) (uint64, error) {
-			return 0, xerrors.New("received http error: HTTPError 503")
+			return 0, errors.New("received http error: HTTPError 503")
 		})
 
 	s.env.ExecuteWorkflow(s.monitor.execute, &MonitorRequest{
@@ -442,7 +442,7 @@ func (s *monitorTestSuite) getMockBlock(height uint64, tag uint32) *api.Block {
 					   ],
 					   "transactionsRoot":"0x4513310fcb9f6f616972a3b948dc5d547f280849a87ebb5af0191f98b87be598",
 					   "uncles":[
-						  
+
 					   ]
 					}
 				`),
@@ -456,7 +456,7 @@ func (s *monitorTestSuite) getMockBlock(height uint64, tag uint32) *api.Block {
 						   "from":"0xa1e4380a3b1f749673e270229993ee55f35663b4",
 						   "gasUsed":"0x5208",
 						   "logs":[
-							  
+
 						   ],
 						   "logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
 						   "root":"0x96a8e009d2b88b1483e6941e6812e32263b05683fac202abc622a3e31aed1957",

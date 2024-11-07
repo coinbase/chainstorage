@@ -2,13 +2,13 @@ package ethereum
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/bootstrap"
@@ -77,12 +77,12 @@ func (p *ethereumRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *ap
 	nativeBlock, err := p.nativeParser.ParseBlock(ctx, rawBlock)
 
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block into native format: %w", err)
+		return nil, fmt.Errorf("failed to parse block into native format: %w", err)
 	}
 
 	block := nativeBlock.GetEthereum()
 	if block == nil {
-		return nil, xerrors.New("failed to find ethereum block")
+		return nil, errors.New("failed to find ethereum block")
 	}
 
 	blockIdentifier := &rosetta.BlockIdentifier{
@@ -97,7 +97,7 @@ func (p *ethereumRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *ap
 
 	transactions, err := p.getRosettaTransactions(block, rawBlock.GetEthereum())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse block transactions: %w", err)
 	}
 
 	if nativeBlock.Height == 0 {
@@ -110,7 +110,7 @@ func (p *ethereumRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *ap
 
 		genesisTransactions, err := p.getGenesisTransactions(genesisAllocation)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to generate genesis transactions: %w", err)
+			return nil, fmt.Errorf("failed to generate genesis transactions: %w", err)
 		}
 		transactions = append(transactions, genesisTransactions...)
 	}
@@ -261,7 +261,7 @@ func (p *ethereumRosettaParserImpl) createBlockRewardTransaction(block *api.Ethe
 func (p *ethereumRosettaParserImpl) feeOps(transaction *api.EthereumTransaction, miner string, block *api.EthereumBlock) ([]*rosetta.Operation, error) {
 	feeDetails, err := getFeeDetails(transaction, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to calculate ethereum fee details: %w", err)
+		return nil, fmt.Errorf("failed to calculate ethereum fee details: %w", err)
 	}
 	minerEarnedAmount := feeDetails.feeAmount
 	if feeDetails.feeBurned != nil {
@@ -339,7 +339,7 @@ func (p *ethereumRosettaParserImpl) getGenesisTransactions(allocations []*bootst
 		address := allo.AccountIdentifier.Address
 		_, err := internal.ChecksumAddress(address)
 		if err != nil {
-			return nil, xerrors.Errorf("%s is not a valid address", address)
+			return nil, fmt.Errorf("%s is not a valid address", address)
 		}
 		addressLower := strings.ToLower(address)
 

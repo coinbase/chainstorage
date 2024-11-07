@@ -2,11 +2,11 @@ package endpoints
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap/zaptest"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -438,7 +438,7 @@ func TestFailoverManager_MasterUnavailable(t *testing.T) {
 	ctx := context.Background()
 	_, err = mgr.WithFailoverContext(ctx, MasterSlaveClusters)
 	require.Error(err)
-	require.True(xerrors.Is(err, ErrFailoverUnavailable))
+	require.True(errors.Is(err, ErrFailoverUnavailable))
 }
 
 func TestFailoverManager_SlaveUnavailable(t *testing.T) {
@@ -486,5 +486,5 @@ func TestFailoverManager_SlaveUnavailable(t *testing.T) {
 	ctx := context.Background()
 	_, err = mgr.WithFailoverContext(ctx, MasterSlaveClusters)
 	require.Error(err)
-	require.True(xerrors.Is(err, ErrFailoverUnavailable))
+	require.True(errors.Is(err, ErrFailoverUnavailable))
 }

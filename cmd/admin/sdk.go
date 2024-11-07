@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/coinbase/chainstorage/sdk/services"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	"github.com/coinbase/chainstorage/sdk"
@@ -35,12 +35,12 @@ var (
 		RunE: newSDKCommand(func(session sdk.Session) error {
 			resp, err := session.Client().GetBlocksByRangeWithTag(context.Background(), sdkFlags.tag, sdkFlags.startHeight, sdkFlags.endHeight)
 			if err != nil {
-				return xerrors.Errorf("failed to get block file metadata: %w", err)
+				return fmt.Errorf("failed to get block file metadata: %w", err)
 			}
 
 			for _, rawBlock := range resp {
 				if err := printBlock(session.Parser(), rawBlock, true); err != nil {
-					return xerrors.Errorf("failed to output block: %w", err)
+					return fmt.Errorf("failed to output block: %w", err)
 				}
 			}
 			return nil
@@ -58,11 +58,11 @@ var (
 
 			rawBlock, err := client.GetBlockWithTag(context.Background(), sdkFlags.tag, sdkFlags.startHeight, sdkFlags.hash)
 			if err != nil {
-				return xerrors.Errorf("failed to get block file metadata: %w", err)
+				return fmt.Errorf("failed to get block file metadata: %w", err)
 			}
 
 			if err := printBlock(session.Parser(), rawBlock, false); err != nil {
-				return xerrors.Errorf("failed to output block: %w", err)
+				return fmt.Errorf("failed to output block: %w", err)
 			}
 
 			return nil
@@ -75,7 +75,7 @@ var (
 		RunE: newSDKCommand(func(session sdk.Session) error {
 			height, err := session.Client().GetLatestBlockWithTag(context.Background(), sdkFlags.tag)
 			if err != nil {
-				return xerrors.Errorf("failed to get height of the latest block: %w", err)
+				return fmt.Errorf("failed to get height of the latest block: %w", err)
 			}
 			logger.Info("Height of the latest block is", zap.Uint64("latestHeight", height))
 
@@ -95,23 +95,23 @@ var (
 				},
 			})
 			if err != nil {
-				return xerrors.Errorf("failed to invoke StreamChainEvents: %w", err)
+				return fmt.Errorf("failed to invoke StreamChainEvents: %w", err)
 			}
 
 			for event := range ch {
 				if event.Error != nil {
-					return xerrors.Errorf("received an error from StreamChainEvents: %w", event.Error)
+					return fmt.Errorf("received an error from StreamChainEvents: %w", event.Error)
 				}
 
 				logger.Info("fetched event", zap.Reflect("event", event.BlockchainEvent))
 
 				if event.BlockchainEvent.SequenceNum != lastSequenceNum+1 {
-					return xerrors.Errorf("sequence number should be mono-increasing: expected %v, got %v", lastSequenceNum+1, event.BlockchainEvent.SequenceNum)
+					return fmt.Errorf("sequence number should be mono-increasing: expected %v, got %v", lastSequenceNum+1, event.BlockchainEvent.SequenceNum)
 				}
 				lastSequenceNum = event.BlockchainEvent.SequenceNum
 
 				if err := printBlock(session.Parser(), event.Block, true); err != nil {
-					return xerrors.Errorf("failed to output block: %w", err)
+					return fmt.Errorf("failed to output block: %w", err)
 				}
 			}
 			return nil
@@ -124,7 +124,7 @@ var (
 		RunE: newSDKCommand(func(session sdk.Session) error {
 			rawBlocks, err := session.Client().GetBlockByTransaction(context.Background(), sdkFlags.tag, sdkFlags.hash)
 			if err != nil {
-				return xerrors.Errorf("failed to get block by transaction: %w", err)
+				return fmt.Errorf("failed to get block by transaction: %w", err)
 			}
 
 			if len(rawBlocks) == 0 {
@@ -134,7 +134,7 @@ var (
 
 			for _, rawBlock := range rawBlocks {
 				if err := printBlock(session.Parser(), rawBlock, false); err != nil {
-					return xerrors.Errorf("failed to output block: %w", err)
+					return fmt.Errorf("failed to output block: %w", err)
 				}
 			}
 
@@ -146,7 +146,7 @@ var (
 func newSDKCommand(fn func(session sdk.Session) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		if err := initializeChainInfoFromFlags(); err != nil {
-			return xerrors.Errorf("failed to init common flags: %w", err)
+			return fmt.Errorf("failed to init common flags: %w", err)
 		}
 
 		manager := services.NewManager()
@@ -159,7 +159,7 @@ func newSDKCommand(fn func(session sdk.Session) error) func(cmd *cobra.Command, 
 			Sidechain:  sidechain,
 		})
 		if err != nil {
-			return xerrors.Errorf("failed to create session: %w", err)
+			return fmt.Errorf("failed to create session: %w", err)
 		}
 
 		return fn(session)

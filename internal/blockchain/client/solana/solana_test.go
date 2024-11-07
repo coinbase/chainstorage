@@ -3,13 +3,13 @@ package solana
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -281,7 +281,7 @@ func (s *solanaClientTestSuite) TestGetBlockByHeight_NotFound() {
 
 	_, err := s.client.GetBlockByHeight(context.Background(), solanaTag, solanaHeight)
 	require.Error(err)
-	require.True(xerrors.Is(err, internal.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, internal.ErrBlockNotFound), err.Error())
 }
 
 func (s *solanaClientTestSuite) TestGetBlockByHeight_Skipped() {

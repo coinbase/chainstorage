@@ -13,7 +13,6 @@ import (
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
 	"github.com/coinbase/chainstorage/internal/utils/finalizer"
@@ -89,22 +88,22 @@ const (
 func New(params ClientParams) (ClientResult, error) {
 	master, err := newClient(params, params.Master)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create master client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create master client: %w", err)
 	}
 
 	slave, err := newClient(params, params.Slave)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create slave client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create slave client: %w", err)
 	}
 
 	validator, err := newClient(params, params.Validator)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create validator client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create validator client: %w", err)
 	}
 
 	consensus, err := newClient(params, params.Consensus)
 	if err != nil {
-		return ClientResult{}, xerrors.Errorf("failed to create consensus client: %w", err)
+		return ClientResult{}, fmt.Errorf("failed to create consensus client: %w", err)
 	}
 
 	return ClientResult{
@@ -144,7 +143,7 @@ func newRetry(params ClientParams, logger *zap.Logger) retry.Retry {
 func (c *clientImpl) Call(ctx context.Context, method *RequestMethod, requestBody []byte) ([]byte, error) {
 	endpoint, err := c.endpointProvider.GetEndpoint(ctx)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get endpoint for request: %w", err)
+		return nil, fmt.Errorf("failed to get endpoint for request: %w", err)
 	}
 
 	endpoint.IncRequestsCounter(1)
@@ -152,7 +151,7 @@ func (c *clientImpl) Call(ctx context.Context, method *RequestMethod, requestBod
 	var response []byte
 	if err := c.wrap(ctx, method, endpoint.Name, func(ctx context.Context) error {
 		if response, err = c.makeHTTPRequest(ctx, method, requestBody, endpoint); err != nil {
-			return xerrors.Errorf("failed to make http request (method=%v, requestBody=%v, endpoint=%v): %w", method, requestBody, endpoint.Name, err)
+			return fmt.Errorf("failed to make http request (method=%v, requestBody=%v, endpoint=%v): %w", method, requestBody, endpoint.Name, err)
 		}
 
 		return nil
@@ -176,7 +175,7 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, method *RequestMethod,
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, bytes.NewReader(requestBody))
 	if err != nil {
 		err = c.sanitizedError(err)
-		return nil, xerrors.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	request.Header.Set("Content-Type", "application/json")
@@ -190,7 +189,7 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, method *RequestMethod,
 	response, err := c.getHTTPClient(endpoint).Do(request)
 	if err != nil {
 		err = c.sanitizedError(err)
-		return nil, retry.Retryable(xerrors.Errorf("failed to send http request: %w", err))
+		return nil, retry.Retryable(fmt.Errorf("failed to send http request: %w", err))
 	}
 
 	finalizer := finalizer.WithCloser(response.Body)
@@ -198,11 +197,11 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, method *RequestMethod,
 
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, retry.Retryable(xerrors.Errorf("failed to read http response: %w", err))
+		return nil, retry.Retryable(fmt.Errorf("failed to read http response: %w", err))
 	}
 
 	if response.StatusCode != http.StatusOK {
-		errHTTP := xerrors.Errorf("received http error: %w", &HTTPError{
+		errHTTP := fmt.Errorf("received http error: %w", &HTTPError{
 			Code:     response.StatusCode,
 			Response: string(responseBody),
 		})

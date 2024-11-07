@@ -10,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -103,7 +102,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 	return w.executeWorkflow(ctx, request, func() error {
 		var cfg config.PollerWorkflowConfig
 		if err := w.readConfig(ctx, &cfg); err != nil {
-			return xerrors.Errorf("failed to read config: %w", err)
+			return fmt.Errorf("failed to read config: %w", err)
 		}
 
 		logger := w.getLogger(ctx).With(
@@ -146,7 +145,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 		if request.DataCompression != "" {
 			dataCompression, err = utils.ParseCompression(request.DataCompression)
 			if err != nil {
-				return xerrors.Errorf("failed to parse data compression: %w", err)
+				return fmt.Errorf("failed to parse data compression: %w", err)
 			}
 		}
 
@@ -162,7 +161,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 		if request.BackoffInterval != "" {
 			backoffInterval, err = time.ParseDuration(request.BackoffInterval)
 			if err != nil {
-				return xerrors.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
+				return fmt.Errorf("failed to parse BackoffInterval=%v: %w", request.BackoffInterval, err)
 			}
 		}
 		zeroBackoff := backoffInterval == 0
@@ -204,7 +203,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 			}
 			sessionCtx, err = workflow.CreateSession(ctx, so)
 			if err != nil {
-				return xerrors.Errorf("failed to create workflow session: %w", err)
+				return fmt.Errorf("failed to create workflow session: %w", err)
 			}
 			defer workflow.CompleteSession(sessionCtx)
 		}
@@ -264,7 +263,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 					if request.RetryableErrorCount <= RetryableErrorLimit {
 						return w.continueAsNew(ctx, request)
 					}
-					return xerrors.Errorf("retryable errors exceeded threshold: %w", err)
+					return fmt.Errorf("retryable errors exceeded threshold: %w", err)
 				}
 
 				if IsConsensusClusterFailure(err) {
@@ -291,7 +290,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 				if cfg.FailoverEnabled && !failover && !IsConsensusValidationFailure(err) {
 					return w.triggerFailover(ctx, request)
 				}
-				return xerrors.Errorf("failed to execute syncer: %w", err)
+				return fmt.Errorf("failed to execute syncer: %w", err)
 			}
 
 			metrics.Gauge(pollerHeightGauge).Update(float64(syncerResponse.LatestSyncedHeight))
@@ -330,7 +329,7 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 
 			if !zeroBackoff {
 				if err := backoff.Get(ctx, nil); err != nil {
-					return xerrors.Errorf("failed to sleep: %w", err)
+					return fmt.Errorf("failed to sleep: %w", err)
 				}
 			}
 		}

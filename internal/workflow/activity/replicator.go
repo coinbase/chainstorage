@@ -2,6 +2,8 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -10,7 +12,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 	tracehttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 
@@ -32,7 +33,7 @@ const (
 )
 
 var (
-	ErrDownloadFailure = xerrors.New("download failure")
+	ErrDownloadFailure = errors.New("download failure")
 )
 
 type (
@@ -104,12 +105,12 @@ func (a *Replicator) downloadBlockData(ctx context.Context, url string) ([]byte,
 	return a.retry.Retry(ctx, func(ctx context.Context) ([]byte, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to create download request: %w", err)
+			return nil, fmt.Errorf("failed to create download request: %w", err)
 		}
 
 		httpResp, err := a.httpClient.Do(req)
 		if err != nil {
-			return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
+			return nil, retry.Retryable(fmt.Errorf("failed to download block file: %w", err))
 		}
 
 		finalizer := finalizer.WithCloser(httpResp.Body)
@@ -119,15 +120,15 @@ func (a *Replicator) downloadBlockData(ctx context.Context, url string) ([]byte,
 			if statusCode == http.StatusRequestTimeout ||
 				statusCode == http.StatusTooManyRequests ||
 				statusCode >= http.StatusInternalServerError {
-				return nil, retry.Retryable(xerrors.Errorf("received %d status code: %w", statusCode, ErrDownloadFailure))
+				return nil, retry.Retryable(fmt.Errorf("received %d status code: %w", statusCode, ErrDownloadFailure))
 			} else {
-				return nil, xerrors.Errorf("received non-retryable %d status code: %w", statusCode, ErrDownloadFailure)
+				return nil, fmt.Errorf("received non-retryable %d status code: %w", statusCode, ErrDownloadFailure)
 			}
 		}
 
 		bodyBytes, err := io.ReadAll(httpResp.Body)
 		if err != nil {
-			return nil, retry.Retryable(xerrors.Errorf("failed to read body: %w", err))
+			return nil, retry.Retryable(fmt.Errorf("failed to read body: %w", err))
 		}
 		return bodyBytes, finalizer.Close()
 	})
@@ -145,7 +146,7 @@ func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.Blo
 		if compression == api.Compression_GZIP {
 			compressedBytes, err = storage_utils.Compress(rawBytes, compression)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to compress block data with type %v: %w", compression.String(), err)
+				return nil, fmt.Errorf("failed to compress block data with type %v: %w", compression.String(), err)
 			}
 		}
 	case api.Compression_GZIP:
@@ -153,11 +154,11 @@ func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.Blo
 		if compression == api.Compression_NONE {
 			rawBytes, err = storage_utils.Decompress(rawBytes, blockFile.Compression)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+				return nil, fmt.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
 			}
 		}
 	default:
-		return nil, xerrors.Errorf("unknown block file compression type %v", blockFile.Compression.String())
+		return nil, fmt.Errorf("unknown block file compression type %v", blockFile.Compression.String())
 	}
 	metadata := &api.BlockMetadata{
 		Tag:          blockFile.Tag,
@@ -177,12 +178,12 @@ func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.Blo
 		if len(rawBytes) == 0 {
 			rawBytes, err = storage_utils.Decompress(bodyBytes, blockFile.Compression)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
+				return nil, fmt.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
 			}
 		}
 
 		if err := proto.Unmarshal(rawBytes, block); err != nil {
-			return nil, xerrors.Errorf("failed to unmarshal file contents: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal file contents: %w", err)
 		}
 		blockFile.BlockTimestamp = block.Metadata.Timestamp
 	}
@@ -201,7 +202,7 @@ func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.Blo
 		rawBlockData.BlockData = compressedBytes
 		return rawBlockData, nil
 	default:
-		return nil, xerrors.Errorf("unknown compression type %v", compression.String())
+		return nil, fmt.Errorf("unknown compression type %v", compression.String())
 	}
 }
 
@@ -237,11 +238,11 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 			)
 			rawBlockData, err := a.prepareRawBlockData(errgroupCtx, blockFile, request.Compression)
 			if err != nil {
-				return xerrors.Errorf("failed to prepare raw block data: %w", err)
+				return fmt.Errorf("failed to prepare raw block data: %w", err)
 			}
 			objectKeyMain, err := a.blobStorage.UploadRaw(errgroupCtx, rawBlockData)
 			if err != nil {
-				return xerrors.Errorf("failed to upload raw block file: %w", err)
+				return fmt.Errorf("failed to upload raw block file: %w", err)
 			}
 			blockMetas[i] = rawBlockData.BlockMetadata
 			blockMetas[i].ObjectKeyMain = objectKeyMain
@@ -249,7 +250,7 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return nil, xerrors.Errorf("failed to replicate block files: %w", err)
+		return nil, fmt.Errorf("failed to replicate block files: %w", err)
 	}
 	logger.Info("Persisting block metadata")
 	err = a.metaStorage.PersistBlockMetas(ctx, false, blockMetas, nil)

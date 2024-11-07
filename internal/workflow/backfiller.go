@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
 
@@ -9,7 +10,6 @@ import (
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/cadence"
@@ -89,7 +89,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 
 		var cfg config.BackfillerWorkflowConfig
 		if err := w.readConfig(ctx, &cfg); err != nil {
-			return xerrors.Errorf("failed to read config: %w", err)
+			return fmt.Errorf("failed to read config: %w", err)
 		}
 
 		batchSize := cfg.BatchSize
@@ -126,7 +126,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 		if request.DataCompression != "" {
 			dataCompression, err = utils.ParseCompression(request.DataCompression)
 			if err != nil {
-				return xerrors.Errorf("failed to parse data compression: %w", err)
+				return fmt.Errorf("failed to parse data compression: %w", err)
 			}
 		}
 
@@ -150,7 +150,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 		lastBlock, err := w.readLastBlock(ctx, tag, request.StartHeight)
 		if err != nil {
 			logger.Error("failed to read last block", zap.Error(err))
-			return xerrors.Errorf("failed to read last block: %w", err)
+			return fmt.Errorf("failed to read last block: %w", err)
 		}
 		logger.Info("last block", zap.Reflect("metadata", lastBlock))
 
@@ -194,7 +194,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 					zap.Uint64("batchEnd", batchEnd),
 					zap.Error(err),
 				)
-				return xerrors.Errorf("failed to process batch [%v, %v): %w", batchStart, batchEnd, err)
+				return fmt.Errorf("failed to process batch [%v, %v): %w", batchStart, batchEnd, err)
 			}
 			lastBlock = batch[len(batch)-1]
 
@@ -223,7 +223,7 @@ func (w *Backfiller) readLastBlock(ctx workflow.Context, tag uint32, height uint
 	}
 	response, err := w.reader.Execute(ctx, request)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to execute reader (request=%v): %w", request, err)
+		return nil, fmt.Errorf("failed to execute reader (request=%v): %w", request, err)
 	}
 
 	return response.Metadata, nil
@@ -331,13 +331,13 @@ func (w *Backfiller) processBatch(
 		// If too many extractors have failed, there may be a bug on our end.
 		// Before further increasing the threshold, please double check if the blockchain nodes are overloaded.
 		if numReprocessRequests > int(maxReprocessedPerBatch) {
-			return nil, xerrors.Errorf("too many extractors to reprocess: %v", numReprocessRequests)
+			return nil, fmt.Errorf("too many extractors to reprocess: %v", numReprocessRequests)
 		}
 
 		for _, reprocessRequest := range reprocessRequests {
 			reprocessResponse, err := w.extractor.Execute(ctx, reprocessRequest)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to reprocess extractor (request=%v): %w", reprocessRequest, err)
+				return nil, fmt.Errorf("failed to reprocess extractor (request=%v): %w", reprocessRequest, err)
 			}
 
 			outputChannel.Send(ctx, reprocessResponse)
@@ -352,11 +352,11 @@ func (w *Backfiller) processBatch(
 	for i := 0; i < batchSize; {
 		var response *activity.ExtractorResponse
 		if ok := outputChannel.Receive(ctx, &response); !ok {
-			return nil, xerrors.Errorf("failed to receive from output channel: %v", i)
+			return nil, fmt.Errorf("failed to receive from output channel: %v", i)
 		}
 
 		if len(response.Metadatas) == 0 {
-			return nil, xerrors.Errorf("received invalid extractor response: %+v", response)
+			return nil, fmt.Errorf("received invalid extractor response: %+v", response)
 		}
 
 		for _, metadata := range response.Metadatas {
@@ -373,7 +373,7 @@ func (w *Backfiller) processBatch(
 	})
 
 	if err := parser.ValidateChain(batchMetadata, lastBlock); err != nil {
-		return nil, xerrors.Errorf("failed to validate chain: %w", err)
+		return nil, fmt.Errorf("failed to validate chain: %w", err)
 	}
 
 	if _, err := w.loader.Execute(ctx, &activity.LoaderRequest{
@@ -381,7 +381,7 @@ func (w *Backfiller) processBatch(
 		Metadata:        batchMetadata,
 		LastBlock:       lastBlock,
 	}); err != nil {
-		return nil, xerrors.Errorf("failed to execute loader: %w", err)
+		return nil, fmt.Errorf("failed to execute loader: %w", err)
 	}
 
 	return batchMetadata, nil

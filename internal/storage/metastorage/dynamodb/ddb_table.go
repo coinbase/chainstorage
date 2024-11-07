@@ -2,6 +2,8 @@ package dynamodb
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
@@ -12,9 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"golang.org/x/xerrors"
 
-	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	storage_errors "github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
 	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 )
@@ -102,7 +103,7 @@ func newDDBTable(
 			params.Config.AWS.IsResetLocal,
 		)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to prepare local resources for event storage: %w", err)
+			return nil, fmt.Errorf("failed to prepare local resources for event storage: %w", err)
 		}
 	}
 	return &table, nil
@@ -119,7 +120,7 @@ func (d *ddbTableImpl) getTransactWriteItem(
 	ddbEntry any) (*dynamodb.TransactWriteItem, error) {
 	item, err := dynamodbattribute.MarshalMap(ddbEntry)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get marshal ddb entry (%v): %w", ddbEntry, err)
+		return nil, fmt.Errorf("failed to get marshal ddb entry (%v): %w", ddbEntry, err)
 	}
 	writeItem := &dynamodb.TransactWriteItem{
 		Put: &dynamodb.Put{
@@ -133,7 +134,7 @@ func (d *ddbTableImpl) getTransactWriteItem(
 func (d *ddbTableImpl) WriteItem(ctx context.Context, item any) error {
 	mItem, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
-		return xerrors.Errorf("failed to get marshal ddb entry (%v): %w", item, err)
+		return fmt.Errorf("failed to get marshal ddb entry (%v): %w", item, err)
 	}
 	_, err = d.table.DBAPI.PutItemWithContext(
 		ctx,
@@ -144,9 +145,9 @@ func (d *ddbTableImpl) WriteItem(ctx context.Context, item any) error {
 	)
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-			return errors.ErrRequestCanceled
+			return storage_errors.ErrRequestCanceled
 		}
-		return xerrors.Errorf("failed to write item: %w", err)
+		return fmt.Errorf("failed to write item: %w", err)
 	}
 	return nil
 }
@@ -160,7 +161,7 @@ func (d *ddbTableImpl) TransactWriteItems(ctx context.Context, items []any) erro
 	for i, item := range items {
 		batchWriteItems[i], err = d.getTransactWriteItem(item)
 		if err != nil {
-			return xerrors.Errorf("failed to transact write items: %w", err)
+			return fmt.Errorf("failed to transact write items: %w", err)
 		}
 	}
 
@@ -172,9 +173,9 @@ func (d *ddbTableImpl) TransactWriteItems(ctx context.Context, items []any) erro
 	)
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-			return errors.ErrRequestCanceled
+			return storage_errors.ErrRequestCanceled
 		}
-		return xerrors.Errorf("failed to transact write items: %w", err)
+		return fmt.Errorf("failed to transact write items: %w", err)
 	}
 	return nil
 }
@@ -192,7 +193,7 @@ func (d *ddbTableImpl) WriteItems(ctx context.Context, items []any) error {
 
 		g.Go(func() error {
 			if err := d.TransactWriteItems(ctx, items[begin:end]); err != nil {
-				return xerrors.Errorf("failed to write items: %w", err)
+				return fmt.Errorf("failed to write items: %w", err)
 			}
 			return nil
 		})
@@ -202,7 +203,7 @@ func (d *ddbTableImpl) WriteItems(ctx context.Context, items []any) error {
 
 func (d *ddbTableImpl) transactGetItems(ctx context.Context, inputKeys []StringMap, outputItems []any) error {
 	if len(inputKeys) != len(outputItems) {
-		return xerrors.New("inputKeys does not have the same size as outputItems")
+		return errors.New("inputKeys does not have the same size as outputItems")
 	}
 	if len(inputKeys) == 0 {
 		return nil
@@ -211,7 +212,7 @@ func (d *ddbTableImpl) transactGetItems(ctx context.Context, inputKeys []StringM
 	for i, keyMap := range inputKeys {
 		dynamodbKey, err := dynamodbattribute.MarshalMap(keyMap)
 		if err != nil {
-			return xerrors.Errorf("could not marshal given key(%v):%w", keyMap, err)
+			return fmt.Errorf("could not marshal given key(%v):%w", keyMap, err)
 		}
 		inputItems[i] = &dynamodb.TransactGetItem{
 			Get: &dynamodb.Get{
@@ -232,13 +233,13 @@ func (d *ddbTableImpl) transactGetItems(ctx context.Context, inputKeys []StringM
 				for _, reason := range reasons {
 					if reason.Code != nil && *reason.Code == dynamodb.BatchStatementErrorCodeEnumTransactionConflict {
 						return retry.Retryable(
-							xerrors.Errorf("failed to TransactGetItems because of transaction conflict, reason=(%v)", reason))
+							fmt.Errorf("failed to TransactGetItems because of transaction conflict, reason=(%v)", reason))
 					}
 				}
 			}
 
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-				return errors.ErrRequestCanceled
+				return storage_errors.ErrRequestCanceled
 			}
 			return err
 		}
@@ -247,11 +248,11 @@ func (d *ddbTableImpl) transactGetItems(ctx context.Context, inputKeys []StringM
 		// if missing then corresponding ItemResponse at same index will be empty
 		for index, item := range inputItems {
 			if len(output.Responses[index].Item) == 0 {
-				return xerrors.Errorf("missing item key=%v: %w", item.Get.ProjectionExpression, errors.ErrItemNotFound)
+				return fmt.Errorf("missing item key=%v: %w", item.Get.ProjectionExpression, storage_errors.ErrItemNotFound)
 			}
 			err = dynamodbattribute.UnmarshalMap(output.Responses[index].Item, outputItems[index])
 			if err != nil {
-				return xerrors.Errorf("failed to unmarshal item (%v, %v): %w", output.Responses[index].Item, outputItems[index], err)
+				return fmt.Errorf("failed to unmarshal item (%v, %v): %w", output.Responses[index].Item, outputItems[index], err)
 			}
 		}
 
@@ -274,7 +275,7 @@ func (d *ddbTableImpl) GetItems(ctx context.Context,
 		}
 		g.Go(func() error {
 			if err := d.transactGetItems(gCtx, inputKeys[begin:end], outputItems[begin:end]); err != nil {
-				return xerrors.Errorf("failed to transact get items: %w", err)
+				return fmt.Errorf("failed to transact get items: %w", err)
 			}
 			return nil
 		})
@@ -285,7 +286,7 @@ func (d *ddbTableImpl) GetItems(ctx context.Context,
 func (d *ddbTableImpl) GetItem(ctx context.Context, keyMap StringMap) (any, error) {
 	dynamodbKey, err := dynamodbattribute.MarshalMap(keyMap)
 	if err != nil {
-		return nil, xerrors.Errorf("could not marshal given key(%v):%w", keyMap, err)
+		return nil, fmt.Errorf("could not marshal given key(%v):%w", keyMap, err)
 	}
 	input := &dynamodb.GetItemInput{
 		Key:            dynamodbKey,
@@ -295,17 +296,17 @@ func (d *ddbTableImpl) GetItem(ctx context.Context, keyMap StringMap) (any, erro
 	output, err := d.table.DBAPI.GetItemWithContext(ctx, input)
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-			return nil, errors.ErrRequestCanceled
+			return nil, storage_errors.ErrRequestCanceled
 		}
-		return nil, xerrors.Errorf("failed to get item for key (%v): %w", keyMap, err)
+		return nil, fmt.Errorf("failed to get item for key (%v): %w", keyMap, err)
 	}
 	if output.Item == nil {
-		return nil, errors.ErrItemNotFound
+		return nil, storage_errors.ErrItemNotFound
 	}
 	outputItem := reflect.New(d.ddbEntryType).Interface()
 	err = dynamodbattribute.UnmarshalMap(output.Item, outputItem)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to unmarshal item (%v): %w", output.Item, err)
+		return nil, fmt.Errorf("failed to unmarshal item (%v): %w", output.Item, err)
 	}
 	return outputItem, nil
 }
@@ -331,20 +332,20 @@ func (d *ddbTableImpl) QueryItems(ctx context.Context, req *QueryItemsRequest) (
 		queryOutput, err := d.table.DBAPI.QueryWithContext(ctx, queryInput)
 		if err != nil {
 			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-				return nil, errors.ErrRequestCanceled
+				return nil, storage_errors.ErrRequestCanceled
 			}
-			return nil, xerrors.Errorf("failed to get query items (index=%v, keyConditionExpression=%v): %w", req.IndexName, req.KeyConditionExpression, err)
+			return nil, fmt.Errorf("failed to get query items (index=%v, keyConditionExpression=%v): %w", req.IndexName, req.KeyConditionExpression, err)
 		}
 
 		if len(queryOutput.Items) == 0 {
-			return nil, errors.ErrItemNotFound
+			return nil, storage_errors.ErrItemNotFound
 		}
 
 		for _, item := range queryOutput.Items {
 			outputItem := reflect.New(d.ddbEntryType).Interface()
 			err = dynamodbattribute.UnmarshalMap(item, outputItem)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal item (%v): %w", item, err)
+				return nil, fmt.Errorf("failed to unmarshal item (%v): %w", item, err)
 			}
 			outputItems = append(outputItems, outputItem)
 		}
@@ -355,7 +356,7 @@ func (d *ddbTableImpl) QueryItems(ctx context.Context, req *QueryItemsRequest) (
 
 		iterations += 1
 		if iterations >= maxQueryIterations {
-			return nil, xerrors.Errorf("too many query iterations (index=%v, keyConditionExpression=%v)", req.IndexName, req.KeyConditionExpression)
+			return nil, fmt.Errorf("too many query iterations (index=%v, keyConditionExpression=%v)", req.IndexName, req.KeyConditionExpression)
 		}
 	}
 
@@ -378,7 +379,7 @@ func (d *ddbTableImpl) BatchWriteItems(ctx context.Context, items []any, paralle
 		group.Go(func() error {
 			for batchItems := range inputChannel {
 				if err := d.batchWriteItemsWithLimit(ctx, batchItems); err != nil {
-					return xerrors.Errorf("failed to batch write items: %w", err)
+					return fmt.Errorf("failed to batch write items: %w", err)
 				}
 			}
 
@@ -396,14 +397,14 @@ func (d *ddbTableImpl) batchWriteItemsWithLimit(ctx context.Context, items []any
 	}
 
 	if numItems > maxWriteItemsSize {
-		return xerrors.Errorf("too many items: %v", numItems)
+		return fmt.Errorf("too many items: %v", numItems)
 	}
 
 	writeRequests := make([]*dynamodb.WriteRequest, numItems)
 	for i, item := range items {
 		writeRequest, err := d.getWriteRequest(item)
 		if err != nil {
-			return xerrors.Errorf("failed to prepare write items: %w", err)
+			return fmt.Errorf("failed to prepare write items: %w", err)
 		}
 
 		writeRequests[i] = writeRequest
@@ -419,7 +420,7 @@ func (d *ddbTableImpl) batchWriteItemsWithLimit(ctx context.Context, items []any
 		}
 		output, err := d.table.DBAPI.BatchWriteItemWithContext(ctx, input)
 		if err != nil {
-			return xerrors.Errorf("failed to batch write items: %w", err)
+			return fmt.Errorf("failed to batch write items: %w", err)
 		}
 
 		unprocessed := output.UnprocessedItems[tableName]
@@ -428,11 +429,11 @@ func (d *ddbTableImpl) batchWriteItemsWithLimit(ctx context.Context, items []any
 			// If DynamoDB returns any unprocessed items, back off and then retry the batch operation on those items.
 			// Ref: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchWriteItem.html
 			writeRequests = unprocessed
-			return retry.Retryable(xerrors.Errorf("failed to process %v items during batch write items", len(unprocessed)))
+			return retry.Retryable(fmt.Errorf("failed to process %v items during batch write items", len(unprocessed)))
 		}
 
 		if numItems != numProcessed {
-			return xerrors.Errorf("failed to write all items: expected=%v, actual=%v", numItems, numProcessed)
+			return fmt.Errorf("failed to write all items: expected=%v, actual=%v", numItems, numProcessed)
 		}
 
 		return nil
@@ -443,7 +444,7 @@ func (d *ddbTableImpl) getWriteRequest(
 	ddbEntry any) (*dynamodb.WriteRequest, error) {
 	item, err := dynamodbattribute.MarshalMap(ddbEntry)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get marshal ddb entry (%v): %w", ddbEntry, err)
+		return nil, fmt.Errorf("failed to get marshal ddb entry (%v): %w", ddbEntry, err)
 	}
 	writeRequest := &dynamodb.WriteRequest{
 		PutRequest: &dynamodb.PutRequest{

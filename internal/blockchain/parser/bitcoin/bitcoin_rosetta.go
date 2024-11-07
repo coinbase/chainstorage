@@ -3,11 +3,11 @@ package bitcoin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -72,12 +72,12 @@ func (p *bitcoinRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 	nativeBlock, err := p.nativeParser.ParseBlock(ctx, rawBlock)
 
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block into native format: %w", err)
+		return nil, fmt.Errorf("failed to parse block into native format: %w", err)
 	}
 
 	block := nativeBlock.GetBitcoin()
 	if block == nil {
-		return nil, xerrors.New("failed to find bitcoin block")
+		return nil, errors.New("failed to find bitcoin block")
 	}
 
 	blockIdentifier := &rosetta.BlockIdentifier{
@@ -93,7 +93,7 @@ func (p *bitcoinRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 
 	transactions, err := p.getRosettaTransactions(block, rawBlock.GetBitcoin())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse block transactions: %w", err)
 	}
 
 	metadata, err := rosetta.FromSDKMetadata(map[string]any{
@@ -108,7 +108,7 @@ func (p *bitcoinRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 	})
 
 	if err != nil {
-		return nil, xerrors.Errorf("failed to convert block metadata to rosetta proto: %w", err)
+		return nil, fmt.Errorf("failed to convert block metadata to rosetta proto: %w", err)
 	}
 
 	return &api.RosettaBlock{
@@ -130,7 +130,7 @@ func (p *bitcoinRosettaParserImpl) getRosettaTransactions(block *api.BitcoinBloc
 		operations, err := p.getRosettaOperations(transaction)
 
 		if err != nil {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"failed to get operation for transaction %s: %w",
 				transaction.GetHash(),
 				err)
@@ -155,7 +155,7 @@ func (p *bitcoinRosettaParserImpl) getRosettaTransactions(block *api.BitcoinBloc
 		})
 
 		if err != nil {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"failed to convert transaction metadata to rosetta proto for transaction %s: %w",
 				transaction.GetHash(),
 				err)
@@ -185,7 +185,7 @@ func (p *bitcoinRosettaParserImpl) getRosettaOperations(
 		metadata, err := getInputMetadata(input)
 
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert input metadata to rosetta proto: %w", err)
+			return nil, fmt.Errorf("failed to convert input metadata to rosetta proto: %w", err)
 		}
 
 		// This reflects an input that does not correspond to a previous output.
@@ -244,7 +244,7 @@ func (p *bitcoinRosettaParserImpl) getRosettaOperations(
 	for outputIdx, output := range tx.Outputs {
 		metadata, err := getOutputMetadata(output)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert output metadata to rosetta proto: %w", err)
+			return nil, fmt.Errorf("failed to convert output metadata to rosetta proto: %w", err)
 		}
 
 		coinChange := &rosetta.CoinChange{

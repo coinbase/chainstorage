@@ -2,11 +2,11 @@ package activity
 
 import (
 	"context"
+	"fmt"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
@@ -57,7 +57,7 @@ func (a *EventLoader) execute(ctx context.Context, request *EventLoaderRequest) 
 	logger := a.getLogger(ctx)
 
 	if err := a.metaStorage.AddEventEntries(ctx, request.EventTag, request.Events); err != nil {
-		return nil, xerrors.Errorf("failed to add events to metaStorage: %w", err)
+		return nil, fmt.Errorf("failed to add events to metaStorage: %w", err)
 	}
 
 	logger.Info(

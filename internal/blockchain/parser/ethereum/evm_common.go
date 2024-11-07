@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/params"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -74,17 +73,17 @@ func getFeeDetails(transaction *api.EthereumTransaction, block *api.EthereumBloc
 
 	if txType == eip1559TxType {
 		if transaction.GetOptionalMaxPriorityFeePerGas() == nil {
-			return nil, xerrors.Errorf("Miss maxPriorityFeePerGas for transaction %v", transaction.Hash)
+			return nil, fmt.Errorf("Miss maxPriorityFeePerGas for transaction %v", transaction.Hash)
 		}
 		maxPriorityFeePerGas = big.NewInt(int64(transaction.GetMaxPriorityFeePerGas()))
 
 		if transaction.GetOptionalMaxFeePerGas() == nil {
-			return nil, xerrors.Errorf("Miss maxFeePerGas for transaction %v", transaction.Hash)
+			return nil, fmt.Errorf("Miss maxFeePerGas for transaction %v", transaction.Hash)
 		}
 		maxFeePerGas = big.NewInt(int64(transaction.GetMaxFeePerGas()))
 
 		if transaction.GetOptionalPriorityFeePerGas() == nil {
-			return nil, xerrors.Errorf("Miss priorityFeePerGas for transaction %v", transaction.Hash)
+			return nil, fmt.Errorf("Miss priorityFeePerGas for transaction %v", transaction.Hash)
 		}
 		priorityFeePerGas = big.NewInt(int64(transaction.GetPriorityFeePerGas()))
 
@@ -131,14 +130,14 @@ func convertCSTransactionToRosettaOps(transaction *api.EthereumTransaction, curr
 			opStatus = opStatusFailure
 			anyError, err := anypb.New(structpb.NewStringValue(trace.Error))
 			if err != nil {
-				return nil, xerrors.Errorf("failed to convert trace error to proto-any: %w", err)
+				return nil, fmt.Errorf("failed to convert trace error to proto-any: %w", err)
 			}
 			metadata["error"] = anyError
 		}
 
 		traceValue, ok := new(big.Int).SetString(trace.Value, 10)
 		if !ok {
-			return nil, xerrors.Errorf("invalid trace value [%s]", trace.Value)
+			return nil, fmt.Errorf("invalid trace value [%s]", trace.Value)
 		}
 
 		zeroValue := traceValue.Sign() == 0
@@ -245,7 +244,7 @@ func convertCSTransactionToRosettaOps(transaction *api.EthereumTransaction, curr
 		}
 
 		if value.Sign() < 0 {
-			return nil, xerrors.Errorf("there is a negative balance [%s] for a suicided account [%s]", value.String(), account)
+			return nil, fmt.Errorf("there is a negative balance [%s] for a suicided account [%s]", value.String(), account)
 		}
 
 		lastOpIndex := ops[len(ops)-1].OperationIdentifier.Index
@@ -287,27 +286,27 @@ func getRosettaTransactionsFromCSBlock(
 		if rewardRecipient != "" {
 			feeOps, err := feeOpsFn(ethTxn, rewardRecipient, block)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse fee operations: %w", err)
+				return nil, fmt.Errorf("failed to parse fee operations: %w", err)
 			}
 			ops = append(ops, feeOps...)
 		}
 
 		tokenTransferOps, err := tokenTransferOpsFn(ethTxn, len(ops))
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse token transfer operations: %w", err)
+			return nil, fmt.Errorf("failed to parse token transfer operations: %w", err)
 		}
 		ops = append(ops, tokenTransferOps...)
 
 		traceOps, err := convertCSTransactionToRosettaOps(ethTxn, currency, len(ops))
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse trace operations: %w", err)
+			return nil, fmt.Errorf("failed to parse trace operations: %w", err)
 		}
 		ops = append(ops, traceOps...)
 
 		for _, opsFn := range opsFns {
 			extraOps, err := opsFn(ethTxn, len(ops))
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse extra operations: %w", err)
+				return nil, fmt.Errorf("failed to parse extra operations: %w", err)
 			}
 
 			ops = append(ops, extraOps...)
@@ -316,7 +315,7 @@ func getRosettaTransactionsFromCSBlock(
 		var receiptMap map[string]any
 		if len(blobData.TransactionReceipts) > i {
 			if err := json.Unmarshal(blobData.TransactionReceipts[i], &receiptMap); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal transaction receipts: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal transaction receipts: %w", err)
 			}
 		}
 
@@ -325,7 +324,7 @@ func getRosettaTransactionsFromCSBlock(
 		// when calculating trace length is fixed on production
 		if len(blobData.TransactionTraces) > i {
 			if err := json.Unmarshal(blobData.TransactionTraces[i], &traceMap); err != nil {
-				return nil, xerrors.Errorf("failed to unmarshal transaction trace: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal transaction trace: %w", err)
 			}
 		}
 
@@ -336,7 +335,7 @@ func getRosettaTransactionsFromCSBlock(
 			"trace":     traceMap,
 		})
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert transaction metadata to rosetta proto: %w", err)
+			return nil, fmt.Errorf("failed to convert transaction metadata to rosetta proto: %w", err)
 		}
 
 		rosettaTransactions[i] = &rosetta.Transaction{
@@ -381,7 +380,7 @@ func getRosettaTransactionsFromCSBlock(
 			"amount":          hexutil.EncodeUint64(withdrawal.Amount),
 		})
 		if err != nil {
-			return nil, xerrors.Errorf("failed to convert withdrawal metadata to rosetta proto: %w", err)
+			return nil, fmt.Errorf("failed to convert withdrawal metadata to rosetta proto: %w", err)
 		}
 
 		rosettaTransactions[len(block.Transactions)+i] = &rosetta.Transaction{

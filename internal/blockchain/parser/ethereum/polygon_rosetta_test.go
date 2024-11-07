@@ -2,6 +2,7 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -9,7 +10,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
@@ -478,7 +478,7 @@ func (s *polygonRosettaParserTestSuite) TestRosettaPolygonResponseParity() {
 
 func (s *polygonRosettaParserTestSuite) normalizeTransaction(expected *rosetta.Transaction, actual *rosetta.Transaction) error {
 	if len(expected.Operations) != len(actual.Operations) {
-		return xerrors.Errorf("operation size is different for transaction:%v", expected.TransactionIdentifier.Hash)
+		return fmt.Errorf("operation size is different for transaction:%v", expected.TransactionIdentifier.Hash)
 	}
 
 	for i := range expected.Operations {

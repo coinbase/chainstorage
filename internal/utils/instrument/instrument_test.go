@@ -2,11 +2,11 @@ package instrument
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/zap/zaptest"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/retry"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -36,14 +36,14 @@ func TestInstrument(t *testing.T) {
 			hasError:     true,
 			successValue: 0,
 			errorValue:   1,
-			fn:           func(ctx context.Context) error { return xerrors.New("mock") },
+			fn:           func(ctx context.Context) error { return errors.New("mock") },
 		},
 		{
 			name:         "withRetry",
 			hasError:     true,
 			successValue: 0,
 			errorValue:   1,
-			fn:           func(ctx context.Context) error { return retry.Retryable(xerrors.New("mock")) },
+			fn:           func(ctx context.Context) error { return retry.Retryable(errors.New("mock")) },
 			retry:        retry.New(retry.WithMaxAttempts(2)),
 		},
 		{
@@ -55,7 +55,7 @@ func TestInstrument(t *testing.T) {
 			opts: []Option{
 				WithFilter(func(err error) bool {
 					var target *MockError
-					return xerrors.As(err, &target)
+					return errors.As(err, &target)
 				}),
 			},
 		},
@@ -76,7 +76,7 @@ func TestInstrument(t *testing.T) {
 			hasError:     true,
 			successValue: 0,
 			errorValue:   1,
-			fn:           func(ctx context.Context) error { return xerrors.New("mock") },
+			fn:           func(ctx context.Context) error { return errors.New("mock") },
 			opts: []Option{
 				WithLogger(zaptest.NewLogger(t), "instrument.test"),
 			},
@@ -155,7 +155,7 @@ func TestInstrumentWithRetry(t *testing.T) {
 	operation := func(ctx context.Context) error {
 		numCalls += 1
 		if numCalls < maxAttempts {
-			return retry.Retryable(xerrors.New("mock"))
+			return retry.Retryable(errors.New("mock"))
 		}
 		return nil
 	}
@@ -208,14 +208,14 @@ func TestInstrumentWithResult(t *testing.T) {
 			hasError:     true,
 			successValue: 0,
 			errorValue:   1,
-			fn:           func(ctx context.Context) (string, error) { return statusError, xerrors.New("mock") },
+			fn:           func(ctx context.Context) (string, error) { return statusError, errors.New("mock") },
 		},
 		{
 			name:         "withRetry",
 			hasError:     true,
 			successValue: 0,
 			errorValue:   1,
-			fn:           func(ctx context.Context) (string, error) { return statusError, retry.Retryable(xerrors.New("mock")) },
+			fn:           func(ctx context.Context) (string, error) { return statusError, retry.Retryable(errors.New("mock")) },
 			retry:        retry.NewWithResult[string](retry.WithMaxAttempts(2)),
 		},
 		{
@@ -227,7 +227,7 @@ func TestInstrumentWithResult(t *testing.T) {
 			opts: []Option{
 				WithFilter(func(err error) bool {
 					var target *MockError
-					return xerrors.As(err, &target)
+					return errors.As(err, &target)
 				}),
 			},
 		},
@@ -248,7 +248,7 @@ func TestInstrumentWithResult(t *testing.T) {
 			hasError:     true,
 			successValue: 0,
 			errorValue:   1,
-			fn:           func(ctx context.Context) (string, error) { return statusError, xerrors.New("mock") },
+			fn:           func(ctx context.Context) (string, error) { return statusError, errors.New("mock") },
 			opts: []Option{
 				WithLogger(zaptest.NewLogger(t), "instrument.test"),
 			},

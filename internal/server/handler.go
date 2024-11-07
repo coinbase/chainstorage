@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -20,7 +21,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
@@ -165,9 +165,9 @@ var (
 	InitialPositionLatest   = api.InitialPosition_LATEST.String()
 	InitialPositionEarliest = api.InitialPosition_EARLIEST.String()
 
-	errServerShutDown       = xerrors.New("sever is shutting down")
-	errNoNewEventForTooLong = xerrors.New("there was no new event for quite a while")
-	errNotImplemented       = xerrors.New("handler method not implemented")
+	errServerShutDown       = errors.New("sever is shutting down")
+	errNoNewEventForTooLong = errors.New("there was no new event for quite a while")
+	errNotImplemented       = errors.New("handler method not implemented")
 
 	// The method the interceptor is given is of the form /coinbase.chainstorage.ChainStorage/GetNativeBlock
 	// This regex matches that and extracts the service and method name into
@@ -329,12 +329,12 @@ func (s *Server) emitAccountStateMetric(clientID string, count int64) {
 func (s *Server) GetLatestBlock(ctx context.Context, req *api.GetLatestBlockRequest) (*api.GetLatestBlockResponse, error) {
 	tag := s.config.GetEffectiveBlockTag(req.GetTag())
 	if err := s.validateTag(tag); err != nil {
-		return nil, xerrors.Errorf("failed to validate tag: %w", err)
+		return nil, fmt.Errorf("failed to validate tag: %w", err)
 	}
 
 	block, err := s.metaStorage.GetLatestBlock(ctx, tag)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get latest block: %w", err)
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
 
 	return &api.GetLatestBlockResponse{
@@ -351,12 +351,12 @@ func (s *Server) GetBlockFile(ctx context.Context, req *api.GetBlockFileRequest)
 
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get block from meta storage: %w", err)
 	}
 
 	blockFile, err := s.newBlockFile(block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to prepare block file: %w", err)
+		return nil, fmt.Errorf("failed to prepare block file: %w", err)
 	}
 
 	s.emitBlocksMetric(formatFile, clientID, 1)
@@ -371,14 +371,14 @@ func (s *Server) GetBlockFilesByRange(ctx context.Context, req *api.GetBlockFile
 
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlockFiles)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get blocks from meta storage: %w", err)
 	}
 
 	blockFiles := make([]*api.BlockFile, len(blocks))
 	for i := 0; i < len(blocks); i++ {
 		blockFile, err := s.newBlockFile(blocks[i])
 		if err != nil {
-			return nil, xerrors.Errorf("newBlockFile error: %w", err)
+			return nil, fmt.Errorf("newBlockFile error: %w", err)
 		}
 
 		blockFiles[i] = blockFile
@@ -394,12 +394,12 @@ func (s *Server) GetRawBlock(ctx context.Context, req *api.GetRawBlockRequest) (
 
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get block from meta storage: %w", err)
 	}
 
 	rawBlock, err := s.getBlockFromBlobStorage(ctx, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	s.emitBlocksMetric(formatRaw, clientID, 1)
@@ -414,12 +414,12 @@ func (s *Server) GetRawBlocksByRange(ctx context.Context, req *api.GetRawBlocksB
 
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlocks)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get blocks from meta storage: %w", err)
 	}
 
 	rawBlocks, err := s.getBlocksFromBlobStorage(ctx, blocks)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	s.emitBlocksMetric(formatRaw, clientID, int64(len(rawBlocks)))
@@ -434,17 +434,17 @@ func (s *Server) GetNativeBlock(ctx context.Context, req *api.GetNativeBlockRequ
 
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get block from meta storage: %w", err)
 	}
 
 	rawBlock, err := s.getBlockFromBlobStorage(ctx, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	nativeBlock, err := s.parser.ParseNativeBlock(ctx, rawBlock)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block: %w", err)
+		return nil, fmt.Errorf("failed to parse block: %w", err)
 	}
 
 	s.emitBlocksMetric(formatNative, clientID, 1)
@@ -459,19 +459,19 @@ func (s *Server) GetNativeBlocksByRange(ctx context.Context, req *api.GetNativeB
 
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlocks)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get blocks from meta storage: %w", err)
 	}
 
 	rawBlocks, err := s.getBlocksFromBlobStorage(ctx, blocks)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	nativeBlocks := make([]*api.NativeBlock, len(rawBlocks))
 	for i := 0; i < len(nativeBlocks); i++ {
 		nativeBlock, err := s.parser.ParseNativeBlock(ctx, rawBlocks[i])
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse block: %w", err)
+			return nil, fmt.Errorf("failed to parse block: %w", err)
 		}
 
 		nativeBlocks[i] = nativeBlock
@@ -490,17 +490,17 @@ func (s *Server) GetRosettaBlock(ctx context.Context, req *api.GetRosettaBlockRe
 
 	block, err := s.getBlockFromMetaStorage(ctx, req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get block from meta storage: %w", err)
 	}
 
 	rawBlock, err := s.getBlockFromBlobStorage(ctx, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	rosettaBlock, err := s.parser.ParseRosettaBlock(ctx, rawBlock)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block: %w", err)
+		return nil, fmt.Errorf("failed to parse block: %w", err)
 	}
 
 	s.emitBlocksMetric(formatRosetta, clientID, 1)
@@ -515,19 +515,19 @@ func (s *Server) GetRosettaBlocksByRange(ctx context.Context, req *api.GetRosett
 
 	blocks, err := s.getBlocksFromMetaStorage(ctx, req, s.config.Api.MaxNumBlocks)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get blocks from meta storage: %w", err)
 	}
 
 	rawBlocks, err := s.getBlocksFromBlobStorage(ctx, blocks)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	rosettaBlocks := make([]*api.RosettaBlock, len(rawBlocks))
 	for i := 0; i < len(rosettaBlocks); i++ {
 		rosettaBlock, err := s.parser.ParseRosettaBlock(ctx, rawBlocks[i])
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse block: %w", err)
+			return nil, fmt.Errorf("failed to parse block: %w", err)
 		}
 
 		rosettaBlocks[i] = rosettaBlock
@@ -547,7 +547,7 @@ func (s *Server) GetBlockByTransaction(ctx context.Context, req *api.GetBlockByT
 
 	blocks, err := s.getBlocksFromTransactionStorage(ctx, req.GetTag(), req.GetTransactionHash())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks from transaction storage: %w", err)
+		return nil, fmt.Errorf("failed to get blocks from transaction storage: %w", err)
 	}
 
 	results := make([]*api.BlockIdentifier, len(blocks))
@@ -576,24 +576,24 @@ func (s *Server) GetNativeTransaction(ctx context.Context, req *api.GetNativeTra
 
 	blocks, err := s.getBlocksFromTransactionStorage(ctx, req.GetTag(), req.GetTransactionHash())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blocks from transaction storage: %w", err)
+		return nil, fmt.Errorf("failed to get blocks from transaction storage: %w", err)
 	}
 
 	rawBlocks, err := s.getBlocksFromBlobStorage(ctx, blocks)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	nativeTransactions := make([]*api.NativeTransaction, len(rawBlocks))
 	for i := 0; i < len(nativeTransactions); i++ {
 		nativeBlock, err := s.parser.ParseNativeBlock(ctx, rawBlocks[i])
 		if err != nil {
-			return nil, xerrors.Errorf("failed to parse block: %w", err)
+			return nil, fmt.Errorf("failed to parse block: %w", err)
 		}
 
 		nativeTransaction, err := s.parser.GetNativeTransaction(ctx, nativeBlock, req.GetTransactionHash())
 		if err != nil {
-			return nil, xerrors.Errorf("failed to extract transaction from block: %w", err)
+			return nil, fmt.Errorf("failed to extract transaction from block: %w", err)
 		}
 
 		nativeTransactions[i] = nativeTransaction
@@ -615,23 +615,23 @@ func (s *Server) GetVerifiedAccountState(ctx context.Context, req *api.GetVerifi
 	// First, use the tag, height, and hash to get the native block
 	block, err := s.getBlockFromMetaStorage(ctx, req.Req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block from meta storage: %w", err)
+		return nil, fmt.Errorf("failed to get block from meta storage: %w", err)
 	}
 
 	rawBlock, err := s.getBlockFromBlobStorage(ctx, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get raw blocks: %w", err)
+		return nil, fmt.Errorf("failed to get raw blocks: %w", err)
 	}
 
 	nativeBlock, err := s.parser.ParseNativeBlock(ctx, rawBlock)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block: %w", err)
+		return nil, fmt.Errorf("failed to parse block: %w", err)
 	}
 
 	// Second, call eth_getProof to fetch the account proof for the target account and block
 	accountProof, err := s.blockchainClient.GetAccountProof(ctx, req)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to call client.GetAccountProof: %w", err)
+		return nil, fmt.Errorf("failed to call client.GetAccountProof: %w", err)
 	}
 
 	// Finally, verify the account state with parser.VerifyAccountState
@@ -642,7 +642,7 @@ func (s *Server) GetVerifiedAccountState(ctx context.Context, req *api.GetVerifi
 	}
 	accountResult, err := s.parser.ValidateAccountState(ctx, request)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to ValidateAccountState: %w", err)
+		return nil, fmt.Errorf("failed to ValidateAccountState: %w", err)
 	}
 
 	clientID := getClientID(ctx)
@@ -664,7 +664,7 @@ func (s *Server) getBlocksFromTransactionStorage(ctx context.Context, tag uint32
 
 	txs, err := s.transactionStorage.GetTransaction(ctx, tag, transactionHash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get transaction from transaction storage: %w", err)
+		return nil, fmt.Errorf("failed to get transaction from transaction storage: %w", err)
 	}
 
 	// use map to dedup in blockNums
@@ -677,7 +677,7 @@ func (s *Server) getBlocksFromTransactionStorage(ctx context.Context, tag uint32
 	blockNums := maps.Keys(blockNumberToMetadataMap)
 	blocksMetadata, err := s.metaStorage.GetBlocksByHeights(ctx, tag, blockNums)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get blockMetadata for blocks=%v: %w", blockNums, err)
+		return nil, fmt.Errorf("failed to get blockMetadata for blocks=%v: %w", blockNums, err)
 	}
 
 	for _, blockMetadata := range blocksMetadata {
@@ -715,7 +715,7 @@ func (s *Server) newBlockFile(block *api.BlockMetadata) (*api.BlockFile, error) 
 	compression := storage_utils.GetCompressionType(key)
 	fileUrl, err := s.blobStorage.PreSign(context.Background(), key)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to generate presigned url: %w", err)
+		return nil, fmt.Errorf("failed to generate presigned url: %w", err)
 	}
 
 	return &api.BlockFile{
@@ -761,7 +761,7 @@ func (s *Server) getBlockFromMetaStorage(ctx context.Context, req requestByID) (
 
 	block, err := s.metaStorage.GetBlockByHash(ctx, tag, height, hash)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block by hash (tag=%v, height=%v, hash=%v): %w", tag, height, hash, err)
+		return nil, fmt.Errorf("failed to get block by hash (tag=%v, height=%v, hash=%v): %w", tag, height, hash, err)
 	}
 
 	return block, nil
@@ -786,14 +786,14 @@ func (s *Server) getBlocksFromMetaStorage(ctx context.Context, req requestByRang
 
 	blocks, err := s.metaStorage.GetBlocksByHeightRange(ctx, tag, startHeight, endHeight)
 	if err != nil {
-		return nil, xerrors.Errorf("internal meta storage error: %w", err)
+		return nil, fmt.Errorf("internal meta storage error: %w", err)
 	}
 
 	// A chain reorg may happen after calling GetBlocksByHeightRange
 	// Validate requests do not go beyond the latest watermark
 	latestBlock, err := s.metaStorage.GetLatestBlock(ctx, tag)
 	if err != nil {
-		return nil, xerrors.Errorf("internal meta storage error: %w", err)
+		return nil, fmt.Errorf("internal meta storage error: %w", err)
 	}
 
 	latest := latestBlock.Height
@@ -809,7 +809,7 @@ func (s *Server) getBlocksFromMetaStorage(ctx context.Context, req requestByRang
 func (s *Server) getBlockFromBlobStorage(ctx context.Context, block *api.BlockMetadata) (*api.Block, error) {
 	output, err := s.blobStorage.Download(ctx, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to download from blob storage (input={%+v}): %w", block, err)
+		return nil, fmt.Errorf("failed to download from blob storage (input={%+v}): %w", block, err)
 	}
 
 	return output, nil
@@ -824,7 +824,7 @@ func (s *Server) getBlocksFromBlobStorage(ctx context.Context, blocks []*api.Blo
 			input := blocks[i]
 			output, err := s.blobStorage.Download(ctx, input)
 			if err != nil {
-				return xerrors.Errorf("failed to download from blob storage (input={%+v}): %w", input, err)
+				return fmt.Errorf("failed to download from blob storage (input={%+v}): %w", input, err)
 			}
 
 			result[i] = output
@@ -833,7 +833,7 @@ func (s *Server) getBlocksFromBlobStorage(ctx context.Context, blocks []*api.Blo
 	}
 
 	if err := group.Wait(); err != nil {
-		return nil, xerrors.Errorf("failed to download blocks from blob storage: %w", err)
+		return nil, fmt.Errorf("failed to download blocks from blob storage: %w", err)
 	}
 
 	return result, nil
@@ -1014,45 +1014,45 @@ func (s *Server) mapToGrpcError(err error, fullMethod string, request any) error
 	code := codes.Internal
 
 	var grpcErr gateway.GrpcError
-	if xerrors.As(err, &grpcErr) {
+	if errors.As(err, &grpcErr) {
 		// If the error is already a grpc error, use the given code.
 		code = grpcErr.GRPCStatus().Code()
 		description = code.String()
-	} else if xerrors.Is(err, storage.ErrItemNotFound) {
+	} else if errors.Is(err, storage.ErrItemNotFound) {
 		description = "block not found"
 		code = codes.NotFound
-	} else if xerrors.Is(err, storage.ErrNoEventHistory) {
+	} else if errors.Is(err, storage.ErrNoEventHistory) {
 		description = "no event history available"
 		code = codes.InvalidArgument
-	} else if xerrors.Is(err, storage.ErrInvalidEventId) {
+	} else if errors.Is(err, storage.ErrInvalidEventId) {
 		description = "invalid event id"
 		code = codes.InvalidArgument
-	} else if xerrors.Is(err, storage.ErrOutOfRange) || xerrors.Is(err, storage.ErrInvalidHeight) {
+	} else if errors.Is(err, storage.ErrOutOfRange) || errors.Is(err, storage.ErrInvalidHeight) {
 		description = "invalid height or out of range"
 		code = codes.InvalidArgument
-	} else if xerrors.Is(err, parser.ErrInvalidChain) {
+	} else if errors.Is(err, parser.ErrInvalidChain) {
 		// Possibly caused by chain reorg.
 		description = "invalid chain"
 		code = codes.FailedPrecondition
-	} else if xerrors.Is(err, storage.ErrRequestCanceled) {
+	} else if errors.Is(err, storage.ErrRequestCanceled) {
 		description = "storage request canceled"
 		code = codes.Canceled
-	} else if xerrors.Is(err, parser.ErrInvalidParameters) {
+	} else if errors.Is(err, parser.ErrInvalidParameters) {
 		description = "invalid parser input parameters"
 		code = codes.InvalidArgument
-	} else if xerrors.Is(err, parser.ErrNotImplemented) {
+	} else if errors.Is(err, parser.ErrNotImplemented) {
 		description = "parser method not implemented"
 		code = codes.Unimplemented
-	} else if xerrors.Is(err, errNotImplemented) {
+	} else if errors.Is(err, errNotImplemented) {
 		description = "handler method not implemented"
 		code = codes.Unimplemented
-	} else if xerrors.Is(err, context.Canceled) {
+	} else if errors.Is(err, context.Canceled) {
 		description = "context canceled"
 		code = codes.Canceled
-	} else if xerrors.Is(err, context.DeadlineExceeded) {
+	} else if errors.Is(err, context.DeadlineExceeded) {
 		description = "context deadline exceeded"
 		code = codes.DeadlineExceeded
-	} else if xerrors.Is(err, errNoNewEventForTooLong) || xerrors.Is(err, errServerShutDown) {
+	} else if errors.Is(err, errNoNewEventForTooLong) || errors.Is(err, errServerShutDown) {
 		description = "please retry after a moment"
 		code = codes.Aborted
 	}
@@ -1113,7 +1113,7 @@ func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.C
 
 	lastSentEventId, err := s.parseChainEventsRequest(ctx, request, eventTag)
 	if err != nil {
-		return xerrors.Errorf("failed to parse chain events request: %w", err)
+		return fmt.Errorf("failed to parse chain events request: %w", err)
 	}
 
 	tick := time.NewTicker(s.config.Api.StreamingInterval)
@@ -1123,7 +1123,7 @@ func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.C
 	for {
 		events, err := s.metaStorage.GetEventsAfterEventId(ctx, eventTag, lastSentEventId, s.config.Api.StreamingBatchSize)
 		if err != nil {
-			return xerrors.Errorf("failed to retrieve events: %w", err)
+			return fmt.Errorf("failed to retrieve events: %w", err)
 		}
 
 		if len(events) > 0 {
@@ -1132,7 +1132,7 @@ func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.C
 		} else {
 			waitTime := backoff.NextBackOff()
 			if waitTime == streamingBackoffStop {
-				return xerrors.Errorf("max wait time exceeded: %w", errNoNewEventForTooLong)
+				return fmt.Errorf("max wait time exceeded: %w", errNoNewEventForTooLong)
 			}
 			tick.Reset(waitTime)
 		}
@@ -1161,7 +1161,7 @@ func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.C
 					s.logger.Debug("client's transport is closing", zap.Error(err))
 					return nil
 				}
-				return xerrors.Errorf("failed to stream event to client: %w", err)
+				return fmt.Errorf("failed to stream event to client: %w", err)
 			}
 
 			eventTagString := strconv.Itoa(int(e.EventTag))
@@ -1177,7 +1177,7 @@ func (s *Server) StreamChainEvents(request *api.ChainEventsRequest, stream api.C
 		select {
 		case <-tick.C:
 		case <-s.streamDone:
-			return xerrors.Errorf("server is being redeployed: %w", errServerShutDown)
+			return fmt.Errorf("server is being redeployed: %w", errServerShutDown)
 		case <-ctx.Done():
 			// The client is canceled. Close the stream now.
 			s.logger.Debug("client is canceled", zap.Error(err))
@@ -1211,11 +1211,11 @@ func (s *Server) GetChainEvents(ctx context.Context, req *api.GetChainEventsRequ
 
 	lastSentEventId, err := s.parseChainEventsRequest(ctx, req, eventTag)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse chain events request: %w", err)
+		return nil, fmt.Errorf("failed to parse chain events request: %w", err)
 	}
 	events, err := s.metaStorage.GetEventsAfterEventId(ctx, eventTag, lastSentEventId, req.GetMaxNumEvents())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get events (req={%+v}): %w", req, err)
+		return nil, fmt.Errorf("failed to get events (req={%+v}): %w", req, err)
 	}
 
 	blockchainEvents := make([]*api.BlockchainEvent, 0, len(events))
@@ -1280,7 +1280,7 @@ func (s *Server) parseChainEventsRequest(ctx context.Context, input parseChainEv
 			// if start from latest, assume last sent event id is max event id - 1
 			latestEventId, err := s.metaStorage.GetMaxEventId(ctx, eventTag)
 			if err != nil {
-				return 0, xerrors.Errorf("failed to retrieve max event id for eventTag=%d: %w", eventTag, err)
+				return 0, fmt.Errorf("failed to retrieve max event id for eventTag=%d: %w", eventTag, err)
 			}
 			lastSentEventId = latestEventId - 1
 		case InitialPositionEarliest:
@@ -1295,7 +1295,7 @@ func (s *Server) parseChainEventsRequest(ctx context.Context, input parseChainEv
 			eventId, err := s.metaStorage.GetFirstEventIdByBlockHeight(ctx, eventTag, decodedHeight)
 			if err != nil {
 				// if no such event under the given block height, metaStorage will throw ErrItemNotFound
-				return 0, xerrors.Errorf("failed to retrieve first event id by block height: %w", err)
+				return 0, fmt.Errorf("failed to retrieve first event id by block height: %w", err)
 			}
 			lastSentEventId = eventId - 1
 		}
@@ -1327,13 +1327,13 @@ func (s *Server) GetVersionedChainEvent(ctx context.Context, req *api.GetVersion
 
 	fromEvent, err := s.metaStorage.GetEventByEventId(ctx, fromEventTag, fromEventId)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get event for eventTag=%v, sequence=%v: %w", fromEventTag, fromEventId, err)
+		return nil, fmt.Errorf("failed to get event for eventTag=%v, sequence=%v: %w", fromEventTag, fromEventId, err)
 	}
 	blockHeight := fromEvent.BlockHeight
 
 	events, err := s.metaStorage.GetEventsByBlockHeight(ctx, toEventTag, blockHeight)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get events for fromEventTag=%v, toEventTag=%v, sequence=%v: %w", fromEventTag, toEventTag, fromEventId, err)
+		return nil, fmt.Errorf("failed to get events for fromEventTag=%v, toEventTag=%v, sequence=%v: %w", fromEventTag, toEventTag, fromEventId, err)
 	}
 
 	// return the event with the largest eventId if there are multiple matches
@@ -1353,7 +1353,7 @@ func (s *Server) GetVersionedChainEvent(ctx context.Context, req *api.GetVersion
 	}
 
 	if matchedEvent == nil {
-		return nil, xerrors.Errorf("cannot find matching event for fromEventTag=%v, toEventTag=%v, sequence=%v. please use another event.", fromEventTag, toEventTag, fromEventId)
+		return nil, fmt.Errorf("cannot find matching event for fromEventTag=%v, toEventTag=%v, sequence=%v. please use another event.", fromEventTag, toEventTag, fromEventId)
 	}
 
 	return &api.GetVersionedChainEventResponse{

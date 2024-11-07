@@ -3,13 +3,13 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"testing"
 
 	geth "github.com/ethereum/go-ethereum/common"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -84,19 +84,19 @@ func TestEthereumValidator_Failures(t *testing.T) {
 	corrupt_block := proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().TransactionsRoot = "0x8fcfe4d75266508496020675b9c3acfdf0074bf2d177c6366b40f669306310db"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+	require.True(errors.Is(err, ErrInvalidBlockHash))
 
 	// Corrupt the block number (from 17000000 to 16000000)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().Number = 16000000
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+	require.True(errors.Is(err, ErrInvalidBlockHash))
 
 	// Corrupt the miner (drop the last 3 chars)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().Miner = "0x690b9a9e9aa1c9db991c7721a92d351db4fac"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+	require.True(errors.Is(err, ErrInvalidBlockHash))
 
 	// 2. Modify the transactions in different ways and fail the transactions verification.
 	err = fixtures.UnmarshalPB("parser/ethereum/native_block_14000000.json", &block)
@@ -108,19 +108,19 @@ func TestEthereumValidator_Failures(t *testing.T) {
 		ChainId: 100,
 	}
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+	require.True(errors.Is(err, ErrInvalidTransactionsHash))
 
 	// Corrupt the gasUsed (from 1395940 to 1395941).
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[0].Gas = 1395941
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+	require.True(errors.Is(err, ErrInvalidTransactionsHash))
 
 	// Corrupt the nounce (from 2760 to 3760).
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[0].Nonce = 3760
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+	require.True(errors.Is(err, ErrInvalidTransactionsHash))
 
 	// 3. Modify the receipts in different ways and fail the receipts verification.
 	err = fixtures.UnmarshalPB("parser/ethereum/native_block_8000000.json", &block)
@@ -130,7 +130,7 @@ func TestEthereumValidator_Failures(t *testing.T) {
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[1].Receipt.CumulativeGasUsed = 73384
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidReceiptsHash))
+	require.True(errors.Is(err, ErrInvalidReceiptsHash))
 
 	// Corrupt the status (from 1 to 0)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
@@ -138,13 +138,13 @@ func TestEthereumValidator_Failures(t *testing.T) {
 		Status: 0,
 	}
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidReceiptsHash))
+	require.True(errors.Is(err, ErrInvalidReceiptsHash))
 
 	// Corrupt the logs (drop the last 4 bytes of logs[0].data)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[1].Receipt.Logs[0].Data = "0x000000000000000000000000000000000000000000000000000003c89f3e"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidReceiptsHash))
+	require.True(errors.Is(err, ErrInvalidReceiptsHash))
 
 	// 4. Modify the withdrawals in different ways and fail the withdrawals verification.
 	err = fixtures.UnmarshalPB("parser/ethereum/native_block_17300000.json", &block)
@@ -154,19 +154,19 @@ func TestEthereumValidator_Failures(t *testing.T) {
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().Withdrawals[0].Index = 4241881
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidWithdrawalsHash))
+	require.True(errors.Is(err, ErrInvalidWithdrawalsHash))
 
 	// Corrupt the validatorIndex of the second Withdrawals (from 551869 to 551870)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().Withdrawals[1].ValidatorIndex = 551870
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidWithdrawalsHash))
+	require.True(errors.Is(err, ErrInvalidWithdrawalsHash))
 
 	// Corrupt the address of the third Withdrawals (add "abc" at the end)
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().GetHeader().Withdrawals[2].Address = "0xb9d7934878b5fb9610b3fe8a5e441e8fad7e293fabc"
 	err = parser.ValidateBlock(ctx, corrupt_block)
-	require.True(xerrors.Is(err, ErrInvalidWithdrawalsHash))
+	require.True(errors.Is(err, ErrInvalidWithdrawalsHash))
 }
 
 func TestValidateAccountState_Success(t *testing.T) {

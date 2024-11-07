@@ -1,13 +1,13 @@
 package activity
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/dlq"
@@ -78,7 +78,7 @@ func (s *EventLoaderTestSuite) TestEventLoader_Error() {
 
 	eventTag := uint32(1)
 	var events []*model.EventEntry
-	s.metaStorage.EXPECT().AddEventEntries(gomock.Any(), eventTag, gomock.Any()).Return(xerrors.Errorf("error loading events"))
+	s.metaStorage.EXPECT().AddEventEntries(gomock.Any(), eventTag, gomock.Any()).Return(fmt.Errorf("error loading events"))
 	request := &EventLoaderRequest{
 		EventTag: eventTag,
 		Events:   events,

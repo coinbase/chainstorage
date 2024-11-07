@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"cloud.google.com/go/firestore"
-	"golang.org/x/xerrors"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -80,7 +79,7 @@ func (b *blockStorageImpl) GetBlockByHeight(ctx context.Context, tag uint32, hei
 // GetBlocksByHeightRange implements internal.BlockStorage.
 func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint32, startHeight uint64, endHeight uint64) ([]*chainstorage.BlockMetadata, error) {
 	if startHeight >= endHeight {
-		return nil, xerrors.Errorf(
+		return nil, fmt.Errorf(
 			"startHeight(%d) should be less than endHeight(%d): %w",
 			startHeight, endHeight, errors.ErrOutOfRange)
 	}
@@ -102,14 +101,14 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 				break
 			}
 			if err != nil {
-				return nil, xerrors.Errorf("failed to get blocks: %w", err)
+				return nil, fmt.Errorf("failed to get blocks: %w", err)
 			}
 			block, err := b.intoBlockMetadata(doc)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse block data: %w", err)
+				return nil, fmt.Errorf("failed to parse block data: %w", err)
 			}
 			if block.Height != expecting {
-				return nil, xerrors.Errorf(
+				return nil, fmt.Errorf(
 					"block metadata with height %d not found: %w",
 					expecting, errors.ErrItemNotFound)
 			}
@@ -117,7 +116,7 @@ func (b *blockStorageImpl) GetBlocksByHeightRange(ctx context.Context, tag uint3
 			expecting = expecting + 1
 		}
 		if expecting < endHeight {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"block metadata with height %d not found: %w",
 				expecting, errors.ErrItemNotFound)
 		}
@@ -139,22 +138,22 @@ func (b *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, h
 		}
 		docs, err := b.client.GetAll(ctx, docRefs)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get blocks by heights: %w", err)
+			return nil, fmt.Errorf("failed to get blocks by heights: %w", err)
 		}
 		blocks := make([]*chainstorage.BlockMetadata, len(heights))
 		expecting := 0
 		for i, doc := range docs {
 			if !doc.Exists() {
-				return nil, xerrors.Errorf(
+				return nil, fmt.Errorf(
 					"block metadata with height %d not found: %w",
 					heights[i], errors.ErrItemNotFound)
 			}
 			block, err := b.intoBlockMetadata(doc)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to parse document snapshot into block metadata: %w", err)
+				return nil, fmt.Errorf("failed to parse document snapshot into block metadata: %w", err)
 			}
 			if block.Height != heights[expecting] {
-				return nil, xerrors.Errorf(
+				return nil, fmt.Errorf(
 					"block metadata with height %d not found: %w",
 					heights[expecting], errors.ErrItemNotFound)
 			}
@@ -162,7 +161,7 @@ func (b *blockStorageImpl) GetBlocksByHeights(ctx context.Context, tag uint32, h
 			blocks[i] = block
 		}
 		if expecting < len(heights) {
-			return nil, xerrors.Errorf(
+			return nil, fmt.Errorf(
 				"block metadata with height %d not found: %w",
 				heights[expecting], errors.ErrItemNotFound)
 		}
@@ -187,7 +186,7 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 			return blocks[i].Height < blocks[j].Height
 		})
 		if err := parser.ValidateChain(blocks, lastBlock); err != nil {
-			return xerrors.Errorf("failed to validate chain: %w", err)
+			return fmt.Errorf("failed to validate chain: %w", err)
 		}
 
 		// Blocks with hash as key can be written in random order
@@ -196,7 +195,7 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 			docRef := b.getBlockDocRef(block.Tag, block.Height, block.Hash)
 			_, err := bulkWriter.Set(docRef, b.fromBlockMetadata(block))
 			if err != nil {
-				return xerrors.Errorf("failed to add block %+v to BulkWriter: %w", block, err)
+				return fmt.Errorf("failed to add block %+v to BulkWriter: %w", block, err)
 			}
 		}
 		bulkWriter.End()
@@ -223,13 +222,13 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 					}
 					err := t.Set(docRef, b.fromBlockMetadata(block))
 					if err != nil {
-						return xerrors.Errorf("failed to add block %+v in firestore transaction: %w", block, err)
+						return fmt.Errorf("failed to add block %+v in firestore transaction: %w", block, err)
 					}
 				}
 				return nil
 			})
 			if err != nil {
-				return xerrors.Errorf("failed to add canonical blocks in firestore transaction: %w", err)
+				return fmt.Errorf("failed to add canonical blocks in firestore transaction: %w", err)
 			}
 		}
 		return nil
@@ -238,7 +237,7 @@ func (b *blockStorageImpl) PersistBlockMetas(ctx context.Context, updateWatermar
 
 func (b *blockStorageImpl) validateHeight(height uint64) error {
 	if height < b.blockStartHeight {
-		return xerrors.Errorf(
+		return fmt.Errorf(
 			"height(%d) should be no less than blockStartHeight(%d): %w",
 			height, b.blockStartHeight, errors.ErrInvalidHeight)
 	}
@@ -260,14 +259,14 @@ func (b *blockStorageImpl) getBlockDocRef(tag uint32, height uint64, hash string
 func (b *blockStorageImpl) getBlock(ctx context.Context, docRef *firestore.DocumentRef) (*chainstorage.BlockMetadata, error) {
 	doc, err := docRef.Get(ctx)
 	if err != nil && status.Code(err) != codes.NotFound {
-		return nil, xerrors.Errorf("failed to get block: %w", err)
+		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
 	if !doc.Exists() {
 		return nil, errors.ErrItemNotFound
 	}
 	block, err := b.intoBlockMetadata(doc)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block data: %w", err)
+		return nil, fmt.Errorf("failed to parse block data: %w", err)
 	}
 	return block, nil
 }
@@ -301,13 +300,13 @@ func (*blockStorageImpl) intoBlockMetadata(doc *firestore.DocumentSnapshot) (*ch
 	var s firestoreBlockMetadata
 	err := doc.DataTo(&s)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse document into BlockMetadata: %w", err)
+		return nil, fmt.Errorf("failed to parse document into BlockMetadata: %w", err)
 	}
 	if s.Height < 0 {
-		return nil, xerrors.Errorf("expecting block Height to be uint64, but got %d", s.Height)
+		return nil, fmt.Errorf("expecting block Height to be uint64, but got %d", s.Height)
 	}
 	if s.ParentHeight < 0 {
-		return nil, xerrors.Errorf("expecting block ParentHeight to be uint64, but got %d", s.ParentHeight)
+		return nil, fmt.Errorf("expecting block ParentHeight to be uint64, but got %d", s.ParentHeight)
 	}
 	return &chainstorage.BlockMetadata{
 		Hash:          s.Hash,

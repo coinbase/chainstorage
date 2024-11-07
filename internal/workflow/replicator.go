@@ -2,13 +2,13 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -79,7 +79,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 
 		var cfg config.ReplicatorWorkflowConfig
 		if err := w.readConfig(ctx, &cfg); err != nil {
-			return xerrors.Errorf("failed to read config: %w", err)
+			return fmt.Errorf("failed to read config: %w", err)
 		}
 
 		batchSize := cfg.BatchSize
@@ -108,7 +108,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 		if request.DataCompression != "" {
 			dataCompression, err = utils.ParseCompression(request.DataCompression)
 			if err != nil {
-				return xerrors.Errorf("failed to parse data compression: %w", err)
+				return fmt.Errorf("failed to parse data compression: %w", err)
 			}
 		}
 
@@ -200,7 +200,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 					Compression: dataCompression,
 				})
 				if err != nil {
-					return xerrors.Errorf("failed to replicate block from %d to %d: %w", batchStart, batchEnd, err)
+					return fmt.Errorf("failed to replicate block from %d to %d: %w", batchStart, batchEnd, err)
 				}
 			}
 
@@ -212,7 +212,7 @@ func (w *Replicator) execute(ctx workflow.Context, request *ReplicatorRequest) e
 					BlockHeight:   endHeight - 1,
 				})
 				if err != nil {
-					return xerrors.Errorf("failed to update watermark: %w", err)
+					return fmt.Errorf("failed to update watermark: %w", err)
 				}
 			}
 		}

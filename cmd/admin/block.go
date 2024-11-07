@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/endpoints"
@@ -50,11 +50,11 @@ var (
 			tag := deps.Config.GetEffectiveBlockTag(blockFlags.tag)
 			rawBlock, err := deps.Client.GetBlockByHeight(context.Background(), tag, blockFlags.height)
 			if err != nil {
-				return xerrors.Errorf("failed to get block: %w", err)
+				return fmt.Errorf("failed to get block: %w", err)
 			}
 
 			if err := printBlock(deps.Parser, rawBlock, false); err != nil {
-				return xerrors.Errorf("failed to print block: %w", err)
+				return fmt.Errorf("failed to print block: %w", err)
 			}
 			return nil
 		},
@@ -82,7 +82,7 @@ var (
 
 			height, err := deps.Client.GetLatestHeight(context.Background())
 			if err != nil {
-				return xerrors.Errorf("failed to get block: %w", err)
+				return fmt.Errorf("failed to get block: %w", err)
 			}
 
 			logger.Info("latest height", zap.Uint64("height", height))

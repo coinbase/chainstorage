@@ -1,8 +1,9 @@
 package internal
 
 import (
+	"fmt"
+
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 )
 
 type (
@@ -76,17 +77,17 @@ func (b *ParserBuilder) Build() fx.Option {
 func (f *parserFactoryImpl) NewParser() (Parser, error) {
 	nativeParser, err := f.nativeParserFactory(f.params)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create native parser: %w", err)
+		return nil, fmt.Errorf("failed to create native parser: %w", err)
 	}
 
 	rosettaParser, err := f.rosettaParserFactory(f.params, nativeParser)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create rosetta parser: %w", err)
+		return nil, fmt.Errorf("failed to create rosetta parser: %w", err)
 	}
 
 	checker, err := f.checkerFactory(f.params)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create checker: %w", err)
+		return nil, fmt.Errorf("failed to create checker: %w", err)
 	}
 
 	validator := f.validatorFactory(f.params)

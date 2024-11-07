@@ -2,11 +2,12 @@ package cron
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc/codes"
 
 	"github.com/coinbase/chainstorage/internal/config"
@@ -76,11 +77,11 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 	if err != nil {
 		// Skip the task if it is a not-found error.
 		var grpcerr gateway.GrpcError
-		if xerrors.As(err, &grpcerr) && grpcerr.GRPCStatus().Code() == codes.NotFound {
+		if errors.As(err, &grpcerr) && grpcerr.GRPCStatus().Code() == codes.NotFound {
 			return nil
 		}
 
-		return xerrors.Errorf("failed to call GetLatestBlock %w", err)
+		return fmt.Errorf("failed to call GetLatestBlock %w", err)
 	}
 
 	t.logger.Info(
@@ -111,7 +112,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 			Height: height,
 			Hash:   hash,
 		}); err != nil {
-			return xerrors.Errorf("failed to call GetBlockFile (height=%v, hash=%v): %w", height, hash, err)
+			return fmt.Errorf("failed to call GetBlockFile (height=%v, hash=%v): %w", height, hash, err)
 		}
 
 		return nil
@@ -123,7 +124,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 			StartHeight: startHeight,
 			EndHeight:   endHeight,
 		}); err != nil {
-			return xerrors.Errorf("failed to call GetBlockFilesByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
+			return fmt.Errorf("failed to call GetBlockFilesByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
 		}
 
 		return nil
@@ -135,7 +136,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 			Height: height,
 			Hash:   hash,
 		}); err != nil {
-			return xerrors.Errorf("failed to call GetRawBlock (height=%v, hash=%v): %w", height, hash, err)
+			return fmt.Errorf("failed to call GetRawBlock (height=%v, hash=%v): %w", height, hash, err)
 		}
 
 		return nil
@@ -147,7 +148,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 			StartHeight: startHeight,
 			EndHeight:   endHeight,
 		}); err != nil {
-			return xerrors.Errorf("failed to call GetRawBlocksByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
+			return fmt.Errorf("failed to call GetRawBlocksByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
 		}
 
 		return nil
@@ -159,7 +160,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 			Height: height,
 			Hash:   hash,
 		}); err != nil {
-			return xerrors.Errorf("failed to call GetNativeBlock (height=%v, hash=%v): %w", height, hash, err)
+			return fmt.Errorf("failed to call GetNativeBlock (height=%v, hash=%v): %w", height, hash, err)
 		}
 
 		return nil
@@ -171,7 +172,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 			StartHeight: startHeight,
 			EndHeight:   endHeight,
 		}); err != nil {
-			return xerrors.Errorf("failed to call GetNativeBlocksByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
+			return fmt.Errorf("failed to call GetNativeBlocksByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
 		}
 
 		return nil
@@ -184,7 +185,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 				Height: height,
 				Hash:   hash,
 			}); err != nil {
-				return xerrors.Errorf("failed to call GetRosettaBlock (height=%v, hash=%v): %w", height, hash, err)
+				return fmt.Errorf("failed to call GetRosettaBlock (height=%v, hash=%v): %w", height, hash, err)
 			}
 
 			return nil
@@ -198,7 +199,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 				StartHeight: startHeight,
 				EndHeight:   endHeight,
 			}); err != nil {
-				return xerrors.Errorf("failed to call GetRosettaBlocksByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
+				return fmt.Errorf("failed to call GetRosettaBlocksByRange for blocks [%v, %v): %w", startHeight, endHeight, err)
 			}
 
 			return nil
@@ -206,7 +207,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 	}
 
 	if err := group.Wait(); err != nil {
-		return xerrors.Errorf("failed to finish canary task: %w", err)
+		return fmt.Errorf("failed to finish canary task: %w", err)
 	}
 
 	return nil
@@ -214,7 +215,7 @@ func (t *pollingCanaryTask) Run(ctx context.Context) error {
 
 func (t *pollingCanaryTask) filterError(err error) error {
 	var grpcErr gateway.GrpcError
-	if xerrors.As(err, &grpcErr) {
+	if errors.As(err, &grpcErr) {
 		code := grpcErr.GRPCStatus().Code()
 		if code == codes.Unimplemented || code == codes.FailedPrecondition {
 			return nil

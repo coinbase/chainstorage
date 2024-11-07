@@ -3,13 +3,13 @@ package workflow
 import (
 	"container/list"
 	"context"
+	"fmt"
 	"strconv"
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -80,7 +80,7 @@ func (w *EventBackfiller) execute(ctx workflow.Context, request *EventBackfiller
 
 		var cfg config.EventBackfillerWorkflowConfig
 		if err := w.readConfig(ctx, &cfg); err != nil {
-			return xerrors.Errorf("failed to read config: %w", err)
+			return fmt.Errorf("failed to read config: %w", err)
 		}
 
 		batchSize := cfg.BatchSize
@@ -107,7 +107,7 @@ func (w *EventBackfiller) execute(ctx workflow.Context, request *EventBackfiller
 		lastEvent, err := w.readLastEvent(ctx, eventTag, request.StartSequence)
 		if err != nil {
 			logger.Error("failed to read last event", zap.Error(err))
-			return xerrors.Errorf("failed to read last event: %w", err)
+			return fmt.Errorf("failed to read last event: %w", err)
 		}
 		logger.Info("last event", zap.Reflect("event data", lastEvent))
 
@@ -146,7 +146,7 @@ func (w *EventBackfiller) execute(ctx workflow.Context, request *EventBackfiller
 					zap.Uint64("batchEnd", batchEnd),
 					zap.Error(err),
 				)
-				return xerrors.Errorf("failed to process batch [%v, %v): %w", batchStart, batchEnd, err)
+				return fmt.Errorf("failed to process batch [%v, %v): %w", batchStart, batchEnd, err)
 			}
 			lastEvent = processedBatch[len(processedBatch)-1]
 
@@ -181,10 +181,10 @@ func (w *EventBackfiller) processBatch(
 	}
 	eventReaderResponse, err := w.eventReader.Execute(ctx, readerRequest)
 	if err != nil || eventReaderResponse.Eventdata == nil || len(eventReaderResponse.Eventdata) == 0 {
-		return nil, xerrors.Errorf("failed to read events with range[startSequence=%v, endSequence=%v) and eventTag=%v: %w", batchStart, batchEnd, upgradeFromEventTag, err)
+		return nil, fmt.Errorf("failed to read events with range[startSequence=%v, endSequence=%v) and eventTag=%v: %w", batchStart, batchEnd, upgradeFromEventTag, err)
 	}
 	if int(batchEnd-batchStart) != len(eventReaderResponse.Eventdata) {
-		return nil, xerrors.Errorf("unmatched length=%v of events data with batch range[startSequence=%v, endSequence=%v) and eventTag=%v", len(eventReaderResponse.Eventdata), batchStart, batchEnd, upgradeFromEventTag)
+		return nil, fmt.Errorf("unmatched length=%v of events data with batch range[startSequence=%v, endSequence=%v) and eventTag=%v", len(eventReaderResponse.Eventdata), batchStart, batchEnd, upgradeFromEventTag)
 	}
 
 	reconcilerRequest := &activity.EventReconcilerRequest{
@@ -195,7 +195,7 @@ func (w *EventBackfiller) processBatch(
 	}
 	reconcilerResponse, err := w.eventReconciler.Execute(ctx, reconcilerRequest)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to execute event reconciler (request=%+v): %w", reconcilerRequest, err)
+		return nil, fmt.Errorf("failed to execute event reconciler (request=%+v): %w", reconcilerRequest, err)
 	}
 
 	eventDDBEntries := reconcilerResponse.Eventdata
@@ -208,7 +208,7 @@ func (w *EventBackfiller) processBatch(
 		Events:   eventDDBEntries,
 	}
 	if _, err := w.eventLoader.Execute(ctx, loaderRequest); err != nil {
-		return nil, xerrors.Errorf("failed to execute event loader (request=%+v): %w", loaderRequest, err)
+		return nil, fmt.Errorf("failed to execute event loader (request=%+v): %w", loaderRequest, err)
 	}
 
 	return eventDDBEntries, nil
@@ -226,7 +226,7 @@ func (w *EventBackfiller) readLastEvent(ctx workflow.Context, eventTag uint32, s
 	}
 	eventReaderResponse, err := w.eventReader.Execute(ctx, readerRequest)
 	if err != nil || eventReaderResponse.Eventdata == nil || len(eventReaderResponse.Eventdata) == 0 {
-		return nil, xerrors.Errorf("failed to read events with range[startSequence=%v, endSequence=%v) and eventTag=%v: %w", sequence-1, sequence, eventTag, err)
+		return nil, fmt.Errorf("failed to read events with range[startSequence=%v, endSequence=%v) and eventTag=%v: %w", sequence-1, sequence, eventTag, err)
 	}
 
 	return eventReaderResponse.Eventdata[0], nil
@@ -253,20 +253,20 @@ func validateEventBlocks(events []*model.EventEntry, lastEvent *model.EventEntry
 		prevItem := eventsValidationStack.Back()
 		prevEvent, ok := model.CastItemToEventEntry(prevItem.Value)
 		if !ok {
-			return xerrors.Errorf("failed to cast {%+v} to *model.EventDDBEntry", prevItem.Value)
+			return fmt.Errorf("failed to cast {%+v} to *model.EventDDBEntry", prevItem.Value)
 		}
 
 		if event.EventType == api.BlockchainEvent_BLOCK_ADDED {
 			// Skip the check if last event is unavailable, skipped OR parent hash is unavailable.
 			if prevEvent != nil && !prevEvent.BlockSkipped && prevEvent.ParentHash != "" {
 				if prevEvent.BlockHeight+1 != event.BlockHeight || prevEvent.BlockHash != event.ParentHash {
-					return xerrors.Errorf("chain with the event sequence is not continuous (last={%+v}, curr={%+v})", prevEvent, event)
+					return fmt.Errorf("chain with the event sequence is not continuous (last={%+v}, curr={%+v})", prevEvent, event)
 				}
 			}
 			eventsValidationStack.PushBack(event)
 		} else {
 			if prevEvent.BlockHeight != event.BlockHeight || prevEvent.BlockHash != event.BlockHash || prevEvent.Tag != event.Tag || prevEvent.BlockSkipped != event.BlockSkipped {
-				return xerrors.Errorf("reorg events (BLOCK_ADDED={%+v}, BLOCK_REMOVED={%+v}) are not matching", prevEvent, event)
+				return fmt.Errorf("reorg events (BLOCK_ADDED={%+v}, BLOCK_REMOVED={%+v}) are not matching", prevEvent, event)
 			}
 			eventsValidationStack.Remove(eventsValidationStack.Back())
 		}

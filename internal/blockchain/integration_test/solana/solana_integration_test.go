@@ -2,6 +2,7 @@ package solana_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
@@ -9,7 +10,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -801,7 +801,7 @@ func (s *solanaTestSuite) TestGetBlockByHeight_NotFound() {
 	ctx := context.Background()
 	_, err := s.client.GetBlockByHeight(ctx, solanaTag, solanaBlockNumberNotFound)
 	require.Error(err)
-	require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+	require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 }
 
 func (s *solanaTestSuite) TestGetBlockByHeight_TransactionErr() {

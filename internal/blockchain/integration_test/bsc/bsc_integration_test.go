@@ -2,6 +2,7 @@ package bsc_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
@@ -17,7 +18,6 @@ import (
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 )
 
 const (
@@ -319,7 +319,7 @@ func TestIntegrationBscGetBlock_NotFound(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := test.getBlock()
 			require.Error(err)
-			require.True(xerrors.Is(err, client.ErrBlockNotFound), err.Error())
+			require.True(errors.Is(err, client.ErrBlockNotFound), err.Error())
 		})
 	}
 }

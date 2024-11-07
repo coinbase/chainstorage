@@ -1,15 +1,15 @@
 package errors
 
-import "golang.org/x/xerrors"
+import "errors"
 
 var (
-	ErrRequestCanceled   = xerrors.New("request canceled")
-	ErrDownloadFailure   = xerrors.New("download failure")
-	ErrOutOfRange        = xerrors.New("out of range")
-	ErrInvalidHeight     = xerrors.New("height is lower than block start height")
-	ErrInvalidEventId    = xerrors.New("event id is lower than event start id")
-	ErrItemNotFound      = xerrors.New("item not found")
-	ErrNoEventHistory    = xerrors.New("no event history")
-	ErrNoEventAvailable  = xerrors.New("no event available")
-	ErrNoMaxEventIdFound = xerrors.New("no max event id found")
+	ErrRequestCanceled   = errors.New("request canceled")
+	ErrDownloadFailure   = errors.New("download failure")
+	ErrOutOfRange        = errors.New("out of range")
+	ErrInvalidHeight     = errors.New("height is lower than block start height")
+	ErrInvalidEventId    = errors.New("event id is lower than event start id")
+	ErrItemNotFound      = errors.New("item not found")
+	ErrNoEventHistory    = errors.New("no event history")
+	ErrNoEventAvailable  = errors.New("no event available")
+	ErrNoMaxEventIdFound = errors.New("no max event id found")
 )

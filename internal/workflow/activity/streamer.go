@@ -3,13 +3,14 @@ package activity
 import (
 	"container/list"
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uber-go/tally/v4"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/cadence"
@@ -29,7 +30,7 @@ const (
 )
 
 var (
-	errorChainCompletelyDifferent = xerrors.New("chain constructed with events completely disagrees with block metadata")
+	errorChainCompletelyDifferent = errors.New("chain constructed with events completely disagrees with block metadata")
 )
 
 type (
@@ -120,11 +121,11 @@ func (s *Streamer) execute(ctx context.Context, request *StreamerRequest) (*Stre
 	var start uint64
 	var startParentBlock *api.BlockMetadata
 	var metaTipHeight uint64
-	if err != nil && xerrors.Is(err, storage.ErrNoEventHistory) {
+	if err != nil && errors.Is(err, storage.ErrNoEventHistory) {
 		start = s.blockStartHeight
 		metaLatest, err := s.metaStorage.GetLatestBlock(ctx, tag)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get latest block from meta storage: %w", err)
+			return nil, fmt.Errorf("failed to get latest block from meta storage: %w", err)
 		}
 		metaTipHeight = metaLatest.Height
 	} else if err == nil {
@@ -138,14 +139,14 @@ func (s *Streamer) execute(ctx context.Context, request *StreamerRequest) (*Stre
 				zap.Int("reorg_distance", reorgDistance))
 			err = s.metaStorage.AddEvents(ctx, eventTag, result.updateEvents)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to add events for reorg: %w", err)
+				return nil, fmt.Errorf("failed to add events for reorg: %w", err)
 			}
 		}
 		start = result.forkBlock.Height + 1
 		startParentBlock = result.forkBlock
 		metaTipHeight = result.canonicalChainTipHeight
 	} else {
-		return nil, xerrors.Errorf("failed to handle reorg: %w", err)
+		return nil, fmt.Errorf("failed to handle reorg: %w", err)
 	}
 
 	end := metaTipHeight + 1
@@ -155,18 +156,18 @@ func (s *Streamer) execute(ctx context.Context, request *StreamerRequest) (*Stre
 
 	var timeSinceLastBlock time.Duration
 	if start > end {
-		return nil, xerrors.Errorf("run into unexpected start (%d) bigger than end (%d)", start, end)
+		return nil, fmt.Errorf("run into unexpected start (%d) bigger than end (%d)", start, end)
 	} else if start == end {
 		// already caught up, no need to do anything
 	} else {
 		events := make([]*model.BlockEvent, 0, end-start)
 		blocks, err := s.metaStorage.GetBlocksByHeightRange(ctx, tag, start, end)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get blocks in range [%d, %d): %w", start, end, err)
+			return nil, fmt.Errorf("failed to get blocks in range [%d, %d): %w", start, end, err)
 		}
 
 		if err = parser.ValidateChain(blocks, startParentBlock); err != nil {
-			return nil, xerrors.Errorf("metastore returns inconsistent data due to race condition: %w", err)
+			return nil, fmt.Errorf("metastore returns inconsistent data due to race condition: %w", err)
 		}
 
 		for _, block := range blocks {
@@ -175,7 +176,7 @@ func (s *Streamer) execute(ctx context.Context, request *StreamerRequest) (*Stre
 		}
 
 		if err = s.metaStorage.AddEvents(ctx, eventTag, events); err != nil {
-			return nil, xerrors.Errorf("failed to add events: %w", err)
+			return nil, fmt.Errorf("failed to add events: %w", err)
 		}
 
 		timeSinceLastBlock = utils.SinceTimestamp(blocks[0].GetTimestamp())
@@ -208,11 +209,11 @@ func (s *Streamer) populateEventsQueue(ctx context.Context, eventTag uint32, min
 	}
 	events, err := s.metaStorage.GetEventsByEventIdRange(ctx, eventTag, minEventId, maxEventId)
 	if err != nil {
-		return xerrors.Errorf("failed to fetch events from metaStorage (minEventId=%d, maxEventId=%d): %w", minEventId, maxEventId, err)
+		return fmt.Errorf("failed to fetch events from metaStorage (minEventId=%d, maxEventId=%d): %w", minEventId, maxEventId, err)
 	}
 	err = eventsToChainAdaptor.AppendEvents(events)
 	if err != nil {
-		return xerrors.Errorf("failed to append events to adaptor: %w", err)
+		return fmt.Errorf("failed to append events to adaptor: %w", err)
 	}
 	*minEventIdFetched = events[0].EventId
 	return nil
@@ -223,22 +224,22 @@ func (s *Streamer) getEventForTailBlock(ctx context.Context, eventTag uint32, mi
 	for {
 		headEvent, err := eventsToChainAdaptor.PopEventForTailBlock()
 		if err != nil {
-			if !xerrors.Is(err, storage.ErrNoEventAvailable) {
-				return nil, xerrors.Errorf("failed to get event for tail block: %w", err)
+			if !errors.Is(err, storage.ErrNoEventAvailable) {
+				return nil, fmt.Errorf("failed to get event for tail block: %w", err)
 			}
 		} else {
 			return headEvent, nil
 		}
 		if numFetches >= streamerMaxAllowedContinuousFetches {
-			return nil, xerrors.Errorf("still trying to fetch after %d times", streamerMaxAllowedContinuousFetches)
+			return nil, fmt.Errorf("still trying to fetch after %d times", streamerMaxAllowedContinuousFetches)
 		}
 		numFetches += 1
 		if *minEventIdFetched <= metastorage.EventIdStartValue {
-			return nil, xerrors.Errorf("trying to get more events with event id below %d", metastorage.EventIdStartValue)
+			return nil, fmt.Errorf("trying to get more events with event id below %d", metastorage.EventIdStartValue)
 		}
 		err = s.populateEventsQueue(ctx, eventTag, minEventIdFetched, eventsToChainAdaptor)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to populate event queue: %w", err)
+			return nil, fmt.Errorf("failed to populate event queue: %w", err)
 		}
 	}
 }
@@ -256,14 +257,14 @@ func (s *Streamer) populateBlocksQueue(ctx context.Context, tag uint32, minBlock
 	}
 	blocks, err := s.metaStorage.GetBlocksByHeightRange(ctx, tag, minHeight, maxHeight)
 	if err != nil {
-		return xerrors.Errorf("failed to fetch blocks from metaStorage (minHeight=%d, maxHeight=%d): %w", minHeight, maxHeight, err)
+		return fmt.Errorf("failed to fetch blocks from metaStorage (minHeight=%d, maxHeight=%d): %w", minHeight, maxHeight, err)
 	}
 	for i := len(blocks) - 1; i >= 0; i-- {
 		block := blocks[i]
 		*minBlockHeightFetched = block.Height
 		if *minBlockFetchedParentHash != "" {
 			if !block.Skipped && block.GetHash() != *minBlockFetchedParentHash {
-				return xerrors.Errorf(
+				return fmt.Errorf(
 					"metastore returns inconsistent data due to race condition (expected_hash=%v, current_block={%+v}",
 					*minBlockFetchedParentHash, block,
 				)
@@ -282,18 +283,18 @@ func (s *Streamer) getTailBlock(ctx context.Context, tag uint32, minBlockHeightF
 		if headItem != nil {
 			headBlock, ok := headItem.Value.(*api.BlockMetadata)
 			if !ok {
-				return nil, xerrors.Errorf("failed to cast %v to *api.BlockMetadata", headItem.Value)
+				return nil, fmt.Errorf("failed to cast %v to *api.BlockMetadata", headItem.Value)
 			}
 			blockList.Remove(headItem)
 			return headBlock, nil
 		}
 
 		if *minBlockHeightFetched <= s.blockStartHeight {
-			return nil, xerrors.Errorf("trying to get more blocks with height below %d", s.blockStartHeight)
+			return nil, fmt.Errorf("trying to get more blocks with height below %d", s.blockStartHeight)
 		}
 		err := s.populateBlocksQueue(ctx, tag, minBlockHeightFetched, minBlockFetchedParentHash, blockList)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to populate block queue: %w", err)
+			return nil, fmt.Errorf("failed to populate block queue: %w", err)
 		}
 	}
 }
@@ -304,11 +305,11 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 	return s.metrics.instrumentHandleReorg.Instrument(ctx, func(ctx context.Context) (*streamerReorgResult, error) {
 		maxEventId, err := s.metaStorage.GetMaxEventId(ctx, eventTag)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
+			return nil, fmt.Errorf("failed to get max event id for eventTag=%d: %w", eventTag, err)
 		}
 		metaLatest, err := s.metaStorage.GetLatestBlock(ctx, req.Tag)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get latest block from meta storage: %w", err)
+			return nil, fmt.Errorf("failed to get latest block from meta storage: %w", err)
 		}
 
 		logger.Info("checking for chain reorg",
@@ -328,7 +329,7 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 		for {
 			headEvent, err = s.getEventForTailBlock(ctx, eventTag, &minEventIdFetched, eventsToChainAdaptor)
 			if err != nil {
-				return nil, xerrors.Errorf("failed to get next event: %w", err)
+				return nil, fmt.Errorf("failed to get next event: %w", err)
 			}
 			if eventWatermarkHeight == nil {
 				height := headEvent.BlockHeight
@@ -344,10 +345,10 @@ func (s *Streamer) handleReorg(ctx context.Context, logger *zap.Logger, req *Str
 				var headBlock *api.BlockMetadata
 				headBlock, err = s.getTailBlock(ctx, req.Tag, minBlockHeightFetched, &minBlockFetchedParentHash, blocksList)
 				if err != nil {
-					return nil, xerrors.Errorf("failed to get next block meta: %w", err)
+					return nil, fmt.Errorf("failed to get next block meta: %w", err)
 				}
 				if headEvent.BlockHeight != headBlock.Height {
-					return nil, xerrors.Errorf("expect head event and head block to have the same height (headEvent = %v, headBlock=%v)", headEvent.BlockHeight, headBlock.Height)
+					return nil, fmt.Errorf("expect head event and head block to have the same height (headEvent = %v, headBlock=%v)", headEvent.BlockHeight, headBlock.Height)
 				}
 				if headEvent.BlockHash == headBlock.Hash {
 					logger.Info("found fork block",

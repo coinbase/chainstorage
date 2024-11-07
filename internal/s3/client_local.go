@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 )
 
 func resetLocalResources(params S3Params) error {
@@ -41,7 +40,7 @@ func deleteBucketIfExists(log *zap.Logger, bucket string, s3Client s3iface.S3API
 				return nil
 			}
 		}
-		return xerrors.Errorf("failed to get bucket %s: %w", bucket, err)
+		return fmt.Errorf("failed to get bucket %s: %w", bucket, err)
 	}
 
 	log.Info(fmt.Sprintf("bucket %s exists, deleting files...", bucket))
@@ -50,7 +49,7 @@ func deleteBucketIfExists(log *zap.Logger, bucket string, s3Client s3iface.S3API
 	})
 
 	if err := s3manager.NewBatchDeleteWithClient(s3Client).Delete(aws.BackgroundContext(), iter); err != nil {
-		return xerrors.Errorf("failed to delete object under bucket %s: %w", bucket, err)
+		return fmt.Errorf("failed to delete object under bucket %s: %w", bucket, err)
 	}
 
 	log.Info(fmt.Sprintf("deleting bucket %s...", bucket))
@@ -59,7 +58,7 @@ func deleteBucketIfExists(log *zap.Logger, bucket string, s3Client s3iface.S3API
 	}
 	_, err = s3Client.DeleteBucket(deleteInput)
 	if err != nil {
-		return xerrors.Errorf("failed to delete bucket %s: %w", bucket, err)
+		return fmt.Errorf("failed to delete bucket %s: %w", bucket, err)
 	}
 	return nil
 }
@@ -76,7 +75,7 @@ func createBucketIfNotExists(bucket string, s3Client s3iface.S3API) error {
 			}
 		}
 
-		return xerrors.Errorf("failed to create bucket %s: %w", bucket, err)
+		return fmt.Errorf("failed to create bucket %s: %w", bucket, err)
 	}
 
 	return nil

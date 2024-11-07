@@ -2,9 +2,9 @@ package internal
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -117,12 +117,12 @@ func NewParser(params Params) (Parser, error) {
 	}
 
 	if factory == nil {
-		return nil, xerrors.Errorf("parser is not implemented: blockchain(%v)-sidechain(%v)", blockchain, sidechain)
+		return nil, fmt.Errorf("parser is not implemented: blockchain(%v)-sidechain(%v)", blockchain, sidechain)
 	}
 
 	parser, err := factory.NewParser()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create parser: %w", err)
+		return nil, fmt.Errorf("failed to create parser: %w", err)
 	}
 
 	scope := params.Metrics

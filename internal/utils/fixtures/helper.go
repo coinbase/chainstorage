@@ -2,11 +2,11 @@ package fixtures
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path"
 	"runtime"
 
-	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -40,11 +40,11 @@ func WriteFile(relPath string, data []byte) error {
 	defer finalizer.Finalize()
 
 	if _, err := f.Write(data); err != nil {
-		return xerrors.Errorf("failed to write data: %w", err)
+		return fmt.Errorf("failed to write data: %w", err)
 	}
 
 	if _, err := f.WriteString("\n"); err != nil {
-		return xerrors.Errorf("failed to write new line: %w", err)
+		return fmt.Errorf("failed to write new line: %w", err)
 	}
 
 	return finalizer.Close()
@@ -53,11 +53,11 @@ func WriteFile(relPath string, data []byte) error {
 func UnmarshalJSON(pathToFile string, out any) error {
 	data, err := ReadFile(pathToFile)
 	if err != nil {
-		return xerrors.Errorf("failed to read file %v: %w", pathToFile, err)
+		return fmt.Errorf("failed to read file %v: %w", pathToFile, err)
 	}
 
 	if err := json.Unmarshal(data, out); err != nil {
-		return xerrors.Errorf("failed to unmarshal file %v: %w", pathToFile, err)
+		return fmt.Errorf("failed to unmarshal file %v: %w", pathToFile, err)
 	}
 
 	return nil
@@ -72,11 +72,11 @@ func MustUnmarshalJSON(pathToFile string, out any) {
 func MarshalJSON(pathToFile string, in any) error {
 	data, err := json.MarshalIndent(in, "", "  ")
 	if err != nil {
-		return xerrors.Errorf("failed to marshal input: %w", err)
+		return fmt.Errorf("failed to marshal input: %w", err)
 	}
 
 	if err := WriteFile(pathToFile, data); err != nil {
-		return xerrors.Errorf("failed to write to file: %w", err)
+		return fmt.Errorf("failed to write to file: %w", err)
 	}
 
 	return nil
@@ -91,11 +91,11 @@ func MustMarshalJSON(pathToFile string, in any) {
 func UnmarshalPB(pathToFile string, out proto.Message) error {
 	data, err := ReadFile(pathToFile)
 	if err != nil {
-		return xerrors.Errorf("failed to read file %v: %w", pathToFile, err)
+		return fmt.Errorf("failed to read file %v: %w", pathToFile, err)
 	}
 
 	if err := protojson.Unmarshal(data, out); err != nil {
-		return xerrors.Errorf("failed to unmarshal file %v: %w", pathToFile, err)
+		return fmt.Errorf("failed to unmarshal file %v: %w", pathToFile, err)
 	}
 
 	return nil
@@ -113,11 +113,11 @@ func MarshalPB(pathToFile string, in proto.Message) error {
 	var buf []byte
 	var err error
 	if buf, err = marshaler.Marshal(in); err != nil {
-		return xerrors.Errorf("failed to marshal input: %w", err)
+		return fmt.Errorf("failed to marshal input: %w", err)
 	}
 
 	if err := WriteFile(pathToFile, buf); err != nil {
-		return xerrors.Errorf("failed to write to file: %w", err)
+		return fmt.Errorf("failed to write to file: %w", err)
 	}
 
 	return nil

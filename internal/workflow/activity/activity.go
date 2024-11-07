@@ -2,12 +2,13 @@ package activity
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/go-playground/validator/v10"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/utils/log"
@@ -82,7 +83,7 @@ func (a *baseActivity) executeActivity(ctx workflow.Context, request any, respon
 		}
 
 		if err := a.runtime.ExecuteActivity(ctx, a.name, request, response); err != nil {
-			return xerrors.Errorf("failed to execute activity (name=%v): %w", a.name, err)
+			return fmt.Errorf("failed to execute activity (name=%v): %w", a.name, err)
 		}
 
 		return nil
@@ -91,7 +92,7 @@ func (a *baseActivity) executeActivity(ctx workflow.Context, request any, respon
 
 func (a *baseActivity) validateRequest(request any) error {
 	if err := a.validate.Struct(request); err != nil {
-		return xerrors.Errorf("invalid activity request (name=%v, request=%+v): %w", a.name, request, err)
+		return fmt.Errorf("invalid activity request (name=%v, request=%+v): %w", a.name, request, err)
 	}
 
 	return nil
@@ -111,5 +112,5 @@ func (a *baseActivity) getLogger(ctx context.Context) *zap.Logger {
 }
 
 func IsCanceledError(err error) bool {
-	return xerrors.Is(err, workflow.ErrCanceled)
+	return errors.Is(err, workflow.ErrCanceled)
 }

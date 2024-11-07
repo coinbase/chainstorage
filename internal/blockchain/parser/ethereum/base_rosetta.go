@@ -2,10 +2,11 @@ package ethereum
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/big"
 
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/ethereum/types"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
@@ -65,12 +66,12 @@ func (p *baseRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Bl
 	nativeBlock, err := p.nativeParser.ParseBlock(ctx, rawBlock)
 
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block into native format: %w", err)
+		return nil, fmt.Errorf("failed to parse block into native format: %w", err)
 	}
 
 	block := nativeBlock.GetEthereum()
 	if block == nil {
-		return nil, xerrors.New("failed to find ethereum block")
+		return nil, errors.New("failed to find ethereum block")
 	}
 
 	blockIdentifier := &rosetta.BlockIdentifier{
@@ -85,7 +86,7 @@ func (p *baseRosettaParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Bl
 
 	transactions, err := p.getRosettaTransactions(block, rawBlock.GetEthereum())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to parse block transactions: %w", err)
+		return nil, fmt.Errorf("failed to parse block transactions: %w", err)
 	}
 
 	return &api.RosettaBlock{
@@ -121,7 +122,7 @@ func (p *baseRosettaParserImpl) feeOps(transaction *api.EthereumTransaction, min
 
 	feeDetails, err := getFeeDetails(transaction, block)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to calculate base fee details: %w", err)
+		return nil, fmt.Errorf("failed to calculate base fee details: %w", err)
 	}
 
 	sequencerFeeAmount := feeDetails.feeAmount

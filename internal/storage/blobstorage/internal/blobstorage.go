@@ -2,9 +2,9 @@ package internal
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
@@ -51,11 +51,11 @@ func WithBlobStorageFactory(params BlobStorageFactoryParams) (BlobStorage, error
 		factory = params.GCS
 	}
 	if factory == nil {
-		return nil, xerrors.Errorf("blob storage type is not implemented: %v", storageType)
+		return nil, fmt.Errorf("blob storage type is not implemented: %v", storageType)
 	}
 	result, err := factory.Create()
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create blob storage of type %v: %w", storageType, err)
+		return nil, fmt.Errorf("failed to create blob storage of type %v: %w", storageType, err)
 	}
 	return result, nil
 }

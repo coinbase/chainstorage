@@ -1,10 +1,9 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
@@ -29,7 +28,7 @@ type Currency struct {
 // for a particular genesis file.
 func GenerateGenesisAllocations(network common.Network) ([]*GenesisAllocation, error) {
 	if network.GetName() == "" {
-		return nil, xerrors.New("network name is empty")
+		return nil, errors.New("network name is empty")
 	}
 	chainInfo := strings.Split(network.GetName(), "-")
 	filePath := fmt.Sprintf("genesis_files/%s/%s.json", chainInfo[0], chainInfo[1])

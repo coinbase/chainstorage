@@ -12,7 +12,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/aws"
 	"github.com/coinbase/chainstorage/internal/storage"
@@ -51,7 +50,7 @@ var (
 			eventTag := resetWatermarkFlags.eventTag
 			currentMaxEventId, err := deps.EventStorage.GetMaxEventId(context.Background(), eventTag)
 			if err != nil {
-				return xerrors.Errorf("failed to get current max event id: %w", err)
+				return fmt.Errorf("failed to get current max event id: %w", err)
 			}
 			logger.Info(fmt.Sprintf("current currentMaxEventId is %d", currentMaxEventId))
 
@@ -72,7 +71,7 @@ var (
 
 			response, err := bufio.NewReader(os.Stdin).ReadString('\n')
 			if err != nil {
-				return xerrors.Errorf("failed to read from console: %w", err)
+				return fmt.Errorf("failed to read from console: %w", err)
 			}
 
 			if strings.ToLower(strings.TrimSpace(response)) != "y" {
@@ -84,7 +83,7 @@ var (
 					zap.Int64("maxEventId", resetWatermarkFlags.eventId),
 					zap.Uint32("eventTag", eventTag),
 				)
-				return xerrors.Errorf("failed to set max event id with eventTag=%v: %w", eventTag, err)
+				return fmt.Errorf("failed to set max event id with eventTag=%v: %w", eventTag, err)
 			} else {
 				logger.Info("successfully set max event id",
 					zap.Int64("maxEventId", resetWatermarkFlags.eventId),

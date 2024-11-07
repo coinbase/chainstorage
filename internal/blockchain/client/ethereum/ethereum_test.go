@@ -3,6 +3,7 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
@@ -404,7 +404,7 @@ func TestEthereumClient_GetBlockByHeightWithEmptyHash(t *testing.T) {
 	require.NotNil(client)
 	_, err := client.GetBlockByHeight(context.Background(), tag, 11322000)
 	require.Error(err)
-	require.True(xerrors.Is(err, internal.ErrBlockNotFound))
+	require.True(errors.Is(err, internal.ErrBlockNotFound))
 }
 
 func TestEthereumClient_GetBlockByHash_UnfinalizedDataError(t *testing.T) {
@@ -438,7 +438,7 @@ func TestEthereumClient_GetBlockByHash_UnfinalizedDataError(t *testing.T) {
 	require.NotNil(client)
 	_, err := client.GetBlockByHash(context.Background(), tag, ethereumHeight, ethereumHash)
 	require.Error(err)
-	require.True(xerrors.Is(err, internal.ErrBlockNotFound))
+	require.True(errors.Is(err, internal.ErrBlockNotFound))
 }
 
 func TestEthereumClient_GetBlockByHeightWithBlockZero(t *testing.T) {
@@ -509,10 +509,10 @@ func TestEthereumClient_GetBlockByHeightWithBestEffort(t *testing.T) {
 					}, nil
 				}
 
-				return nil, xerrors.Errorf("unknown tracer: %v", tracer)
+				return nil, fmt.Errorf("unknown tracer: %v", tracer)
 			}
 
-			return nil, xerrors.Errorf("unknown method: %v", method)
+			return nil, fmt.Errorf("unknown method: %v", method)
 		})
 
 	receiptResponse := []*jsonrpc.Response{
@@ -1021,7 +1021,7 @@ func TestEthereumClient_GetBlockByHashExecutionTimeoutError(t *testing.T) {
 				}, nil
 
 			default:
-				return nil, xerrors.Errorf("unknown method: %v", method)
+				return nil, fmt.Errorf("unknown method: %v", method)
 			}
 		})
 
@@ -1156,7 +1156,7 @@ func TestEthereumClient_RetryOrphanedTransactionReceipts_RetryLimitExceeded(t *t
 
 	_, err := client.GetBlockByHeight(context.Background(), tag, 0xacc290)
 	require.Error(err)
-	require.True(xerrors.Is(err, internal.ErrBlockNotFound))
+	require.True(errors.Is(err, internal.ErrBlockNotFound))
 }
 
 func TestCanReprocess(t *testing.T) {

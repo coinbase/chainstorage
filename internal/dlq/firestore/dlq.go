@@ -3,11 +3,11 @@ package firestore
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"cloud.google.com/go/firestore"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq/internal"
@@ -56,12 +56,12 @@ func New(params DLQParams) (DLQ, error) {
 	ctx := context.Background()
 	config := params.Config.GCP
 	if config == nil {
-		return nil, xerrors.Errorf("failed to create firestore meta storage: missing GCP config")
+		return nil, fmt.Errorf("failed to create firestore meta storage: missing GCP config")
 	}
 
 	client, err := firestore.NewClient(ctx, config.Project)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to create firestore client: %w", err)
+		return nil, fmt.Errorf("failed to create firestore client: %w", err)
 	}
 	metrics := params.Metrics.SubScope("dlq").Tagged(map[string]string{
 		"storage_type": "firestore",
@@ -97,7 +97,7 @@ func (q *dlqImpl) SendMessage(ctx context.Context, message *internal.Message) er
 	return q.instrumentSendMessage.Instrument(ctx, func(ctx context.Context) error {
 		body, err := json.Marshal(message.Data)
 		if err != nil {
-			return xerrors.Errorf("failed to marshal body: %w", err)
+			return fmt.Errorf("failed to marshal body: %w", err)
 		}
 		messageBody := string(body)
 
@@ -110,7 +110,7 @@ func (q *dlqImpl) SendMessage(ctx context.Context, message *internal.Message) er
 		})
 
 		if err != nil {
-			return xerrors.Errorf("failed to send message: %w", err)
+			return fmt.Errorf("failed to send message: %w", err)
 		}
 
 		q.logger.Info(

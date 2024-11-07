@@ -2,9 +2,8 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
-
-	"golang.org/x/xerrors"
 )
 
 type WorkflowIdentity int
@@ -50,7 +49,7 @@ func GetWorkflowIdentify(name string) WorkflowIdentity {
 func (w WorkflowIdentity) String() (string, error) {
 	workflowIdentityString, ok := workflowIdentityToString[w]
 	if !ok {
-		return "", xerrors.Errorf("unsupported workflow identity: %v", w)
+		return "", fmt.Errorf("unsupported workflow identity: %v", w)
 	}
 	return workflowIdentityString, nil
 }
@@ -106,7 +105,7 @@ func (w WorkflowIdentity) UnmarshalJsonStringToRequest(str string) (any, error) 
 			return req, nil
 		}
 	default:
-		err = xerrors.Errorf("unsupported workflow identity: %v", w)
+		err = fmt.Errorf("unsupported workflow identity: %v", w)
 	}
 	return nil, err
 }

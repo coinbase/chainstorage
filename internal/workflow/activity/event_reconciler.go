@@ -2,10 +2,10 @@ package activity
 
 import (
 	"context"
+	"fmt"
 
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage"
@@ -89,7 +89,7 @@ func (a *EventReconciler) execute(ctx context.Context, request *EventReconcilerR
 func (a *EventReconciler) readBlock(ctx context.Context, tag uint32, height uint64) (*api.BlockMetadata, error) {
 	blockMetadata, err := a.metaStorage.GetBlockByHeight(ctx, tag, height)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to get block(tag=%v) by height=%v: %w", tag, height, err)
+		return nil, fmt.Errorf("failed to get block(tag=%v) by height=%v: %w", tag, height, err)
 	}
 
 	return blockMetadata, nil
