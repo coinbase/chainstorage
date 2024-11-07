@@ -505,7 +505,7 @@ func (c *rosettaClientWithRawBlockApiImpl) getBlockByHashRequest(hash string) ([
 
 	body, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create getBlockByHashRequest: %w", request, err)
+		return nil, fmt.Errorf("failed to create getBlockByHashRequest (%v): %w", request, err)
 	}
 
 	return body, nil

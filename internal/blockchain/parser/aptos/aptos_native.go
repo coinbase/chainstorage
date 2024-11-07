@@ -652,7 +652,7 @@ func (p *aptosNativeParserImpl) parseTransactions(blockHeight uint64, transactio
 				return nil, fmt.Errorf("failed to parse validator transactions with hash=%s: %w", transactionInfo.TransactionHash, err)
 			}
 		default:
-			return nil, fmt.Errorf("failed to parse transaction_hash=%s, unknown type: %w", transactionInfo.TransactionHash, transactionInfo.Type)
+			return nil, fmt.Errorf("failed to parse transaction_hash=%s, unknown type: %s: %w", transactionInfo.TransactionHash, transactionInfo.Type, err)
 		}
 
 		result[i] = transaction
@@ -897,7 +897,7 @@ func (p *aptosNativeParserImpl) parseChanges(changes []json.RawMessage) ([]*api.
 			}
 
 		default:
-			return nil, fmt.Errorf("failed to parse change type: %w", wcType.Type)
+			return nil, fmt.Errorf("failed to parse change type %s", wcType.Type)
 		}
 	}
 
