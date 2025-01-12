@@ -6,8 +6,6 @@ cadence:
   address: temporal-dev.example.com:7233
 chain:
   block_start_height: 15000000
-sdk:
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/arbitrum/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
 sla:
@@ -15,9 +13,3 @@ sla:
   - monitor
   - poller
   - streamer
-workflows:
-  poller:
-    activity_retry_maximum_attempts: 6
-    activity_schedule_to_start_timeout: 5m
-  streamer:
-    activity_schedule_to_start_timeout: 5m

@@ -162,7 +162,7 @@ func (w *Backfiller) execute(ctx workflow.Context, request *BackfillerRequest) e
 					"checkpoint reached",
 					zap.Reflect("newRequest", newRequest),
 				)
-				return workflow.NewContinueAsNewError(ctx, w.name, &newRequest)
+				return w.continueAsNew(ctx, &newRequest)
 			}
 
 			batchEnd := batchStart + batchSize

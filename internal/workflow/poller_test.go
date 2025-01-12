@@ -528,7 +528,7 @@ func (s *pollerTestSuite) TestPollerFailure_ConsensusAutomaticFailover() {
 	s.cfg.Workflows.Poller.ConsensusValidation = true
 	s.cfg.Workflows.Poller.ConsensusValidationMuted = false
 	s.cfg.Workflows.Poller.ConsensusFailoverEnabled = true
-	s.cfg.Workflows.Poller.ActivityRetryMaximumAttempts = 1
+	s.cfg.Workflows.Poller.ActivityRetry.MaximumAttempts = 1
 	s.cfg.Workflows.Poller.LivenessCheckEnabled = false
 
 	localHeight := uint64(100)
@@ -578,7 +578,7 @@ func (s *pollerTestSuite) TestPollerFailure_ConsensusValidationFailure() {
 	s.cfg.Workflows.Poller.ConsensusValidation = true
 	s.cfg.Workflows.Poller.ConsensusValidationMuted = false
 	s.cfg.Workflows.Poller.ConsensusFailoverEnabled = true
-	s.cfg.Workflows.Poller.ActivityRetryMaximumAttempts = 1
+	s.cfg.Workflows.Poller.ActivityRetry.MaximumAttempts = 1
 	s.cfg.Workflows.Poller.LivenessCheckEnabled = false
 
 	localHeight := uint64(100)

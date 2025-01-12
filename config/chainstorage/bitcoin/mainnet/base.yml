@@ -71,7 +71,7 @@ gcp:
 sdk:
   auth_header: ""
   auth_token: ""
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/bitcoin/mainnet/v1
+  chainstorage_address: https://example-chainstorage-bitcoin-mainnet
   num_workers: 10
   restful: true
 server:
@@ -91,8 +91,12 @@ sla:
   time_since_last_event: 1h15m
 workflows:
   backfiller:
-    activity_retry_maximum_attempts: 3
-    activity_schedule_to_start_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 10m
     batch_size: 2500
     checkpoint_size: 5000
@@ -100,21 +104,27 @@ workflows:
     mini_batch_size: 1
     num_concurrent_extractors: 21
     task_list: default
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.backfiller
+    workflow_run_timeout: 24h
   benchmarker:
-    activity_retry_maximum_attempts: 3
-    activity_schedule_to_start_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 10m
     child_workflow_execution_start_to_close_timeout: 60m
     task_list: default
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.benchmarker
+    workflow_run_timeout: 24h
   cross_validator:
-    activity_retry_maximum_attempts: 8
-    activity_schedule_to_start_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 8
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 10m
     backoff_interval: 10s
     batch_size: 100
@@ -122,22 +132,33 @@ workflows:
     parallelism: 4
     task_list: default
     validation_percentage: 10
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.cross_validator
+    workflow_retry:
+      backoff_coefficient: 1
+      initial_interval: 30s
+      maximum_attempts: 3
+      maximum_interval: 30s
+    workflow_run_timeout: 24h
   event_backfiller:
-    activity_retry_maximum_attempts: 3
-    activity_schedule_to_start_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 10m
     batch_size: 250
     checkpoint_size: 5000
     task_list: default
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.event_backfiller
+    workflow_run_timeout: 24h
   monitor:
-    activity_retry_maximum_attempts: 8
-    activity_schedule_to_start_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 6
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 10m
     backoff_interval: 10s
     batch_size: 50
@@ -146,13 +167,21 @@ workflows:
     event_gap_limit: 300
     parallelism: 4
     task_list: default
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.monitor
+    workflow_retry:
+      backoff_coefficient: 1
+      initial_interval: 30s
+      maximum_attempts: 6
+      maximum_interval: 30s
+    workflow_run_timeout: 24h
   poller:
     activity_heartbeat_timeout: 15m
-    activity_retry_maximum_attempts: 8
-    activity_schedule_to_start_timeout: 2m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 6
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 30m
     backoff_interval: 10s
     checkpoint_size: 1000
@@ -165,31 +194,46 @@ workflows:
     session_creation_timeout: 2m
     session_enabled: false
     task_list: default
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.poller
+    workflow_retry:
+      backoff_coefficient: 1
+      initial_interval: 30s
+      maximum_attempts: 6
+      maximum_interval: 30s
+    workflow_run_timeout: 24h
   replicator:
-    activity_retry_maximum_attempts: 5
-    activity_schedule_to_start_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 10m
     batch_size: 1000
     checkpoint_size: 10000
     mini_batch_size: 100
     parallelism: 10
     task_list: default
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.replicator
+    workflow_run_timeout: 24h
   streamer:
-    activity_retry_maximum_attempts: 5
-    activity_schedule_to_start_timeout: 2m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 5
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
     activity_start_to_close_timeout: 2m
     backoff_interval: 10s
     batch_size: 500
     checkpoint_size: 500
     task_list: default
-    workflow_decision_timeout: 2m
-    workflow_execution_timeout: 24h
     workflow_identity: workflow.streamer
+    workflow_retry:
+      backoff_coefficient: 1
+      initial_interval: 30s
+      maximum_attempts: 3
+      maximum_interval: 30s
+    workflow_run_timeout: 24h
   workers:
   - task_list: default

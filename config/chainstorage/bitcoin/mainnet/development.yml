@@ -4,13 +4,5 @@ aws:
   bucket: example-chainstorage-bitcoin-mainnet-dev
 cadence:
   address: temporal-dev.example.com:7233
-sdk:
-  chainstorage_address: https://nft-api.coinbase.com/api/exp/chainstorage/bitcoin/mainnet/v1
 server:
   bind_address: 0.0.0.0:9090
-workflows:
-  poller:
-    activity_retry_maximum_attempts: 6
-    activity_schedule_to_start_timeout: 5m
-  streamer:
-    activity_schedule_to_start_timeout: 5m

@@ -17,6 +17,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/types/known/durationpb"
 	zapadapter "logur.dev/adapter/zap"
 	"logur.dev/logur"
 
@@ -227,7 +228,7 @@ func (r *runtimeImpl) startDomain(ctx context.Context) error {
 	retentionPeriod := 24 * time.Hour * time.Duration(cadenceConfig.RetentionPeriod)
 	err := r.namespaceClient.Register(ctx, &workflowservice.RegisterNamespaceRequest{
 		Namespace:                        cadenceConfig.Domain,
-		WorkflowExecutionRetentionPeriod: &retentionPeriod,
+		WorkflowExecutionRetentionPeriod: durationpb.New(retentionPeriod),
 	})
 	if err != nil {
 		if _, ok := err.(*serviceerror.NamespaceAlreadyExists); !ok {

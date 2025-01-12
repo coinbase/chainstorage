@@ -250,6 +250,14 @@ var (
 		ParentHeight: uint64(0xc5d823),
 	}
 
+	ethereumMetadataPostDencun = &api.BlockMetadata{
+		Tag:          ethereumTag,
+		Hash:         "0x063d33e2bcaaf7120314c8e182fd5f123e0aea285b5efacfacf3733906eeb25e",
+		ParentHash:   "0xf6f01969dcd86ccb581212587c27d4be0962e8a46a441efdaf667c34ac908e7a",
+		Height:       uint64(0x1e06b),
+		ParentHeight: uint64(0x1e06a),
+	}
+
 	fixtureHeaderPostLondon = []byte(`
 	{
 		"difficulty": "0x1ac98fe2d7d4a9",
@@ -2686,6 +2694,53 @@ func TestParseEthereumBlock_PostLondon_LegacyTransaction(t *testing.T) {
 	actual := nativeBlock.GetEthereum()
 	require.NotNil(actual)
 	require.Equal(expected.Header, actual.Header)
+	require.Equal(expected.Transactions, actual.Transactions)
+}
+
+func TestParseEthereumBlock_DencunBlobTransaction(t *testing.T) {
+	require := testutil.Require(t)
+	fixtureHeaderPostDencun := fixtures.MustReadFile("parser/ethereum/ethereum_header_post_dencun_122987.json")
+	fixtureReceiptPostDencun := fixtures.MustReadFile("parser/ethereum/ethereum_receipt_post_dencun_122987.json")
+	fixtureTracesPostDencun := fixtures.MustReadFile("parser/ethereum/ethereum_traces_post_dencun_122987.json")
+
+	block := &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ETHEREUM,
+		Network:    common.Network_NETWORK_ETHEREUM_MAINNET,
+		Metadata:   ethereumMetadataPostDencun,
+		Blobdata: &api.Block_Ethereum{
+			Ethereum: &api.EthereumBlobdata{
+				Header:              fixtureHeaderPostDencun,
+				TransactionReceipts: [][]byte{fixtureReceiptPostDencun},
+				TransactionTraces:   [][]byte{fixtureTracesPostDencun},
+			},
+		},
+	}
+
+	var expected api.EthereumBlock
+	fixtures.MustUnmarshalPB("parser/ethereum/ethereum_header_expected_post_dencun_122987.json", &expected)
+
+	var parser internal.Parser
+	app := testapp.New(
+		t,
+		Module,
+		internal.Module,
+		fx.Populate(&parser),
+	)
+	defer app.Close()
+
+	require.NotNil(parser)
+
+	nativeBlock, err := parser.ParseNativeBlock(context.Background(), block)
+
+	require.NoError(err)
+
+	require.Equal(common.Blockchain_BLOCKCHAIN_ETHEREUM, nativeBlock.Blockchain)
+	require.Equal(common.Network_NETWORK_ETHEREUM_MAINNET, nativeBlock.Network)
+
+	actual := nativeBlock.GetEthereum()
+	require.NotNil(actual)
+	require.Equal(expected.Header, actual.Header)
+
 	require.Equal(expected.Transactions, actual.Transactions)
 }
 

@@ -183,12 +183,12 @@ type (
 		WorkflowIdentity               string         `mapstructure:"workflow_identity" validate:"required"`
 		Enabled                        bool           `mapstructure:"enabled"`
 		TaskList                       string         `mapstructure:"task_list" validate:"required"`
-		WorkflowDecisionTimeout        time.Duration  `mapstructure:"workflow_decision_timeout" validate:"required"`
-		WorkflowExecutionTimeout       time.Duration  `mapstructure:"workflow_execution_timeout" validate:"required"`
-		ActivityScheduleToStartTimeout time.Duration  `mapstructure:"activity_schedule_to_start_timeout" validate:"required"`
+		WorkflowRunTimeout             time.Duration  `mapstructure:"workflow_run_timeout" validate:"required"`
+		WorkflowRetry                  *RetryPolicy   `mapstructure:"workflow_retry"`
+		ActivityScheduleToCloseTimeout time.Duration  `mapstructure:"activity_schedule_to_close_timeout" validate:"required"`
 		ActivityStartToCloseTimeout    time.Duration  `mapstructure:"activity_start_to_close_timeout" validate:"required"`
 		ActivityHeartbeatTimeout       time.Duration  `mapstructure:"activity_heartbeat_timeout"`
-		ActivityRetryMaximumAttempts   int32          `mapstructure:"activity_retry_maximum_attempts" validate:"required"`
+		ActivityRetry                  *RetryPolicy   `mapstructure:"activity_retry" validate:"required"`
 		BlockTag                       BlockTagConfig `mapstructure:"block_tag"`
 		EventTag                       EventTagConfig `mapstructure:"event_tag"`
 		Storage                        StorageConfig  `mapstructure:"storage"`
@@ -196,6 +196,13 @@ type (
 		FailoverEnabled                bool           `mapstructure:"failover_enabled"`
 		ConsensusFailoverEnabled       bool           `mapstructure:"consensus_failover_enabled"`
 		SLA                            SLAConfig      `mapstructure:"sla"`
+	}
+
+	RetryPolicy struct {
+		MaximumAttempts    int32         `mapstructure:"maximum_attempts" validate:"required,gt=1"` // 1 means no retries.
+		BackoffCoefficient float64       `mapstructure:"backoff_coefficient" validate:"required"`
+		InitialInterval    time.Duration `mapstructure:"initial_interval" validate:"required"`
+		MaximumInterval    time.Duration `mapstructure:"maximum_interval" validate:"required"`
 	}
 
 	BackfillerWorkflowConfig struct {

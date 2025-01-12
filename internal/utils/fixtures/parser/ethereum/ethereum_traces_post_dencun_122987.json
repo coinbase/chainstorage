@@ -1,0 +1,12 @@
+{
+  "type": "CALL",
+  "from": "0x96a265475855c0e7e1052ce18852408a0c02854d",
+  "to": "0x27eca677bc82cf14f33e7e981b50418741ba4fe1",
+  "value": "0x0",
+  "gas": "0xdacf",
+  "gasUsed": "0x5208",
+  "input": "ee5e3b694a0465d2f19d07df98e860493188ff2a5681dd8a8ab7345a3b869564",
+  "output": "0x",
+  "time": "1.26343ms",
+  "calls": []
+}

@@ -109,6 +109,11 @@ func NewParser(params Params) (Parser, error) {
 				factory = params.Rosetta
 			}
 		}
+	} else {
+		switch sidechain {
+		case api.SideChain_SIDECHAIN_ETHEREUM_MAINNET_BEACON, api.SideChain_SIDECHAIN_ETHEREUM_HOLESKY_BEACON:
+			factory = params.EthereumBeacon
+		}
 	}
 
 	if factory == nil {

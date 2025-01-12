@@ -30,11 +30,5 @@ func BlockMetadataToProto(bm *BlockMetaDataDDBEntry) *api.BlockMetadata {
 		Timestamp:     utils.ToTimestamp(bm.Timestamp),
 	}
 
-	// Set parent height if it is not present,
-	// except for the genesis and skipped block.
-	if v.ParentHeight == 0 && v.Height != 0 && !v.Skipped {
-		v.ParentHeight = v.Height - 1
-	}
-
 	return v
 }

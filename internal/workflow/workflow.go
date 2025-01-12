@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/uber-go/tally/v4"
@@ -71,10 +71,6 @@ type (
 )
 
 const (
-	activityRetryInitialInterval    = 10 * time.Second
-	activityRetryMaximumInterval    = 3 * time.Minute
-	activityRetryBackoffCoefficient = 2.0
-
 	loggerMsg = "workflow.request"
 
 	tagBlockTag = "tag"
@@ -170,9 +166,10 @@ func (w *baseWorkflow) startWorkflow(ctx context.Context, workflowID string, req
 	workflowOptions := client.StartWorkflowOptions{
 		ID:                                       workflowID,
 		TaskQueue:                                cfg.TaskList,
-		WorkflowRunTimeout:                       cfg.WorkflowExecutionTimeout,
+		WorkflowRunTimeout:                       cfg.WorkflowRunTimeout,
 		WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
 		WorkflowExecutionErrorWhenAlreadyStarted: true,
+		RetryPolicy:                              w.getRetryPolicy(cfg.WorkflowRetry),
 	}
 
 	execution, err := w.runtime.ExecuteWorkflow(ctx, workflowOptions, w.name, request)
@@ -184,10 +181,21 @@ func (w *baseWorkflow) startWorkflow(ctx context.Context, workflowID string, req
 }
 
 func (w *baseWorkflow) executeWorkflow(ctx workflow.Context, request any, fn instrument.Fn, opts ...instrument.Option) error {
+	workflowInfo := workflow.GetInfo(ctx)
+
+	// Check if this is the last attempt.
+	// This tag is used to determine if an alert should be sent for a failed workflow.
+	lastAttempt := true
+	if workflowInfo.RetryPolicy != nil && workflowInfo.Attempt < workflowInfo.RetryPolicy.MaximumAttempts {
+		lastAttempt = false
+	}
+
 	opts = append(
 		opts,
 		instrument.WithLoggerField(zap.String("workflow", w.name)),
 		instrument.WithLoggerField(zap.Reflect("request", request)),
+		instrument.WithLoggerField(zap.Bool("last_attempt", lastAttempt)),
+		instrument.WithScopeTag("last_attempt", strconv.FormatBool(lastAttempt)),
 		instrument.WithFilter(IsContinueAsNewError),
 	)
 	if ir, ok := request.(InstrumentedRequest); ok {
@@ -243,16 +251,42 @@ func (w *baseWorkflow) withActivityOptions(ctx workflow.Context) workflow.Contex
 	cfg := w.config.Base()
 	return workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		TaskQueue:              cfg.TaskList,
-		ScheduleToStartTimeout: cfg.ActivityScheduleToStartTimeout,
 		StartToCloseTimeout:    cfg.ActivityStartToCloseTimeout,
+		ScheduleToCloseTimeout: cfg.ActivityScheduleToCloseTimeout,
 		HeartbeatTimeout:       cfg.ActivityHeartbeatTimeout,
-		RetryPolicy: &temporal.RetryPolicy{
-			InitialInterval:    activityRetryInitialInterval,
-			MaximumInterval:    activityRetryMaximumInterval,
-			BackoffCoefficient: activityRetryBackoffCoefficient,
-			MaximumAttempts:    cfg.ActivityRetryMaximumAttempts,
-		},
+		RetryPolicy:            w.getRetryPolicy(cfg.ActivityRetry),
 	})
+}
+
+func (w *baseWorkflow) getRetryPolicy(cfg *config.RetryPolicy) *temporal.RetryPolicy {
+	if cfg == nil || cfg.MaximumAttempts <= 0 {
+		return nil
+	}
+
+	return &temporal.RetryPolicy{
+		// Maximum number of attempts. 1 means no retry.
+		MaximumAttempts: cfg.MaximumAttempts,
+		// Coefficient used to calculate the next retry backoff interval.
+		BackoffCoefficient: cfg.BackoffCoefficient,
+		// Backoff interval for the first retry.
+		InitialInterval: cfg.InitialInterval,
+		// This value is the cap of the interval.
+		MaximumInterval: cfg.MaximumInterval,
+	}
+}
+
+// continueAsNew overrides the workflow options before the workflow is restarted;
+// otherwise, the workflow needs to be manually restarted whenever there is a change in StartWorkflowOptions.
+func (w *baseWorkflow) continueAsNew(ctx workflow.Context, request any) error {
+	cfg := w.config.Base()
+
+	// Override the workflow options to be carried over to the next run.
+	ctx = workflow.WithWorkflowRunTimeout(ctx, cfg.WorkflowRunTimeout)
+	options := workflow.ContinueAsNewErrorOptions{
+		RetryPolicy: w.getRetryPolicy(cfg.WorkflowRetry),
+	}
+
+	return workflow.NewContinueAsNewErrorWithOptions(ctx, options, w.name, request)
 }
 
 func IsContinueAsNewError(err error) bool {

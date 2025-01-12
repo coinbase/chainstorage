@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "index": "0",
+      "blob": "0x000",
+      "kzg_commitment": "0xa4390099fd9a8813a31ba775cd7b9e329872408985f7d04e322b5baa66c666fe2f798de1bffef2f0aee17b05c09e52a6",
+      "kzg_proof": "0x92f11a15f63d80b2a40ec87274dd2770f1086239159bdc446f2daede8b5890a20c264a1e5d2a5257787305f5f9842e7c",
+      "signed_block_header": {
+        "message": {
+          "slot": "10",
+          "proposer_index": "607538",
+          "parent_root": "0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+          "state_root": "0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+          "body_root": "0x971949b435ae93c15f28e6a74f341359f26c89b9174d5fe2bb12bf706d73a508"
+        },
+        "signature": "0xa7ff4e5624fb114142b6827982c5f015cebb163df95a101a0d31c08cddfbe69c68197374542a038ea99c10b9c769254c0520a33ac47b4701a2c80c04b785b09884b84e707291a97ce9d11f4e4d394c061b2a5b33ab721f7bbf477dbe812d1293"
+      },
+      "kzg_commitment_inclusion_proof": [
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "0xf5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b"
+      ]
+    }
+  ]
+}

@@ -138,6 +138,11 @@ func NewClient(params Params) (Result, error) {
 				factory = params.Rosetta
 			}
 		}
+	} else {
+		switch sidechain {
+		case api.SideChain_SIDECHAIN_ETHEREUM_MAINNET_BEACON, api.SideChain_SIDECHAIN_ETHEREUM_HOLESKY_BEACON:
+			factory = params.EthereumBeacon
+		}
 	}
 	if factory == nil {
 		return Result{}, xerrors.Errorf("client is not implemented: blockchain(%v)-sidechain(%v)", blockchain, sidechain)

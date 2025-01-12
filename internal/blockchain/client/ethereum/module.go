@@ -2,6 +2,8 @@ package ethereum
 
 import (
 	"go.uber.org/fx"
+
+	"github.com/coinbase/chainstorage/internal/blockchain/client/ethereum/beacon"
 )
 
 var Module = fx.Options(
@@ -37,4 +39,5 @@ var Module = fx.Options(
 		Name:   "polygon",
 		Target: NewPolygonClientFactory,
 	}),
+	beacon.Module,
 )
