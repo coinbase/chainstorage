@@ -612,7 +612,7 @@ func (v *ethereumValidator) ValidateAccountState(ctx context.Context, req *api.V
 	if accountResult.Nonce != hexutil.Uint64(verifiedAccountState.Nonce) {
 		return nil, xerrors.Errorf("account nonce is not matched, (nonce in proof=%v, nonce in verified result=%v): %w", accountResult.Nonce, hexutil.Uint64(verifiedAccountState.Nonce), ErrAccountNonceNotMatched)
 	}
-	if accountResult.Balance.ToInt().Cmp(verifiedAccountState.Balance) != 0 {
+	if verifiedAccountState.Balance.CmpBig(accountResult.Balance.ToInt()) != 0 {
 		return nil, xerrors.Errorf("account balance is not matched, (balance in proof=%v, balance in verified result=%v): %w", accountResult.Balance.ToInt(), verifiedAccountState.Balance, ErrAccountBalanceNotMatched)
 	}
 	if accountResult.StorageHash != verifiedAccountState.Root {
