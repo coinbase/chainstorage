@@ -46,8 +46,9 @@ func TestEthereumValidator_Success(t *testing.T) {
 	// 6. block 17000000: post merge, pre shanghai.
 	// 7. block 17034873: post shanghai, no withdrawals in the block, but has withdrawalsRoot.
 	// 8. block 17300000: post shanghai, has withdrawals in the block.
+	// 9. block 22119617: post dencun, has blob header and blob transactions.
 
-	blocks := []int{1000, 2000000, 4000000, 8000000, 14000000, 17000000, 17034873, 17300000}
+	blocks := []int{1000, 2000000, 4000000, 8000000, 14000000, 17000000, 17034873, 17300000, 22119617}
 	for _, b := range blocks {
 		var block api.NativeBlock
 		path := fmt.Sprintf("parser/ethereum/native_block_%d.json", b)
@@ -98,6 +99,20 @@ func TestEthereumValidator_Failures(t *testing.T) {
 	err = parser.ValidateBlock(ctx, corrupt_block)
 	require.True(xerrors.Is(err, ErrInvalidBlockHash))
 
+	// Corrupt the amount of blob gas used (from 131072 to 100)
+	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
+	corrupt_block.GetEthereum().GetHeader().OptionalBlobGasUsed = &api.EthereumHeader_BlobGasUsed{
+		BlobGasUsed: 100,
+	}
+	err = parser.ValidateBlock(ctx, corrupt_block)
+	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+
+	// Corrupt the beacon block root (drop the last 5 chars)
+	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
+	corrupt_block.GetEthereum().GetHeader().ParentBeaconBlockRoot = "0x0d86349e9ee1647771048bf8905f2fc85bd348ec75abac5e3e2f0b5dec9"
+	err = parser.ValidateBlock(ctx, corrupt_block)
+	require.True(xerrors.Is(err, ErrInvalidBlockHash))
+
 	// 2. Modify the transactions in different ways and fail the transactions verification.
 	err = fixtures.UnmarshalPB("parser/ethereum/native_block_14000000.json", &block)
 	require.NoError(err)
@@ -119,6 +134,23 @@ func TestEthereumValidator_Failures(t *testing.T) {
 	// Corrupt the nounce (from 2760 to 3760).
 	corrupt_block = proto.Clone(&block).(*api.NativeBlock)
 	corrupt_block.GetEthereum().Transactions[0].Nonce = 3760
+	err = parser.ValidateBlock(ctx, corrupt_block)
+	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+
+	// Corrupt the max blob gas fee (from 20000000000 to 10).
+	var blob_block api.NativeBlock
+	err = fixtures.UnmarshalPB("parser/ethereum/native_block_70951.json", &blob_block)
+	require.NoError(err)
+	corrupt_block = proto.Clone(&blob_block).(*api.NativeBlock)
+	corrupt_block.GetEthereum().Transactions[0].OptionalMaxFeePerBlobGas = &api.EthereumTransaction_MaxFeePerBlobGas{
+		MaxFeePerBlobGas: "10",
+	}
+	err = parser.ValidateBlock(ctx, corrupt_block)
+	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
+
+	// Corrupt the blob hashes (add a new blob hash)
+	corrupt_block = proto.Clone(&blob_block).(*api.NativeBlock)
+	corrupt_block.GetEthereum().Transactions[0].BlobVersionedHashes = []string{"0x0000"}
 	err = parser.ValidateBlock(ctx, corrupt_block)
 	require.True(xerrors.Is(err, ErrInvalidTransactionsHash))
 

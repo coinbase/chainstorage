@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"golang.org/x/xerrors"
@@ -160,6 +161,24 @@ func (v *ethereumValidator) validateBlockHeader(ctx context.Context, header *api
 		protocolHeader.WithdrawalsHash = &hash
 	}
 
+	// EIP-4788: Beacon block root in the EVM
+	if header.ParentBeaconBlockRoot != "" {
+		root := geth.HexToHash(header.ParentBeaconBlockRoot)
+		protocolHeader.ParentBeaconRoot = &root
+	}
+
+	// EIP-4844: include the add blob gas used and excess blob gas to the block header.
+	if header.GetBlobGasUsed() != 0 {
+		bgu := header.GetBlobGasUsed()
+		protocolHeader.BlobGasUsed = &bgu
+	}
+
+	// EIP-4844: include the add blob gas used and excess blob gas to the block header.
+	if header.GetExcessBlobGas() != 0 {
+		ebg := header.GetExcessBlobGas()
+		protocolHeader.ExcessBlobGas = &ebg
+	}
+
 	// Note that Hash returns the block hash of the header, which is simply the keccak256 hash of its RLP encoding.
 	// We expect that the block hash recomputed following the protocol should match the one from the payload itself.
 	expectedHash := protocolHeader.Hash()
@@ -295,11 +314,75 @@ func (v *ethereumValidator) toGethTransaction(transaction *api.EthereumTransacti
 	// https://github.com/ethereum/go-ethereum/blob/8013a494fe3f0812aa1661aba43898d22a6fc061/internal/ethapi/transaction_args.go#L284
 	var data types.TxData
 	switch {
+	case transaction.GetType() == types.BlobTxType:
+		//v.logger.Debug(
+		//	"toGethTransaction: BlobTx",
+		//	zap.String("hash", transaction.GetHash()),
+		//)
+
+		value256, overflow := uint256.FromBig(value)
+		if overflow {
+			return nil, xerrors.Errorf("failed to convert value %s to uint256.Int", value.String())
+		}
+
+		var chainId *uint256.Int
+		if transaction.GetOptionalChainId() != nil {
+			chainId = uint256.NewInt(transaction.GetChainId())
+		}
+
+		var blobFeeCap *uint256.Int
+		if transaction.GetOptionalMaxFeePerBlobGas() != nil {
+			bfc, err := uint256.FromDecimal(transaction.GetMaxFeePerBlobGas())
+			if err != nil {
+				return nil, xerrors.Errorf("failed to convert blob fee cap %s to uint256.Int", transaction.GetMaxFeePerBlobGas())
+			}
+
+			blobFeeCap = bfc
+		}
+
+		al := types.AccessList{}
+		if transaction.GetTransactionAccessList() != nil {
+			al = toGethAccessList(transaction.GetTransactionAccessList())
+		}
+
+		var blobHashes []geth.Hash
+		blobHashes = make([]geth.Hash, len(transaction.BlobVersionedHashes))
+		for i, h := range transaction.BlobVersionedHashes {
+			blobHashes[i] = geth.HexToHash(h)
+		}
+		parsedR, err := uint256.FromHex(transaction.GetR())
+		if err != nil {
+			return nil, xerrors.Errorf("failed to convert r %s to uint256.Int: %w", transaction.GetR(), err)
+		}
+		parsedS, err := uint256.FromHex(transaction.GetS())
+		if err != nil {
+			return nil, xerrors.Errorf("failed to convert s %s to uint256.Int: %w", transaction.GetS(), err)
+		}
+		parsedV, err := uint256.FromHex(transaction.GetV())
+		if err != nil {
+			return nil, xerrors.Errorf("failed to convert v %s to uint256.Int: %w", transaction.GetV(), err)
+		}
+		data = &types.BlobTx{
+			ChainID:    chainId,
+			Nonce:      transaction.GetNonce(),
+			GasTipCap:  uint256.NewInt(transaction.GetMaxPriorityFeePerGas()),
+			GasFeeCap:  uint256.NewInt(transaction.GetMaxFeePerGas()),
+			Gas:        transaction.GetGas(),
+			To:         *to,
+			Value:      value256,
+			Data:       input,
+			AccessList: al,
+			BlobFeeCap: blobFeeCap,
+			BlobHashes: blobHashes,
+			V:          parsedV,
+			R:          parsedR,
+			S:          parsedS,
+		}
 	case transaction.GetOptionalMaxFeePerGas() != nil:
-		v.logger.Debug(
-			"toGethTransaction: DynamicFeeTx",
-			zap.String("hash", transaction.GetHash()),
-		)
+		//v.logger.Debug(
+		//	"toGethTransaction: DynamicFeeTx",
+		//	zap.String("hash", transaction.GetHash()),
+		//)
 		al := types.AccessList{}
 		if transaction.GetTransactionAccessList() != nil {
 			al = toGethAccessList(transaction.GetTransactionAccessList())
@@ -321,10 +404,10 @@ func (v *ethereumValidator) toGethTransaction(transaction *api.EthereumTransacti
 		}
 
 	case transaction.GetOptionalTransactionAccessList() != nil:
-		v.logger.Debug(
-			"toGethTransaction: AccessListTx",
-			zap.String("hash", transaction.GetHash()),
-		)
+		//v.logger.Debug(
+		//	"toGethTransaction: AccessListTx",
+		//	zap.String("hash", transaction.GetHash()),
+		//)
 		data = &types.AccessListTx{
 			To:         to,
 			ChainID:    chainId,
@@ -342,12 +425,12 @@ func (v *ethereumValidator) toGethTransaction(transaction *api.EthereumTransacti
 	case (v.config.Blockchain() == common.Blockchain_BLOCKCHAIN_OPTIMISM ||
 		v.config.Blockchain() == common.Blockchain_BLOCKCHAIN_BASE) &&
 		transaction.GetType() == types.DepositTxType:
-		v.logger.Debug(
-			"toGethTransaction: DepositTx",
-			zap.String("hash", transaction.GetHash()),
-			zap.String("sourceHash", transaction.GetSourceHash()),
-			zap.Bool("isSystemTx", transaction.GetIsSystemTx()),
-		)
+		//v.logger.Debug(
+		//	"toGethTransaction: DepositTx",
+		//	zap.String("hash", transaction.GetHash()),
+		//	zap.String("sourceHash", transaction.GetSourceHash()),
+		//	zap.Bool("isSystemTx", transaction.GetIsSystemTx()),
+		//)
 		data = &types.DepositTx{
 			SourceHash:          geth.HexToHash(transaction.GetSourceHash()),
 			From:                geth.HexToAddress(transaction.GetFrom()),
