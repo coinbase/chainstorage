@@ -27,7 +27,7 @@ type tronParserTestSuite struct {
 }
 
 func TestTronParserTestSuite(t *testing.T) {
-	t.Skip()
+	// t.Skip()
 	suite.Run(t, new(tronParserTestSuite))
 }
 
@@ -121,12 +121,20 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{
+					CallValue: 100,
+				},
+				{
+					CallValue: 100,
+				},
+			},
 		},
 		{
 			Type:             "CALL",
 			From:             "TU2MJ5Veik1LRAgjeSzEdvmDYx7mefJZvd",
 			To:               "TXA2WjFc5f86deJcZZCdbdpkpUTKTA3VDM",
-			Value:            "0",
+			Value:            "1000",
 			TraceType:        "CALL",
 			CallType:         "CALL",
 			TraceId:          "997225b56440a9bd172f05f44a663830b72093a12502551cda99b0bc7c60cbc1",
@@ -135,6 +143,15 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{
+					TokenId:   "1004777",
+					CallValue: 1000000000000000,
+				},
+				{
+					CallValue: 1000,
+				},
+			},
 		},
 		{
 			Type:             "CALL",
@@ -149,12 +166,22 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{
+					TokenId:   "1004777",
+					CallValue: 1000,
+				},
+				{
+					TokenId:   "1004777",
+					CallValue: 100,
+				},
+			},
 		},
 		{
 			Type:             "CALL",
 			From:             "TU2MJ5Veik1LRAgjeSzEdvmDYx7mefJZvd",
 			To:               "TU3kjFuhtEo42tsCBtfYUAZxoqQ4yuSLQ5",
-			Value:            "0",
+			Value:            "100000",
 			TraceType:        "CALL",
 			CallType:         "CALL",
 			TraceId:          "cf6f699d9bdae8aa25fae310a06bb60a29a7812548cf3c1d83c737fd1a22c0ee",
@@ -163,6 +190,15 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{
+					TokenId:   "1004777",
+					CallValue: 100,
+				},
+				{
+					CallValue: 100000,
+				},
+			},
 		},
 		{
 			Type:             "CALL",
@@ -177,6 +213,9 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{},
+			},
 		},
 		{
 			Type:             "CALL",
@@ -191,6 +230,14 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{
+					CallValue: 822994311610,
+				},
+				{
+					CallValue: 2000000,
+				},
+			},
 		},
 		{
 			Type:             "CALL",
@@ -205,6 +252,9 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{},
+			},
 		},
 		{
 			Type:             "CALL",
@@ -219,6 +269,11 @@ func (s *tronParserTestSuite) TestParseTronBlock() {
 			BlockNumber:      0x4034F5C,
 			TransactionHash:  "e14935e6144007163609bb49292897ba81bf7ee93bf28ba4cc5ebd0d6b95f4b9",
 			TransactionIndex: 1,
+			TronCallValueInfo: []*api.TronCallValueInfo{
+				{
+					CallValue: 1424255258,
+				},
+			},
 		},
 	}
 

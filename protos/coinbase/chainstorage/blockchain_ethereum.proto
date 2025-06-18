@@ -240,6 +240,7 @@ message EthereumTransactionFlattenedTrace {
   uint64 block_number = 17;
   string transaction_hash = 18;
   uint64 transaction_index = 19;
+  repeated TronCallValueInfo tron_call_value_info = 20;
 }
 
 message EthereumTokenTransfer {
@@ -282,4 +283,9 @@ message EthereumAccountStateResponse {
   uint64 nonce = 1;
   string storage_hash = 2;
   string code_hash = 3;
+}
+
+message TronCallValueInfo {
+  string token_id = 1;
+  int64 call_value = 2;
 }

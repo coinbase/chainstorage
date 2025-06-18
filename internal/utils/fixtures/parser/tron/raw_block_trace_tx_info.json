@@ -101,7 +101,13 @@
                 "note": "63616c6c",
                 "transferTo_address": "41e8667633c747066c70672c58207cc745a9860527",
                 "callValueInfo": [
-                    {}
+                    {   
+                        "tokenId": "1004777",
+                        "callValue": 1000000000000000
+                    },
+                    {
+                        "callValue": 1000
+                    }
                 ],
                 "hash": "997225b56440a9bd172f05f44a663830b72093a12502551cda99b0bc7c60cbc1"
             },
@@ -110,7 +116,14 @@
                 "note": "63616c6c",
                 "transferTo_address": "41e8667633c747066c70672c58207cc745a9860527",
                 "callValueInfo": [
-                    {}
+                    {
+                        "tokenId": "1004777",
+                        "callValue": 1000
+                    },
+                    {
+                        "tokenId": "1004777",
+                        "callValue": 100
+                    }
                 ],
                 "hash": "7ac8dd16dede5c512330f5033c8fd6f5390d742aa51b805f805098109eb54fe9"
             },
@@ -119,7 +132,13 @@
                 "note": "63616c6c",
                 "transferTo_address": "41c64e69acde1c7b16c2a3efcdbbdaa96c3644c2b3",
                 "callValueInfo": [
-                    {}
+                    {
+                        "tokenId": "1004777",
+                        "callValue": 100
+                    },
+                    {
+                        "callValue": 100000
+                    }
                 ],
                 "hash": "cf6f699d9bdae8aa25fae310a06bb60a29a7812548cf3c1d83c737fd1a22c0ee"
             },

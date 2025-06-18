@@ -58,20 +58,24 @@ type TronInternalTransaction struct {
 }
 
 func convertInternalTransactionToTrace(itx *TronInternalTransaction) *api.EthereumTransactionFlattenedTrace {
-	// Calculate total value from CallValueInfo
-	var totalValue int64
-	for _, callValue := range itx.CallValueInfo {
-		totalValue += callValue.CallValue
+	// only keep native values, ignore TRC10 token values
+	var nativeTokenValue int64
+	for _, callValueInfoItem := range itx.CallValueInfo {
+		if callValueInfoItem.TokenId == "" {
+			// If TokenId is empty, it means this is a native token transfer
+			nativeTokenValue += callValueInfoItem.CallValue
+		}
 	}
 
 	trace := &api.EthereumTransactionFlattenedTrace{
-		Type:      "CALL",
-		TraceType: "CALL",
-		CallType:  "CALL",
-		From:      hexToTronAddress(itx.CallerAddress),
-		To:        hexToTronAddress(itx.TransferToAddress),
-		Value:     strconv.FormatInt(totalValue, 10),
-		TraceId:   itx.Hash,
+		Type:              "CALL",
+		TraceType:         "CALL",
+		CallType:          "CALL",
+		From:              hexToTronAddress(itx.CallerAddress),
+		To:                hexToTronAddress(itx.TransferToAddress),
+		Value:             strconv.FormatInt(nativeTokenValue, 10),
+		TraceId:           itx.Hash,
+		TronCallValueInfo: convertTronCallValueInfo(itx.CallValueInfo),
 	}
 	if itx.Rejected {
 		trace.Error = "Internal transaction is executed failed"
@@ -81,6 +85,17 @@ func convertInternalTransactionToTrace(itx *TronInternalTransaction) *api.Ethere
 	}
 
 	return trace
+}
+
+func convertTronCallValueInfo(callValueInfo []TronCallValueInfo) []*api.TronCallValueInfo {
+	result := make([]*api.TronCallValueInfo, len(callValueInfo))
+	for i, info := range callValueInfo {
+		result[i] = &api.TronCallValueInfo{
+			TokenId:   info.TokenId,
+			CallValue: info.CallValue,
+		}
+	}
+	return result
 }
 
 func parseTronTxInfo(
