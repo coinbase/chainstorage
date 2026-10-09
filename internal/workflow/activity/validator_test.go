@@ -10,6 +10,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"go.uber.org/fx"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client"
 	clientmocks "github.com/coinbase/chainstorage/internal/blockchain/client/mocks"
@@ -811,4 +812,32 @@ func (s *ValidatorTestSuite) TestValidator_WithSkipBlock() {
 		EventGap:                 0,
 		EventTag:                 eventTag,
 	}, response)
+}
+
+func TestGetValidationEndHeight(t *testing.T) {
+	tests := []struct {
+		name                                      string
+		start, persisted, tip, padding, max, want uint64
+	}{
+		{"padding_exceeds_tip", 1, 10, 5, 6, 10, 1},
+		{"zero_tip", 1, 10, 0, 1, 10, 1},
+		{"zero_start", 0, 10, 5, 6, 10, 0},
+		{"padding_equals_tip", 0, 10, 5, 5, 10, 0},
+		{"ordinary_subtraction", 1, 20, 10, 2, 20, 8},
+		{"persisted_cap", 1, 6, 10, 2, 20, 6},
+		{"batch_cap", 1, 20, 20, 0, 3, 3},
+		{"below_start", 5, 20, 6, 2, 10, 5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := testutil.Require(t)
+			request := &ValidatorRequest{
+				ValidationHeightPadding: tt.padding,
+				MaxHeightsToValidate:    tt.max,
+			}
+			got, err := getValidationEndHeight(tt.start, &api.BlockMetadata{Height: tt.persisted}, tt.tip, request, zap.NewNop())
+			require.NoError(err)
+			require.Equal(tt.want, got)
+		})
+	}
 }

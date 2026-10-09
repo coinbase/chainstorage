@@ -39,6 +39,16 @@ message BlockIdentifier {
   google.protobuf.Timestamp timestamp = 5;
 }
 
+enum BlockObjectFormat {
+  option allow_alias = true;
+
+  // Alias order controls the protojson spelling. Keep the pre-rename name first
+  // until mixed-version REST clients and servers no longer coexist.
+  BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK = 0;
+  BLOCK_OBJECT_FORMAT_SINGLE_BLOCK = 0;
+  BLOCK_OBJECT_FORMAT_CSCB_BATCH = 1;
+}
+
 message BlockMetadata {
   // Tag is a way to version the blockchain dataset. See http://go/cs-design for more details.
   uint32 tag = 1;
@@ -56,6 +66,18 @@ message BlockMetadata {
   bool skipped = 7;
   // Block timestamp. Note that this attribute is only available in recent blocks.
   google.protobuf.Timestamp timestamp = 8;
+  // Offset of this block's raw protobuf payload inside the decoded object payload.
+  uint64 byte_offset = 9;
+  // Length of this block's raw protobuf payload. Zero means single-block whole-object reads.
+  uint64 byte_length = 10;
+  // Length of the decoded payload region that contains this block.
+  uint64 uncompressed_length = 11;
+  // Object format for object_key_main. Zero value is the single-block whole-object format.
+  BlockObjectFormat object_format = 12;
+  // Physical object-storage generation that owns object_key_main. Empty means
+  // the immutable legacy generation; non-empty values such as "v2" resolve
+  // through the configured generation registry.
+  string storage_generation = 13;
 }
 
 message TransactionMetadata {

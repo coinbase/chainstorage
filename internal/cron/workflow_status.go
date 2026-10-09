@@ -155,7 +155,7 @@ func (t *workflowStatusTask) Run(ctx context.Context) error {
 }
 
 func (t *workflowStatusTask) markOpenWorkflows(ctx context.Context, expectedWorkflowMap map[string]bool) error {
-	openWorkflows, err := t.runtime.ListOpenWorkflows(ctx, t.config.Cadence.Domain, maxPageSize)
+	openWorkflows, err := t.runtime.ListOpenWorkflows(ctx, t.config.Cadence.Domain, maxPageSize, "")
 	if err != nil {
 		return xerrors.Errorf("failed to get open workflows: %w", err)
 	}

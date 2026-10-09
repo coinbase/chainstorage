@@ -1,7 +1,9 @@
 package dynamodb
 
 import (
-	"github.com/aws/aws-sdk-go/aws/session"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"golang.org/x/xerrors"
 
 	"go.uber.org/fx"
@@ -9,6 +11,16 @@ import (
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/internal"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 )
+
+func (m *metaStorageImpl) AcquireSingleBlockUploadGuard(
+	ctx context.Context,
+	tag uint32,
+	height uint64,
+	hash string,
+) (internal.SingleBlockUploadGuard, error) {
+	// Durable retirement is Postgres-only, so DynamoDB has no retirement fence.
+	return internal.NewUnfencedSingleBlockUploadGuard(), nil
+}
 
 type (
 	metaStorageImpl struct {
@@ -20,7 +32,7 @@ type (
 	Params struct {
 		fx.In
 		fxparams.Params
-		Session *session.Session
+		AWSConfig aws.Config
 	}
 
 	metaStorageFactory struct {

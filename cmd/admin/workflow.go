@@ -40,14 +40,18 @@ var (
 
 type executors struct {
 	fx.In
-	Backfiller      *workflow.Backfiller
-	Monitor         *workflow.Monitor
-	Poller          *workflow.Poller
-	Streamer        *workflow.Streamer
-	Benchmarker     *workflow.Benchmarker
-	CrossValidator  *workflow.CrossValidator
-	EventBackfiller *workflow.EventBackfiller
-	Replicator      *workflow.Replicator
+	Backfiller           *workflow.Backfiller
+	Monitor              *workflow.Monitor
+	Poller               *workflow.Poller
+	Streamer             *workflow.Streamer
+	Benchmarker          *workflow.Benchmarker
+	CrossValidator       *workflow.CrossValidator
+	EventBackfiller      *workflow.EventBackfiller
+	Replicator           *workflow.Replicator
+	Migrator             *workflow.Migrator
+	BatchConsolidator    *workflow.BatchConsolidator
+	SingleBlockRetention *workflow.SingleBlockRetention
+	Runtime              cadence.Runtime
 }
 
 var (
@@ -72,6 +76,14 @@ var (
 		},
 	}
 
+	listWorkflowCmd = &cobra.Command{
+		Use:   "list",
+		Short: "list running workflows",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listWorkflows()
+		},
+	}
+
 	workflowFlags struct {
 		workflow   string
 		workflowID string
@@ -86,11 +98,37 @@ func init() {
 
 	workflowCmd.AddCommand(startWorkflowCmd)
 	workflowCmd.AddCommand(stopWorkflowCmd)
+	workflowCmd.AddCommand(listWorkflowCmd)
 	rootCmd.AddCommand(workflowCmd)
 }
 
+func listWorkflows() error {
+	app, executors, err := initApp()
+	if err != nil {
+		return xerrors.Errorf("failed to init app: %w", err)
+	}
+	defer app.Close()
+	ctx := context.Background()
+	workflows, err := executors.Runtime.ListOpenWorkflows(ctx, app.Config().Cadence.Domain, 0, "") //list all workflows
+	if err != nil {
+		return xerrors.Errorf("failed to list workflows: %w", err)
+	} else {
+		logger.Info("\nlisting all workflows: ")
+	}
+	for _, workflow := range workflows.Executions { //print all workflows
+		logger.Info("\nworkflow",
+			zap.String("workflowID", workflow.Execution.GetWorkflowId()),
+			zap.String("runID", workflow.Execution.GetRunId()),
+			zap.String("type", workflow.Type.GetName()),
+			zap.Time("startTime", workflow.StartTime.AsTime()),
+			zap.String("status", workflow.Status.String()),
+		)
+	}
+	return nil
+}
 func startWorkflow() error {
 	workflowIdentity := workflow.GetWorkflowIdentify(workflowFlags.workflow)
+	workflowId := workflowFlags.workflowID
 	if workflowIdentity == workflow.UnknownIdentity {
 		return xerrors.Errorf("invalid workflow: %v", workflowFlags.workflow)
 	}
@@ -101,7 +139,7 @@ func startWorkflow() error {
 	}
 	defer app.Close()
 
-	ctx := context.Background()
+	ctx := workflow.WithWorkflowID(context.Background(), workflowId)
 	workflowIdentityString, err := workflowIdentity.String()
 	if err != nil {
 		return xerrors.Errorf("error parsing workflowIdentity: %w", err)
@@ -166,6 +204,24 @@ func startWorkflow() error {
 			return xerrors.Errorf("error converting to request type")
 		}
 		run, err = executors.Replicator.Execute(ctx, &request)
+	case workflow.MigratorIdentity:
+		request, ok := req.(workflow.MigratorRequest)
+		if !ok {
+			return xerrors.Errorf("error converting to request type")
+		}
+		run, err = executors.Migrator.Execute(ctx, &request)
+	case workflow.BatchConsolidatorIdentity:
+		request, ok := req.(workflow.BatchConsolidatorRequest)
+		if !ok {
+			return xerrors.Errorf("error converting to request type")
+		}
+		run, err = executors.BatchConsolidator.Execute(ctx, &request)
+	case workflow.SingleBlockRetentionIdentity:
+		request, ok := req.(workflow.SingleBlockRetentionRequest)
+		if !ok {
+			return xerrors.Errorf("error converting to request type")
+		}
+		run, err = executors.SingleBlockRetention.Execute(ctx, &request)
 	default:
 		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}
@@ -236,6 +292,12 @@ func stopWorkflow() error {
 		err = executors.EventBackfiller.StopWorkflow(ctx, workflowIdentityString, reason)
 	case workflow.ReplicatorIdentity:
 		err = executors.Replicator.StopWorkflow(ctx, workflowIdentityString, reason)
+	case workflow.MigratorIdentity:
+		err = executors.Migrator.StopWorkflow(ctx, workflowIdentityString, reason)
+	case workflow.BatchConsolidatorIdentity:
+		err = executors.BatchConsolidator.StopWorkflow(ctx, workflowIdentityString, reason)
+	case workflow.SingleBlockRetentionIdentity:
+		err = executors.SingleBlockRetention.StopWorkflow(ctx, workflowIdentityString, reason)
 	default:
 		return xerrors.Errorf("unsupported workflow identity: %v", workflowIdentity)
 	}

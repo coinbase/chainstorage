@@ -24,6 +24,17 @@ aws:
     transaction_table: example_chainstorage_transactions_table_polygon_mainnet
     versioned_event_table: example_chainstorage_versioned_block_events_polygon_mainnet
     versioned_event_table_block_index: example_chainstorage_versioned_block_events_by_block_id_polygon_mainnet
+  postgres:
+    connect_timeout: 30s
+    database: chainstorage_polygon_mainnet
+    host: localhost
+    max_connections: 25
+    min_connections: 5
+    password: ""
+    port: 5433
+    ssl_mode: require
+    statement_timeout: 60s
+    user: cs_polygon_mainnet_worker
   presigned_url_expiration: 30m
   region: us-east-1
   storage:
@@ -111,6 +122,21 @@ workflows:
     task_list: default
     workflow_identity: workflow.backfiller
     workflow_run_timeout: 24h
+  batch_consolidator:
+    activity_heartbeat_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
+    activity_start_to_close_timeout: 30m
+    batch_size: 10000
+    checkpoint_size: 100000
+    max_blocks: 0
+    task_list: default
+    workflow_identity: workflow.batch_consolidator
+    workflow_run_timeout: 24h
   benchmarker:
     activity_retry:
       backoff_coefficient: 2
@@ -157,6 +183,20 @@ workflows:
     checkpoint_size: 5000
     task_list: default
     workflow_identity: workflow.event_backfiller
+    workflow_run_timeout: 24h
+  migrator:
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
+    activity_start_to_close_timeout: 30m
+    backoff_interval: 5s
+    batch_size: 1000
+    checkpoint_size: 5000
+    task_list: default
+    workflow_identity: workflow.migrator
     workflow_run_timeout: 24h
   monitor:
     activity_retry:
@@ -226,6 +266,19 @@ workflows:
     parallelism: 10
     task_list: default
     workflow_identity: workflow.replicator
+    workflow_run_timeout: 24h
+  single_block_retention:
+    activity_heartbeat_timeout: 5m
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 12h
+    activity_start_to_close_timeout: 6h
+    max_object_ranges: 1
+    task_list: default
+    workflow_identity: workflow.single_block_retention
     workflow_run_timeout: 24h
   streamer:
     activity_retry:

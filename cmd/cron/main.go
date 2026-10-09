@@ -17,10 +17,12 @@ import (
 	"github.com/coinbase/chainstorage/internal/gateway"
 	"github.com/coinbase/chainstorage/internal/s3"
 	"github.com/coinbase/chainstorage/internal/storage"
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	"github.com/coinbase/chainstorage/internal/tally"
 	"github.com/coinbase/chainstorage/internal/tracer"
 	"github.com/coinbase/chainstorage/internal/utils/consts"
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
+	"github.com/coinbase/chainstorage/internal/workflow"
 	"github.com/coinbase/chainstorage/sdk"
 	"github.com/coinbase/chainstorage/sdk/services"
 )
@@ -32,8 +34,28 @@ func main() {
 
 func startManager(opts ...fx.Option) services.SystemManager {
 	manager := services.NewManager()
-	logger := manager.Logger()
 	ctx := manager.Context()
+
+	opts = cronAppOptions(manager, opts...)
+	app := fx.New(opts...)
+
+	logger := manager.Logger()
+	if err := app.Start(ctx); err != nil {
+		logger.Fatal("failed to start app", zap.Error(err))
+	}
+	manager.AddPreShutdownHook(func() {
+		logger.Info("shutting down cron")
+		if err := app.Stop(ctx); err != nil {
+			logger.Error("failed to stop app", zap.Error(err))
+		}
+	})
+
+	logger.Info("started cron")
+	return manager
+}
+
+func cronAppOptions(manager services.SystemManager, opts ...fx.Option) []fx.Option {
+	logger := manager.Logger()
 
 	opts = append(
 		opts,
@@ -54,24 +76,14 @@ func startManager(opts ...fx.Option) services.SystemManager {
 		parser.Module,
 		s3.Module,
 		storage.Module,
+		downloader.Module,
 		tally.Module,
 		fx.NopLogger,
+		workflow.Module,
 		fx.Provide(func() services.SystemManager { return manager }),
 		fx.Provide(func() *zap.Logger { return logger }),
 		fx.Invoke(cron.RegisterRunner),
 	)
-	app := fx.New(opts...)
 
-	if err := app.Start(ctx); err != nil {
-		logger.Fatal("failed to start app", zap.Error(err))
-	}
-	manager.AddPreShutdownHook(func() {
-		logger.Info("shutting down cron")
-		if err := app.Stop(ctx); err != nil {
-			logger.Error("failed to stop app", zap.Error(err))
-		}
-	})
-
-	logger.Info("started cron")
-	return manager
+	return opts
 }

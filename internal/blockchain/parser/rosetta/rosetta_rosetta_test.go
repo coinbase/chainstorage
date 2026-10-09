@@ -148,18 +148,20 @@ func TestParseRosettaRosettaBlockFromNative(t *testing.T) {
 		},
 	}
 
-	var parser internal.Parser
+	// The rosetta parser is instantiated directly because no blockchain is
+	// currently dispatched to it; the fixtures are dogecoin-flavored sample data.
+	var parser internal.RosettaParser
 	app := testapp.New(
 		t,
 		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_DOGECOIN, common.Network_NETWORK_DOGECOIN_MAINNET),
-		Module,
-		internal.Module,
+		fx.Provide(NewRosettaNativeParser),
+		fx.Provide(NewRosettaRosettaParser),
 		fx.Populate(&parser),
 	)
 	defer app.Close()
 	require.NotNil(parser)
 
-	actual, err := parser.ParseRosettaBlock(context.Background(), block)
+	actual, err := parser.ParseBlock(context.Background(), block)
 	require.NoError(err)
 	require.NotNil(actual)
 	require.Equal(expected, actual)
@@ -179,18 +181,18 @@ func TestParseRosettaRosettaBlock_Nil(t *testing.T) {
 		},
 	}
 
-	var parser internal.Parser
+	var parser internal.RosettaParser
 	app := testapp.New(
 		t,
 		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_DOGECOIN, common.Network_NETWORK_DOGECOIN_MAINNET),
-		Module,
-		internal.Module,
+		fx.Provide(NewRosettaNativeParser),
+		fx.Provide(NewRosettaRosettaParser),
 		fx.Populate(&parser),
 	)
 	defer app.Close()
 	require.NotNil(parser)
 
-	actual, err := parser.ParseRosettaBlock(context.Background(), block)
+	actual, err := parser.ParseBlock(context.Background(), block)
 	require.Nil(actual)
 	require.NotNil(err)
 	require.Contains(err.Error(), "not found")

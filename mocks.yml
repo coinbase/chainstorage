@@ -11,6 +11,7 @@ gomocks:
   - package: internal/storage/blobstorage
     interfaces:
       - BlobStorage
+      - SingleBlockUploader
   - package: internal/storage/blobstorage/downloader
     interfaces:
       - BlockDownloader

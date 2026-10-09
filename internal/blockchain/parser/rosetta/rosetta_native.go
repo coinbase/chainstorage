@@ -23,7 +23,7 @@ func NewRosettaNativeParser(params internal.ParserParams, opts ...internal.Parse
 	}, nil
 }
 
-func (p *rosettaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
+func (p *rosettaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block, opts ...internal.ParseOption) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
 		return nil, xerrors.New("metadata not found")

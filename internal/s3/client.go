@@ -1,12 +1,12 @@
 package s3
 
 import (
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	otaws "github.com/opentracing-contrib/go-aws-sdk"
+	"context"
+	"io"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
@@ -14,18 +14,40 @@ import (
 )
 
 type (
-	Downloader = s3manageriface.DownloaderAPI
-	Uploader   = s3manageriface.UploaderAPI
-	Client     = s3iface.S3API
+	// Client interface for S3 operations
+	Client interface {
+		GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+		PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+		HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+		HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
+		GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error)
+		GetBucketLifecycleConfiguration(ctx context.Context, params *s3.GetBucketLifecycleConfigurationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLifecycleConfigurationOutput, error)
+		CreateBucket(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error)
+		DeleteBucket(ctx context.Context, params *s3.DeleteBucketInput, optFns ...func(*s3.Options)) (*s3.DeleteBucketOutput, error)
+		ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+		ListObjectVersions(ctx context.Context, params *s3.ListObjectVersionsInput, optFns ...func(*s3.Options)) (*s3.ListObjectVersionsOutput, error)
+		DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+		DeleteObjects(ctx context.Context, params *s3.DeleteObjectsInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectsOutput, error)
+	}
+
+	// Downloader interface for S3 download operations
+	Downloader interface {
+		Download(ctx context.Context, w io.WriterAt, input *s3.GetObjectInput, options ...func(*manager.Downloader)) (n int64, err error)
+	}
+
+	// Uploader interface for S3 upload operations
+	Uploader interface {
+		Upload(ctx context.Context, input *s3.PutObjectInput, opts ...func(*manager.Uploader)) (*manager.UploadOutput, error)
+	}
 
 	S3 struct {
-		Session *session.Session
+		Config aws.Config
 	}
 
 	S3Params struct {
 		fx.In
 		fxparams.Params
-		Session *session.Session
+		AWSConfig aws.Config
 	}
 
 	ClientParams struct {
@@ -42,22 +64,20 @@ func NewS3(params S3Params) (*S3, error) {
 	}
 
 	return &S3{
-		Session: params.Session,
+		Config: params.AWSConfig,
 	}, nil
 }
 
 func NewUploader(params ClientParams) Uploader {
-	return s3manager.NewUploader(params.S3.Session)
+	client := s3.NewFromConfig(params.S3.Config)
+	return manager.NewUploader(client)
 }
 
 func NewDownloader(params ClientParams) Downloader {
-	return s3manager.NewDownloader(params.S3.Session)
+	client := s3.NewFromConfig(params.S3.Config)
+	return manager.NewDownloader(client)
 }
 
 func NewClient(params ClientParams) Client {
-	s3Client := s3.New(params.S3.Session)
-	// this is optional as we already have traces at session level
-	// but since we have the client, we might as well add for extra information at client level
-	otaws.AddOTHandlers(s3Client.Client)
-	return s3Client
+	return s3.NewFromConfig(params.S3.Config)
 }

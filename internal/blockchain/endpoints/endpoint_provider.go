@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"os"
+	"regexp"
 
 	"github.com/uber-go/tally/v4"
 	"go.uber.org/fx"
@@ -50,10 +53,11 @@ type (
 
 	EndpointProviderResult struct {
 		fx.Out
-		Master    EndpointProvider `name:"master"`
-		Slave     EndpointProvider `name:"slave"`
-		Validator EndpointProvider `name:"validator"`
-		Consensus EndpointProvider `name:"consensus"`
+		Master     EndpointProvider `name:"master"`
+		Slave      EndpointProvider `name:"slave"`
+		Validator  EndpointProvider `name:"validator"`
+		Consensus  EndpointProvider `name:"consensus"`
+		Additional EndpointProvider `name:"additional"`
 	}
 )
 
@@ -73,15 +77,17 @@ type (
 )
 
 const (
-	masterEndpointGroupName    = "master"
-	slaveEndpointGroupName     = "slave"
-	validatorEndpointGroupName = "validator"
-	consensusEndpointGroupName = "consensus"
-	contextKeyFailover         = "failover:"
+	masterEndpointGroupName     = "master"
+	slaveEndpointGroupName      = "slave"
+	validatorEndpointGroupName  = "validator"
+	consensusEndpointGroupName  = "consensus"
+	contextKeyFailover          = "failover:"
+	additionalEndpointGroupName = "additional"
 )
 
 var (
 	ErrFailoverUnavailable = xerrors.New("no endpoint is available for failover")
+	placeholderVarRE       = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 )
 
 func NewEndpointProvider(params EndpointProviderParams) (EndpointProviderResult, error) {
@@ -116,12 +122,16 @@ func NewEndpointProvider(params EndpointProviderParams) (EndpointProviderResult,
 			return EndpointProviderResult{}, xerrors.Errorf("failed to create consensus endpoint provider with slave endpoints: %w", err)
 		}
 	}
-
+	additional, err := newEndpointProvider(logger, params.Config, scope, &params.Config.Chain.Client.Additional.EndpointGroup, additionalEndpointGroupName)
+	if err != nil {
+		return EndpointProviderResult{}, xerrors.Errorf("failed to create additional endpoint provider: %w", err)
+	}
 	return EndpointProviderResult{
-		Master:    master,
-		Slave:     slave,
-		Validator: validator,
-		Consensus: consensus,
+		Master:     master,
+		Slave:      slave,
+		Validator:  validator,
+		Consensus:  consensus,
+		Additional: additional,
 	}, nil
 }
 
@@ -154,6 +164,8 @@ func newEndpointProvider(logger *zap.Logger, cfg *config.Config, scope tally.Sco
 		primaryPicker, secondaryPicker = secondaryPicker, primaryPicker
 	}
 
+	logEndpointGroup(logger, name, primaryEndpoints, secondaryEndpoints)
+
 	return &endpointProvider{
 		name:               name,
 		endpointGroup:      endpointGroup,
@@ -164,6 +176,42 @@ func newEndpointProvider(logger *zap.Logger, cfg *config.Config, scope tally.Sco
 		secondaryPicker:    secondaryPicker,
 		secondaryEndpoints: secondaryEndpoints,
 	}, nil
+}
+
+// logEndpointGroup records the endpoint settings that are actually in effect,
+// so that a misconfigured deployment can be diagnosed from the startup log
+// instead of by inspecting the provider's rate-limit errors. Note that the rate
+// limiter is per endpoint per group: the same URL configured in several groups
+// gets an independent budget in each of them.
+func logEndpointGroup(logger *zap.Logger, name string, primary []*Endpoint, secondary []*Endpoint) {
+	if len(primary) == 0 {
+		logger.Warn("endpoint group is empty", zap.String("endpoint_group", name))
+		return
+	}
+
+	for _, endpoint := range primary {
+		logger.Info(
+			"endpoint config",
+			zap.String("endpoint_group", name),
+			zap.String("endpoint", endpoint.Name),
+			zap.String("host", endpointHost(endpoint.Config.Url)),
+			zap.Uint8("weight", endpoint.Config.Weight),
+			zap.Int("rps", endpoint.Config.RPS),
+			zap.Bool("rps_count_batch", endpoint.Config.RPSCountBatch),
+			zap.Int("num_failover_endpoints", len(secondary)),
+		)
+	}
+}
+
+// endpointHost strips the path and the userinfo from the url, since providers
+// such as QuickNode embed the API key in them.
+func endpointHost(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Host == "" {
+		return "unknown"
+	}
+
+	return parsed.Host
 }
 
 func newEndpoints(
@@ -207,6 +255,15 @@ func newEndpoint(
 	endpoint *config.Endpoint,
 	endpointConfig *config.EndpointConfig,
 ) (*Endpoint, error) {
+	// Expand URL placeholders before it is used anywhere else (e.g. sticky session cookie hash).
+	if endpoint.Url != "" {
+		expanded, err := expandEndpointURL(endpoint.Url)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to expand endpoint url for %q: %w", endpoint.Name, err)
+		}
+		endpoint.Url = expanded
+	}
+
 	var opts []ClientOption
 
 	//TODO: check if this is still needed
@@ -263,6 +320,10 @@ func newEndpoint(
 		opts = append(opts, withRPS(endpoint.RPS))
 	}
 
+	if endpoint.RPSCountBatch {
+		opts = append(opts, withRPSCountBatch(true))
+	}
+
 	client, err := newHTTPClient(opts...)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create http client for %v: %w", endpoint.Name, err)
@@ -284,6 +345,38 @@ func newEndpoint(
 			}).
 			Counter("requests"),
 	}, nil
+}
+
+// expandEndpointURL expands placeholders in the URL using environment variables.
+//
+// Supported formats:
+// - {VAR}: custom syntax (e.g. {URL_TOKEN})
+//
+// It returns an error if any placeholder is left unresolved.
+func expandEndpointURL(raw string) (string, error) {
+	missing := make(map[string]struct{})
+	expanded := placeholderVarRE.ReplaceAllStringFunc(raw, func(m string) string {
+		sub := placeholderVarRE.FindStringSubmatch(m)
+		// sub is always [full, group1] when regex matches, but keep it defensive.
+		if len(sub) != 2 {
+			return m
+		}
+
+		key := sub[1]
+		val, ok := os.LookupEnv(key)
+		if !ok {
+			missing[key] = struct{}{}
+			return m
+		}
+		return val
+	})
+
+	if len(missing) > 0 {
+		// Keep the expanded URL in the error for debugging (it will still contain {VAR} markers).
+		return "", xerrors.Errorf("endpoint url contains unresolved placeholder(s): %v", expanded)
+	}
+
+	return expanded, nil
 }
 
 func getStickySessionValue(cfg *config.Config) string {

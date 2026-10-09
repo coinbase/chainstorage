@@ -2,28 +2,25 @@ package dynamodb
 
 import (
 	"context"
+	"errors"
 	"reflect"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"golang.org/x/xerrors"
 
-	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
+	storageerrors "github.com/coinbase/chainstorage/internal/storage/internal/errors"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
 	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 )
 
 var (
-	awsStringType = aws.String("S")
-	awsNumberType = aws.String("N")
-	hashKeyType   = aws.String("HASH")
-	rangeKeyType  = aws.String("RANGE")
+	awsStringType = types.ScalarAttributeTypeS
+	awsNumberType = types.ScalarAttributeTypeN
+	hashKeyType   = types.KeyTypeHash
+	rangeKeyType  = types.KeyTypeRange
 )
 
 const (
@@ -48,8 +45,18 @@ type (
 		BatchWriteItems(ctx context.Context, items []any, parallelism int) error
 	}
 
-	// DynamoAPI For mock generation for testing purpose
-	DynamoAPI = dynamodbiface.DynamoDBAPI
+	// DynamoAPI interface for mock generation for testing purpose
+	DynamoAPI interface {
+		PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+		GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+		Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+		TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
+		TransactGetItems(ctx context.Context, params *dynamodb.TransactGetItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactGetItemsOutput, error)
+		BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error)
+		CreateTable(ctx context.Context, params *dynamodb.CreateTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error)
+		DeleteTable(ctx context.Context, params *dynamodb.DeleteTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteTableOutput, error)
+		DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+	}
 
 	ddbTableImpl struct {
 		table        *tableDBAPI
@@ -63,10 +70,10 @@ type (
 	}
 
 	QueryItemsRequest struct {
-		ExclusiveStartKey         map[string]*dynamodb.AttributeValue
+		ExclusiveStartKey         map[string]types.AttributeValue
 		KeyConditionExpression    *string
-		ExpressionAttributeNames  map[string]*string
-		ExpressionAttributeValues map[string]*dynamodb.AttributeValue
+		ExpressionAttributeNames  map[string]string
+		ExpressionAttributeValues map[string]types.AttributeValue
 		IndexName                 string
 		ConsistentRead            bool
 	}
@@ -77,21 +84,19 @@ type (
 func newDDBTable(
 	tableName string,
 	ddbEntryType reflect.Type,
-	keySchema []*dynamodb.KeySchemaElement,
-	attrDefs []*dynamodb.AttributeDefinition,
-	globalSecondaryIndexes []*dynamodb.GlobalSecondaryIndex,
+	keySchema []types.KeySchemaElement,
+	attrDefs []types.AttributeDefinition,
+	globalSecondaryIndexes []types.GlobalSecondaryIndex,
 	params Params,
 ) (ddbTable, error) {
-	//logger := log.WithPackage(params.Logger)
-	retry := retry.New()
+	retryClient := retry.New()
 
-	//TODO: enable assume-role if params.Config.AWS.DynamoDB.Arn is not empty
-	awsTable := newTableAPI(tableName, params.Session)
+	awsTable := newTableAPI(tableName, params.AWSConfig)
 
 	table := ddbTableImpl{
 		table:        awsTable,
 		ddbEntryType: ddbEntryType,
-		retry:        retry,
+		retry:        retryClient,
 	}
 	if params.Config.AWS.IsLocalStack {
 		err := initLocalDb(
@@ -108,21 +113,21 @@ func newDDBTable(
 	return &table, nil
 }
 
-func newTableAPI(tableName string, session *session.Session) *tableDBAPI {
+func newTableAPI(tableName string, cfg aws.Config) *tableDBAPI {
 	return &tableDBAPI{
 		TableName: tableName,
-		DBAPI:     dynamodb.New(session),
+		DBAPI:     dynamodb.NewFromConfig(cfg),
 	}
 }
 
 func (d *ddbTableImpl) getTransactWriteItem(
-	ddbEntry any) (*dynamodb.TransactWriteItem, error) {
-	item, err := dynamodbattribute.MarshalMap(ddbEntry)
+	ddbEntry any) (*types.TransactWriteItem, error) {
+	item, err := attributevalue.MarshalMap(ddbEntry)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get marshal ddb entry (%v): %w", ddbEntry, err)
 	}
-	writeItem := &dynamodb.TransactWriteItem{
-		Put: &dynamodb.Put{
+	writeItem := &types.TransactWriteItem{
+		Put: &types.Put{
 			TableName: aws.String(d.table.TableName),
 			Item:      item,
 		},
@@ -131,11 +136,11 @@ func (d *ddbTableImpl) getTransactWriteItem(
 }
 
 func (d *ddbTableImpl) WriteItem(ctx context.Context, item any) error {
-	mItem, err := dynamodbattribute.MarshalMap(item)
+	mItem, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return xerrors.Errorf("failed to get marshal ddb entry (%v): %w", item, err)
 	}
-	_, err = d.table.DBAPI.PutItemWithContext(
+	_, err = d.table.DBAPI.PutItem(
 		ctx,
 		&dynamodb.PutItemInput{
 			Item:      mItem,
@@ -143,8 +148,8 @@ func (d *ddbTableImpl) WriteItem(ctx context.Context, item any) error {
 		},
 	)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-			return errors.ErrRequestCanceled
+		if errors.Is(err, context.Canceled) {
+			return storageerrors.ErrRequestCanceled
 		}
 		return xerrors.Errorf("failed to write item: %w", err)
 	}
@@ -155,24 +160,25 @@ func (d *ddbTableImpl) TransactWriteItems(ctx context.Context, items []any) erro
 	if len(items) == 0 {
 		return nil
 	}
-	batchWriteItems := make([]*dynamodb.TransactWriteItem, len(items))
+	batchWriteItems := make([]types.TransactWriteItem, len(items))
 	var err error
 	for i, item := range items {
-		batchWriteItems[i], err = d.getTransactWriteItem(item)
+		writeItem, err := d.getTransactWriteItem(item)
 		if err != nil {
 			return xerrors.Errorf("failed to transact write items: %w", err)
 		}
+		batchWriteItems[i] = *writeItem
 	}
 
-	_, err = d.table.DBAPI.TransactWriteItemsWithContext(
+	_, err = d.table.DBAPI.TransactWriteItems(
 		ctx,
 		&dynamodb.TransactWriteItemsInput{
 			TransactItems: batchWriteItems,
 		},
 	)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-			return errors.ErrRequestCanceled
+		if errors.Is(err, context.Canceled) {
+			return storageerrors.ErrRequestCanceled
 		}
 		return xerrors.Errorf("failed to transact write items: %w", err)
 	}
@@ -207,14 +213,14 @@ func (d *ddbTableImpl) transactGetItems(ctx context.Context, inputKeys []StringM
 	if len(inputKeys) == 0 {
 		return nil
 	}
-	inputItems := make([]*dynamodb.TransactGetItem, len(inputKeys))
+	inputItems := make([]types.TransactGetItem, len(inputKeys))
 	for i, keyMap := range inputKeys {
-		dynamodbKey, err := dynamodbattribute.MarshalMap(keyMap)
+		dynamodbKey, err := attributevalue.MarshalMap(keyMap)
 		if err != nil {
 			return xerrors.Errorf("could not marshal given key(%v):%w", keyMap, err)
 		}
-		inputItems[i] = &dynamodb.TransactGetItem{
-			Get: &dynamodb.Get{
+		inputItems[i] = types.TransactGetItem{
+			Get: &types.Get{
 				Key:       dynamodbKey,
 				TableName: aws.String(d.table.TableName),
 			},
@@ -222,23 +228,24 @@ func (d *ddbTableImpl) transactGetItems(ctx context.Context, inputKeys []StringM
 	}
 
 	return d.retry.Retry(ctx, func(ctx context.Context) error {
-		output, err := d.table.DBAPI.TransactGetItemsWithContext(ctx, &dynamodb.TransactGetItemsInput{
+		output, err := d.table.DBAPI.TransactGetItems(ctx, &dynamodb.TransactGetItemsInput{
 			TransactItems: inputItems,
 		})
 
 		if err != nil {
-			if transactionCanceledException, ok := err.(*dynamodb.TransactionCanceledException); ok {
+			var transactionCanceledException *types.TransactionCanceledException
+			if errors.As(err, &transactionCanceledException) {
 				reasons := transactionCanceledException.CancellationReasons
 				for _, reason := range reasons {
-					if reason.Code != nil && *reason.Code == dynamodb.BatchStatementErrorCodeEnumTransactionConflict {
+					if reason.Code != nil && *reason.Code == "TransactionConflict" {
 						return retry.Retryable(
 							xerrors.Errorf("failed to TransactGetItems because of transaction conflict, reason=(%v)", reason))
 					}
 				}
 			}
 
-			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-				return errors.ErrRequestCanceled
+			if errors.Is(err, context.Canceled) {
+				return storageerrors.ErrRequestCanceled
 			}
 			return err
 		}
@@ -247,9 +254,9 @@ func (d *ddbTableImpl) transactGetItems(ctx context.Context, inputKeys []StringM
 		// if missing then corresponding ItemResponse at same index will be empty
 		for index, item := range inputItems {
 			if len(output.Responses[index].Item) == 0 {
-				return xerrors.Errorf("missing item key=%v: %w", item.Get.ProjectionExpression, errors.ErrItemNotFound)
+				return xerrors.Errorf("missing item key=%v: %w", item.Get.ProjectionExpression, storageerrors.ErrItemNotFound)
 			}
-			err = dynamodbattribute.UnmarshalMap(output.Responses[index].Item, outputItems[index])
+			err = attributevalue.UnmarshalMap(output.Responses[index].Item, outputItems[index])
 			if err != nil {
 				return xerrors.Errorf("failed to unmarshal item (%v, %v): %w", output.Responses[index].Item, outputItems[index], err)
 			}
@@ -283,7 +290,7 @@ func (d *ddbTableImpl) GetItems(ctx context.Context,
 }
 
 func (d *ddbTableImpl) GetItem(ctx context.Context, keyMap StringMap) (any, error) {
-	dynamodbKey, err := dynamodbattribute.MarshalMap(keyMap)
+	dynamodbKey, err := attributevalue.MarshalMap(keyMap)
 	if err != nil {
 		return nil, xerrors.Errorf("could not marshal given key(%v):%w", keyMap, err)
 	}
@@ -292,18 +299,18 @@ func (d *ddbTableImpl) GetItem(ctx context.Context, keyMap StringMap) (any, erro
 		TableName:      aws.String(d.table.TableName),
 		ConsistentRead: aws.Bool(true),
 	}
-	output, err := d.table.DBAPI.GetItemWithContext(ctx, input)
+	output, err := d.table.DBAPI.GetItem(ctx, input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-			return nil, errors.ErrRequestCanceled
+		if errors.Is(err, context.Canceled) {
+			return nil, storageerrors.ErrRequestCanceled
 		}
 		return nil, xerrors.Errorf("failed to get item for key (%v): %w", keyMap, err)
 	}
 	if output.Item == nil {
-		return nil, errors.ErrItemNotFound
+		return nil, storageerrors.ErrItemNotFound
 	}
 	outputItem := reflect.New(d.ddbEntryType).Interface()
-	err = dynamodbattribute.UnmarshalMap(output.Item, outputItem)
+	err = attributevalue.UnmarshalMap(output.Item, outputItem)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to unmarshal item (%v): %w", output.Item, err)
 	}
@@ -314,7 +321,7 @@ func (d *ddbTableImpl) QueryItems(ctx context.Context, req *QueryItemsRequest) (
 	queryInput := &dynamodb.QueryInput{
 		ExclusiveStartKey:         req.ExclusiveStartKey,
 		KeyConditionExpression:    req.KeyConditionExpression,
-		Select:                    aws.String(dynamodb.SelectAllAttributes),
+		Select:                    types.SelectAllAttributes,
 		ExpressionAttributeNames:  req.ExpressionAttributeNames,
 		ExpressionAttributeValues: req.ExpressionAttributeValues,
 		TableName:                 aws.String(d.table.TableName),
@@ -328,21 +335,21 @@ func (d *ddbTableImpl) QueryItems(ctx context.Context, req *QueryItemsRequest) (
 	outputItems := make([]any, 0)
 	iterations := 0
 	for true {
-		queryOutput, err := d.table.DBAPI.QueryWithContext(ctx, queryInput)
+		queryOutput, err := d.table.DBAPI.Query(ctx, queryInput)
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok && aerr.Code() == request.CanceledErrorCode {
-				return nil, errors.ErrRequestCanceled
+			if errors.Is(err, context.Canceled) {
+				return nil, storageerrors.ErrRequestCanceled
 			}
 			return nil, xerrors.Errorf("failed to get query items (index=%v, keyConditionExpression=%v): %w", req.IndexName, req.KeyConditionExpression, err)
 		}
 
 		if len(queryOutput.Items) == 0 {
-			return nil, errors.ErrItemNotFound
+			return nil, storageerrors.ErrItemNotFound
 		}
 
 		for _, item := range queryOutput.Items {
 			outputItem := reflect.New(d.ddbEntryType).Interface()
-			err = dynamodbattribute.UnmarshalMap(item, outputItem)
+			err = attributevalue.UnmarshalMap(item, outputItem)
 			if err != nil {
 				return nil, xerrors.Errorf("failed to unmarshal item (%v): %w", item, err)
 			}
@@ -399,25 +406,25 @@ func (d *ddbTableImpl) batchWriteItemsWithLimit(ctx context.Context, items []any
 		return xerrors.Errorf("too many items: %v", numItems)
 	}
 
-	writeRequests := make([]*dynamodb.WriteRequest, numItems)
+	writeRequests := make([]types.WriteRequest, numItems)
 	for i, item := range items {
 		writeRequest, err := d.getWriteRequest(item)
 		if err != nil {
 			return xerrors.Errorf("failed to prepare write items: %w", err)
 		}
 
-		writeRequests[i] = writeRequest
+		writeRequests[i] = *writeRequest
 	}
 
 	tableName := d.table.TableName
 	numProcessed := 0
 	return d.retry.Retry(ctx, func(ctx context.Context) error {
 		input := &dynamodb.BatchWriteItemInput{
-			RequestItems: map[string][]*dynamodb.WriteRequest{
+			RequestItems: map[string][]types.WriteRequest{
 				tableName: writeRequests,
 			},
 		}
-		output, err := d.table.DBAPI.BatchWriteItemWithContext(ctx, input)
+		output, err := d.table.DBAPI.BatchWriteItem(ctx, input)
 		if err != nil {
 			return xerrors.Errorf("failed to batch write items: %w", err)
 		}
@@ -440,13 +447,13 @@ func (d *ddbTableImpl) batchWriteItemsWithLimit(ctx context.Context, items []any
 }
 
 func (d *ddbTableImpl) getWriteRequest(
-	ddbEntry any) (*dynamodb.WriteRequest, error) {
-	item, err := dynamodbattribute.MarshalMap(ddbEntry)
+	ddbEntry any) (*types.WriteRequest, error) {
+	item, err := attributevalue.MarshalMap(ddbEntry)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get marshal ddb entry (%v): %w", ddbEntry, err)
 	}
-	writeRequest := &dynamodb.WriteRequest{
-		PutRequest: &dynamodb.PutRequest{
+	writeRequest := &types.WriteRequest{
+		PutRequest: &types.PutRequest{
 			Item: item,
 		},
 	}

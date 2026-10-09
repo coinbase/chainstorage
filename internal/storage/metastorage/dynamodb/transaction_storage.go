@@ -4,9 +4,9 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"golang.org/x/xerrors"
 
 	ddbmodel "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
@@ -26,7 +26,7 @@ type (
 var _ internal.TransactionStorage = (*transactionStorageImpl)(nil)
 
 func newTransactionStorage(params Params) (internal.TransactionStorage, error) {
-	attrDefs := []*dynamodb.AttributeDefinition{
+	attrDefs := []types.AttributeDefinition{
 		{
 			AttributeName: aws.String(ddbmodel.TransactionPidKeyName),
 			AttributeType: awsStringType,
@@ -36,7 +36,7 @@ func newTransactionStorage(params Params) (internal.TransactionStorage, error) {
 			AttributeType: awsStringType,
 		},
 	}
-	keySchema := []*dynamodb.KeySchemaElement{
+	keySchema := []types.KeySchemaElement{
 		{
 			AttributeName: aws.String(ddbmodel.TransactionPidKeyName),
 			KeyType:       hashKeyType,

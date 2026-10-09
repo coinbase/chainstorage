@@ -22,6 +22,10 @@
   - [Overriding the Configuration](#overriding-the-configuration)
 - [Development](#development)
   - [Running Server](#running-server)
+  - [Running with PostgreSQL](#running-with-postgresql)
+  - [PostgreSQL Role-Based Setup (Recommended)](#postgresql-role-based-setup-recommended)
+  - [Local Development Setup](#local-development-setup)
+  - [Admin CLI](#admin-cli)
   - [AWS localstack](#aws-localstack)
   - [Temporal Workflow](#temporal-workflow)
 - [Failover](#failover)
@@ -55,33 +59,52 @@ It aims to provide an efficient and flexible way to access the on-chain data:
 - Flexibility is improved by decoupling data interpretation from data ingestion. ChainStorage stores the raw data, and the parsing is deferred until the data is consumed. The parsers are shipped as part of the SDK and run on the consumer side. Thanks to the ELT (Extract, Load, Transform) architecture, we can quickly iterate on the parser without ingesting the data from the blockchain again.
 
 ## Quick Start
+This section will guide you through setting up ChainStorage on your local machine for development.
 
-Make sure your local go version is 1.22 by running the following commands:
-```shell
-brew install go@1.22
-brew unlink go
-brew link go@1.22
+### Prerequisites
+1.  **Go (version 1.24):**
+    ```shell
+    brew install go@1.24
+    brew unlink go
+    brew link go@1.24
+    ```
+    Verify your Go installation:
+    ```shell
+    go version
+    ```
+2.  **Protocol Buffer Compiler (protobuf):** Used for code generation based on `.proto` files.
+    ```shell
+    brew install protobuf@29
+    brew unlink protobuf
+    brew link protobuf@29
+    ```
+    Verify your installation:
+    ```shell
+    protoc --version
+    ```
 
-brew install protobuf@25.2
-brew unlink protobuf
-brew link protobuf
+### Initial Setup
 
-```
-
-To set up for the first time (only done once):
+This command (run only once) installs necessary Go tools for development, like linters and code generators.
 ```shell
 make bootstrap
 ```
 
-Rebuild everything:
+### Build the Project
+
+This command compiles the ChainStorage Go programs.
 ```shell
 make build
 ```
+You'll run this command whenever you make changes to the Go source code.
 
-Generate Protos:
+### Generate Protocol Buffers
+
+ChainStorage uses Protocol Buffers to define data structures. This command generates Go code from those definitions.
 ```shell
 make proto
 ```
+You'll need to run this if you change any `.proto` files (usually located in the `protos/` directory).
 
 ## Command Line
 
@@ -119,14 +142,24 @@ All sub-commands require the `blockchain`, `env`, `network` flags.
 
 ### Block Command
 
-Fetch a block from ethereum mainnet:
-```shell
-go run ./cmd/admin block --blockchain ethereum --network mainnet --env local --height 46147
-```
+This command allows you to fetch and inspect individual blocks from a specified blockchain and network.
 
-Fetch a block from ethereum goerli:
+**Usage Example:**
+
+Fetch block #46147 from Ethereum mainnet, using your local configuration:
 ```shell
-go run ./cmd/admin block --blockchain ethereum --network goerli --env local --height 46147
+go run ./cmd/admin/main.go block --blockchain ethereum --network mainnet --env local --height 46147
+```
+*   `block`: The command to fetch block data.
+*   `--blockchain ethereum --network mainnet --env local`: These flags specify the target (Ethereum mainnet) and the configuration environment (local).
+*   `--height 46147`: The specific block number you want to retrieve.
+
+You can also fetch blocks from other supported blockchains and networks by changing the flag values:
+
+Fetch a block from Ethereum Goerli testnet:
+```shell
+# Assuming Goerli is configured and data is available
+go run ./cmd/admin/main.go block --blockchain ethereum --network goerli --env local --height 12345
 ```
 
 ### Backfill Command (development)
@@ -187,19 +220,44 @@ make functional TARGET=internal/blockchain/... TEST_FILTER=TestIntegrationPolygo
 ```
 
 ## Configuration
-
+Configuration in ChainStorage tells the system:
+1. Which blockchain to connect to (like Ethereum, Bitcoin, etc.)
+2. How to connect to that blockchain (which nodes/servers to use)
+3. Where to store the data it collects
+4. How to process and manage the data
 ### Dependency overview
 
 To understand the structure and elements of ChainStorage's config, it's important to comprehend its dependencies.
 
-- **Temporal**: Temporal is a workflow engine that orchestrates the data ingestion workflow. It calls ChainStorage service endpoint to complete various of tasks.
-- **Blob storage** - current implementation is on AWS S3, and the local service is provied by localstack
-- **Key value storage** - current implemnentation is based on dynamodb and the local service is provied by localstack
-- **Dead Letter queue** - current implementation is on SQS and the local service is provied by localstack
+ChainStorage needs several services to work properly:
+
+1. **Blockchain Nodes**: These are servers that maintain a copy of the blockchain. ChainStorage connects to these to get blockchain data.
+   - Example: An Ethereum node that provides information about Ethereum transactions and blocks
+
+2. **Storage Systems**:
+    - **Blob storage** - current implementation is on AWS S3, and the local service is provied by localstack
+    - **Key value storage** - current implemnentation is based on dynamodb and the local service is provied by localstack
+    - **Dead Letter queue** - current implementation is on SQS and the local service is provied by localstack
+
+3. **Workflow Engine** (Temporal):Temporal is a workflow engine that orchestrates the data ingestion workflow. It calls ChainStorage service endpoint to complete various of tasks.
+
 
 ### Template location and generated config
 
 The config template directory is in `config_templates/config`, which `make config` reads this directory and generates the config into the `config/chainstorage` directory.
+### Creating New Configurations
+
+Every new asset in ChainStorage consists of ChainStorage configuration files.
+These configuration files are generated from `.template.yml` template files using:
+
+```shell
+make config
+```
+
+these templates will be under a directory dedicated to storing the config templates
+in a structure that mirrors the final config structure of the `config`
+directories. All configurations from this directory will be generated within the final
+respective config directories
 
 ### Environment Variables
 
@@ -218,19 +276,6 @@ The directory structure is as follows: `config/{namespace}/{blockchain}/{network
   This env var controls the `{environment}` in which the service is deployed. Possible values include `production`
   , `development`, and `local` (which is also the default value).
 
-### Creating New Configurations
-
-Every new asset in ChainStorage consists of ChainStorage configuration files.
-These configuration files are generated from `.template.yml` template files using:
-
-```shell
-make config
-```
-
-these templates will be under a directory dedicated to storing the config templates
-in a structure that mirrors the final config structure of the `config`
-directories. All configurations from this directory will be generated within the final
-respective config directories
 
 ### Template Format and Inheritance
 
@@ -325,7 +370,9 @@ chain:
 ```
 
 ### Overriding the Configuration
+You can override configurations in two ways:
 
+1. **Environment Variables**:
 You may override any configuration using an environment variable. The environment variable should be prefixed with
 "CHAINSTORAGE_". For nested dictionary, use underscore to separate the keys.
 
@@ -333,9 +380,30 @@ For example, you may override the endpoint group config at runtime by injecting 
 * master: CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP
 * slave: CHAINSTORAGE_CHAIN_CLIENT_SLAVE_ENDPOINT_GROUP
 
-Alternatively, you may override the configuration by creating `secrets.yml` within the same directory. Its attributes
+**Security Best Practice - PostgreSQL Credentials:**
+For sensitive data like database passwords, always use environment variables instead of hardcoding them in config files:
+```shell
+# PostgreSQL credentials (never put these in config files!)
+export CHAINSTORAGE_AWS_POSTGRES_USER="your_username"
+export CHAINSTORAGE_AWS_POSTGRES_PASSWORD="your_secure_password"
+
+# Storage type configuration
+export CHAINSTORAGE_STORAGE_TYPE_META="POSTGRES"
+```
+
+2. **secrets.yml**: Alternatively, you may override the configuration by creating `secrets.yml` within the same directory. Its attributes
 will be merged into the runtime configuration and take the highest precedence. Note that this file may contain
 credentials and is excluded from check-in by `.gitignore`.
+
+Example `config/chainstorage/ethereum/mainnet/.secrets.yml`:
+```yaml
+storage_type:
+  meta: POSTGRES
+aws:
+  postgres:
+    user: your_username
+    password: your_secure_password
+```
 
 ## Development
 
@@ -361,6 +429,218 @@ make server
 # Use aws local stack
 make server CHAINSTORAGE_CONFIG=ethereum_goerli
 ```
+
+### Running with PostgreSQL
+
+ChainStorage supports PostgreSQL as an alternative to DynamoDB for metadata storage. Here's how to set it up:
+
+#### 1. Start PostgreSQL Database
+
+You can use Docker to run PostgreSQL locally:
+
+```shell
+# Start PostgreSQL container
+docker run --name chainstorage-postgres \
+  -e POSTGRES_USER=temporal \
+  -e POSTGRES_PASSWORD=temporal \
+  -e POSTGRES_DB=postgres \
+  -p 5432:5432 \
+  -d postgres:13
+```
+
+Or add it to your existing docker-compose setup.
+
+#### 2. Configure Meta Storage Type
+
+Create or modify your local config to use PostgreSQL instead of DynamoDB. You have two options:
+
+**Option A: Create a local secrets file (recommended for development)**
+
+Create `config/chainstorage/{blockchain}/{network}/.secrets.yml` (e.g., `config/chainstorage/ethereum/mainnet/.secrets.yml`):
+
+```yaml
+storage_type:
+  meta: POSTGRES
+```
+
+**Option B: Set via environment variable**
+
+```shell
+export CHAINSTORAGE_STORAGE_TYPE_META=POSTGRES
+```
+
+#### 3. Set PostgreSQL Credentials
+
+Since PostgreSQL credentials should not be hardcoded in config files, set them via environment variables:
+
+```shell
+# PostgreSQL connection details
+export CHAINSTORAGE_AWS_POSTGRES_USER="temporal"
+export CHAINSTORAGE_AWS_POSTGRES_PASSWORD="temporal"
+export CHAINSTORAGE_AWS_POSTGRES_HOST="localhost"
+export CHAINSTORAGE_AWS_POSTGRES_PORT="5432"
+export CHAINSTORAGE_AWS_POSTGRES_SSL_MODE="require"
+```
+
+#### 4. Run the Server
+
+Now start the server with PostgreSQL configuration:
+
+```shell
+# Method 1: Using exported environment variables
+make server
+
+# Method 2: Setting environment variables inline
+CHAINSTORAGE_STORAGE_TYPE_META=POSTGRES \
+CHAINSTORAGE_AWS_POSTGRES_USER="temporal" \
+CHAINSTORAGE_AWS_POSTGRES_PASSWORD="temporal" \
+make server
+```
+
+#### PostgreSQL Configuration Reference
+
+The following environment variables can be used to configure PostgreSQL:
+
+| Environment Variable | Config Path | Description | Default |
+|---------------------|-------------|-------------|---------|
+| `CHAINSTORAGE_AWS_POSTGRES_HOST` | `aws.postgres.host` | PostgreSQL hostname | `localhost` |
+| `CHAINSTORAGE_AWS_POSTGRES_PORT` | `aws.postgres.port` | PostgreSQL port | `5432` |
+| `CHAINSTORAGE_AWS_POSTGRES_USER` | `aws.postgres.user` | PostgreSQL username | (required) |
+| `CHAINSTORAGE_AWS_POSTGRES_PASSWORD` | `aws.postgres.password` | PostgreSQL password | (required) |
+| `CHAINSTORAGE_AWS_POSTGRES_DATABASE` | `aws.postgres.database` | Database name | `chainstorage_{blockchain}_{network}` |
+| `CHAINSTORAGE_AWS_POSTGRES_SSL_MODE` | `aws.postgres.ssl_mode` | SSL mode | `require` |
+| `CHAINSTORAGE_AWS_POSTGRES_MAX_CONNECTIONS` | `aws.postgres.max_connections` | Maximum connection pool size | `25` |
+| `CHAINSTORAGE_AWS_POSTGRES_MIN_CONNECTIONS` | `aws.postgres.min_connections` | Minimum connection pool size | `5` |
+| `CHAINSTORAGE_AWS_POSTGRES_CONNECT_TIMEOUT` | `aws.postgres.connect_timeout` | Connection establishment timeout | `30s` |
+| `CHAINSTORAGE_AWS_POSTGRES_STATEMENT_TIMEOUT` | `aws.postgres.statement_timeout` | Statement/transaction timeout | `60s` |
+| `CHAINSTORAGE_STORAGE_TYPE_META` | `storage_type.meta` | Meta storage type | `DYNAMODB` |
+
+#### Database Schema
+
+ChainStorage runtime server and worker processes do not run schema migrations during startup. Apply schema changes through the privileged `db-init` or `db-migrate` admin command before starting runtime pods. The database contains tables for:
+- `block_metadata` - Block metadata and headers
+- `canonical_blocks` - Canonical chain state
+- `block_events` - Blockchain event log
+
+### PostgreSQL Setup
+
+ChainStorage supports PostgreSQL as an alternative to DynamoDB for metadata storage with role-based access for enhanced security.
+
+#### Local Development
+
+**Quick Start:**
+```bash
+# Start PostgreSQL with automatic database initialization
+docker-compose -f docker-compose-local-dev.yml up -d chainstorage-postgres
+```
+
+This automatically creates:
+- Shared `chainstorage_worker` and `chainstorage_server` roles
+- Databases for all supported networks (ethereum_mainnet, bitcoin_mainnet, etc.)
+- Proper permissions (worker: read-write, server: read-only)
+
+**Default Credentials:**
+- Worker: `chainstorage_worker` / `worker_password`
+- Server: `chainstorage_server` / `server_password`
+
+**Manual Setup:**
+```bash
+chainstorage admin setup-postgres \
+  --blockchain ethereum \
+  --network mainnet \
+  --env local \
+  --master-user postgres \
+  --master-password postgres \
+  --worker-password worker_password \
+  --server-password server_password
+```
+
+#### Production/Development Setup
+
+In production, databases are initialized using the `db-init` command:
+
+```bash
+# Connect to admin pod
+kubectl exec -it deploy/chainstorage-admin-dev-console -c chainstorage-admin -- /bin/bash
+
+# Initialize database for ethereum-mainnet
+./admin db-init --blockchain ethereum --network mainnet --env dev
+```
+
+The `db-init` command:
+1. Reads master credentials from environment variables (injected by Kubernetes)
+2. Fetches network-specific credentials from AWS Secrets Manager (`chainstorage/db-creds/{env}`)
+3. Creates network-specific users with passwords from the secret
+4. Grants the privileged migration role membership in the worker role
+5. Creates the worker-owned database (e.g., `chainstorage_ethereum_mainnet`)
+6. Runs pending embedded migrations under a per-database advisory lock
+7. Reconciles runtime permissions and fails if any grant cannot be applied
+
+Both privileged migration commands hold the advisory lock on the same physical
+connection that executes migrations and grants. A lost connection aborts the
+invocation; rerun the command to recheck migration history and recover any
+invalid concurrent indexes belonging to pending migrations.
+
+#### Database Naming Convention
+
+Databases follow the pattern: `chainstorage_{blockchain}_{network}`
+
+Examples:
+- `chainstorage_ethereum_mainnet`
+- `chainstorage_bitcoin_mainnet`
+- `chainstorage_polygon_testnet`
+
+Note: Hyphens in blockchain/network names are replaced with underscores.
+
+### Local Development Setup
+
+#### Complete Local Environment
+
+Start the full local development stack:
+
+```shell
+# Start all services (PostgreSQL, Temporal, LocalStack)
+make localstack
+
+# Load environment variables
+source scripts/postgres-roles-local.env
+```
+
+#### Available Commands
+
+**Database Operations:**
+```shell
+# Set up PostgreSQL database and roles for a new network
+go run ./cmd/admin setup-postgres \
+  --blockchain ethereum \
+  --network mainnet \
+  --env local \
+  --master-user postgres \
+  --master-password postgres \
+  --host localhost \
+  --port 5433
+
+# Initialize databases from AWS Secrets Manager (production)
+go run ./cmd/admin db-init \
+  --secret-name chainstorage/db-init/prod \
+  --aws-region us-east-1
+
+# Migrate data from DynamoDB to PostgreSQL
+chainstorage admin migrate-dynamodb-to-postgres \
+  --blockchain ethereum \
+  --network mainnet \
+  --env local \
+  --start-height 1000000 \
+  --end-height 1001000
+```
+
+#### Command Reference
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `setup-postgres` | Create database and roles | `setup-postgres --master-user postgres --master-password postgres` |
+| `db-init` | Initialize from AWS Secrets Manager | `db-init --blockchain ethereum --network mainnet --env dev` |
+| `migrate-dynamodb-to-postgres` | Migrate data from DynamoDB to PostgreSQL | `migrate-dynamodb-to-postgres --start-height 1000000 --end-height 1001000` |
 
 ### AWS localstack
 
@@ -412,6 +692,75 @@ Start the streamer workflow:
 go run ./cmd/admin workflow start --workflow streamer --input '{}' --blockchain ethereum --network goerli --env local
 ```
 
+Start the migrator workflow (event-driven migration from DynamoDB to PostgreSQL):
+```shell
+# Migrate events by sequence range
+go run ./cmd/admin workflow start --workflow migrator --input '{"StartEventSequence": 1, "EndEventSequence": 1000, "Tag": 2, "EventTag": 3, "BatchSize": 500, "Parallelism": 2, "CheckpointSize": 10000}' --blockchain ethereum --network mainnet --env local
+
+# Auto-resume from last migrated position
+go run ./cmd/admin workflow start --workflow migrator --input '{"StartEventSequence": 0, "EndEventSequence": 100000, "Tag": 2, "EventTag": 3, "AutoResume": true}' --blockchain ethereum --network mainnet --env local
+
+# Continuous sync mode with auto-resume
+go run ./cmd/admin workflow start --workflow migrator --input '{"StartEventSequence": 0, "EndEventSequence": 0, "Tag": 2, "EventTag": 3, "AutoResume": true, "ContinuousSync": true, "BatchSize": 500,"Parallelism": 2, "CheckpointSize": 10000}' --blockchain ethereum --network mainnet --env local
+
+# Custom batch size and parallelism for large migrations
+go run ./cmd/admin workflow start --workflow migrator --input '{"StartEventSequence": 1000000, "EndEventSequence": 2000000, "Tag": 1, "EventTag": 0, "BatchSize": 10000, "Parallelism": 16, "CheckpointSize": 100000}' --blockchain ethereum --network mainnet --env local
+```
+Note: The migrator uses an event-driven architecture where events are fetched by sequence number and blocks are extracted from BLOCK_ADDED events. This ensures data consistency and proper handling of blockchain reorganizations.
+
+Start the cross validator workflow:
+```shell
+go run ./cmd/admin workflow start --workflow cross_validator --input '{"StartHeight": 15500000, "Tag": 0}' --blockchain ethereum --network mainnet --env local
+```
+
+Start the event backfiller workflow:
+```shell
+go run ./cmd/admin workflow start --workflow event_backfiller --input '{"Tag": 0, "EventTag": 0, "StartSequence": 1000, "EndSequence": 2000}' --blockchain ethereum --network mainnet --env local
+```
+
+Start the replicator workflow:
+```shell
+go run ./cmd/admin workflow start --workflow replicator --input '{"Tag": 0, "StartHeight": 1000000, "EndHeight": 1001000}' --blockchain ethereum --network mainnet --env local
+```
+
+Inspect currently due single-block retention cohorts in an exact repaired range
+without deleting:
+```shell
+go run ./cmd/admin workflow start --workflow single_block_retention --input '{"Tag": 0, "StartHeight": 100000, "EndHeight": 110000, "MaxObjectRanges": 20, "Parallelism": 20}' --blockchain solana --network mainnet --env local
+```
+
+The workflow is manual-only while production retention is being verified; no
+recurring cron or Temporal Schedule starts it. `MaxObjectRanges` bounds each
+Temporal run, while optional `Parallelism` bounds concurrent CSCB cohort
+lifecycles from 1 to 20 and defaults to 1. Each concurrency slot schedules one
+CSCB cohort activity, which processes all covered single-block rows; Temporal
+may dispatch a bounded retry to a different worker. Selected cohorts are
+validated as unique and non-overlapping before execution on new workflow
+histories. If any post-processing failure occurs after cohort activities start,
+the terminal Temporal application error includes structured outcomes for every
+cohort launched in that run; a failed wave starts no later wave. A read-only run
+remains bounded, reports the current backlog through `MoreEligibleRanges`, and
+returns its frozen `EligibilityCutoff`. A new
+execute sweep must supply that exact dry-run cutoff. It continues as new with
+the same cutoff, selection, and approval envelope until a final empty selection
+confirms that no cohort from the frozen set remains; it never admits cohorts
+that become eligible later or bypasses each cohort's retention clock. Execution
+requires Postgres metadata plus versioned S3 storage, an explicit
+`FallbackReadsValidated` assertion with zero `FallbackErrorCount`, and a
+separate operator approval (`ApprovedChain`, `ApprovedStartHeight`,
+`ApprovedEndHeight`) that must fully contain the selection range. This permits
+one immutable campaign-wide approval to authorize separately bounded shards,
+while selections extending outside that envelope are rejected. Every selected
+cohort must also be fully contained by the envelope across continuations; the
+approval is passed through unchanged and is never derived from selector output,
+so unbounded execution requests are rejected. API and SDK clients
+continue to use the same Chainstorage interface; the
+`DirectStorageClientsGuarded` execution gate applies only to consumers that
+bypass Chainstorage and access object storage directly. The process activity
+heartbeats from the row and per-version delete loops under a bounded heartbeat
+timeout, so stopping the workflow cancels destructive work between steps
+instead of letting it run to completion.
+
 Stop the monitor workflow:
 ```shell
 go run ./cmd/admin workflow stop --workflow monitor --blockchain ethereum --network mainnet --env local
@@ -427,7 +776,7 @@ Using Temporal CLI to check the status of the workflow:
 brew install tctl
 
 tctl --address localhost:7233 --namespace chainstorage-ethereum-mainnet workflow show --workflow_id workflow.backfiller
-````
+```
 
 ## Failover
 
@@ -556,6 +905,36 @@ and out of order, the logical ordering guarantee is preserved.
 6. Update watermark once all the batches have been processed.
 7. Repeat above steps.
 
+## Data Migration Tool
+
+Tool to migrate blockchain data from DynamoDB to PostgreSQL with complete reorg support and data integrity preservation.
+
+### Overview
+
+The migration tool performs a comprehensive transfer of blockchain data:
+- **Block metadata** from DynamoDB to PostgreSQL (`block_metadata` + `canonical_blocks` tables)
+- **Events** from DynamoDB to PostgreSQL (`block_events` table)
+- **Complete reorg data** including both canonical and non-canonical blocks
+- **Event ID-based migration** for efficient sequential processing
+
+**Critical Requirements**: 
+1. Block metadata **must** be migrated before events (foreign key dependencies)
+2. Migration preserves complete blockchain history including all reorg blocks
+3. Canonical block identification is maintained through migration ordering
+
+### Basic Usage
+
+```bash
+# Migrate both blocks and events for a height range
+go run cmd/admin/*.go migrate \
+  --env=local \
+  --blockchain=ethereum \
+  --network=mainnet \
+  --start-height=1000000 \
+  --end-height=1001000 \
+  --tag=1 \
+  --event-tag=0
+```
 ## Contact Us
 
 We have set up a Discord server soon. Here is the link to join (limited 10) https://discord.com/channels/1079683467018764328/1079683467786334220.

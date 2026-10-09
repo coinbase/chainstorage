@@ -21,6 +21,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/blockchain/parser/internal"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/log"
+	"github.com/coinbase/chainstorage/internal/utils/utils"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
@@ -121,8 +122,9 @@ type (
 		// The EIP-2718 type of the transaction
 		Type EthereumQuantity `json:"type"`
 		// The EIP-1559 related fields
-		MaxFeePerGas         *EthereumQuantity             `json:"maxFeePerGas"`
-		MaxPriorityFeePerGas *EthereumQuantity             `json:"maxPriorityFeePerGas"`
+		// EIP-1559 fee caps are uint256 and user-signed (INF-1990).
+		MaxFeePerGas         *EthereumBigQuantity          `json:"maxFeePerGas"`
+		MaxPriorityFeePerGas *EthereumBigQuantity          `json:"maxPriorityFeePerGas"`
 		AccessList           *[]*EthereumTransactionAccess `json:"accessList"`
 		Mint                 *EthereumBigQuantity          `json:"mint"`
 		// The EIP-4844 related fields
@@ -237,19 +239,36 @@ type (
 		Output  EthereumHexString `json:"output"`
 	}
 
+	// receiptIndexMismatchTolerator decides whether a receipt/transaction TransactionIndex
+	// mismatch (when hash/blockHash/blockNumber already match) is acceptable for a given chain.
+	// The default parser has none (strict). Chains with known data quirks inject one via
+	// WithReceiptIndexMismatchTolerator to keep their special-case knowledge out of this file.
+	receiptIndexMismatchTolerator func(
+		transaction *api.EthereumTransaction,
+		receipt *api.EthereumTransactionReceipt,
+		transactions []*api.EthereumTransaction,
+		txHashCounts map[string]int,
+	) bool
+
 	ethereumNativeParserImpl struct {
-		Logger    *zap.Logger
-		validate  *validator.Validate
-		nodeType  types.EthereumNodeType
-		traceType types.TraceType
-		config    *config.Config
-		metrics   *ethereumNativeParserMetrics
+		Logger                        *zap.Logger
+		validate                      *validator.Validate
+		nodeType                      types.EthereumNodeType
+		traceType                     types.TraceType
+		config                        *config.Config
+		metrics                       *ethereumNativeParserMetrics
+		src20Parser                   SRC20TokenTransferParser      // Optional, only Seismic sets this
+		timestampInMs                 bool                          // If true, raw timestamps are in milliseconds and need to be converted to seconds
+		receiptIndexMismatchTolerator receiptIndexMismatchTolerator // Optional, only chains with duplicate-tx quirks (e.g. MegaETH) set this
 	}
 
 	ethereumParserOptions struct {
-		nodeType        types.EthereumNodeType
-		traceType       types.TraceType
-		checksumAddress bool
+		nodeType                      types.EthereumNodeType
+		traceType                     types.TraceType
+		checksumAddress               bool
+		src20Parser                   SRC20TokenTransferParser
+		timestampInMs                 bool
+		receiptIndexMismatchTolerator receiptIndexMismatchTolerator
 	}
 
 	nestedParityTrace struct {
@@ -260,6 +279,7 @@ type (
 
 	ethereumNativeParserMetrics struct {
 		gasPriceOutOfRangeCounter tally.Counter
+		feeCapOutOfRangeCounter   tally.Counter
 	}
 )
 
@@ -285,9 +305,11 @@ const (
 
 	parserMetricsReasonKey    = "reason"
 	gasPriceOutOfRangeFailure = "gas_price_out_of_range"
+	feeCapOutOfRangeFailure   = "fee_cap_out_of_range"
 	parseFailure              = "parse_failure"
 
 	arbitrumNITROUpgradeBlockNumber = 22_207_818
+	tronNoncePlaceHolder            = "0x0000000000000000"
 )
 
 func (v EthereumHexString) MarshalJSON() ([]byte, error) {
@@ -331,7 +353,7 @@ func (v *EthereumQuantity) UnmarshalJSON(input []byte) error {
 		return xerrors.Errorf("failed to unmarshal EthereumQuantity into string: %w", err)
 	}
 
-	if s == "" {
+	if s == "" || s == tronNoncePlaceHolder {
 		*v = 0
 		return nil
 	}
@@ -378,6 +400,24 @@ func (v *EthereumBigQuantity) UnmarshalJSON(input []byte) error {
 func (v EthereumBigQuantity) Value() string {
 	i := big.Int(v)
 	return i.String()
+}
+
+// saturatingFeeCap converts an EIP-1559 fee cap to the uint64 proto
+// field, clamping a value above 64 bits to math.MaxUint64 rather than
+// failing the block: the cap is user-signed and valid up to uint256
+// (INF-1990). Mirrors the gasPrice out-of-range handling.
+func (p *ethereumNativeParserImpl) saturatingFeeCap(v *EthereumBigQuantity, field string, txHash string) uint64 {
+	n, err := v.Uint64()
+	if err == nil {
+		return n
+	}
+	p.metrics.feeCapOutOfRangeCounter.Inc(1)
+	p.Logger.Warn("fee cap is out of uint64 range; saturating",
+		zap.String("field", field),
+		zap.String("value", v.Value()),
+		zap.String("transaction hash", txHash),
+	)
+	return math.MaxUint64
 }
 
 func (v EthereumBigQuantity) Uint64() (uint64, error) {
@@ -448,12 +488,16 @@ func NewEthereumNativeParser(params internal.ParserParams, opts ...internal.Pars
 	}
 
 	return &ethereumNativeParserImpl{
-		Logger:    log.WithPackage(params.Logger),
-		validate:  validator.New(),
-		nodeType:  options.nodeType,
-		traceType: options.traceType,
-		config:    params.Config,
-		metrics:   newEthereumNativeParserMetrics(params.Metrics),
+		Logger:        log.WithPackage(params.Logger),
+		validate:      validator.New(),
+		nodeType:      options.nodeType,
+		traceType:     options.traceType,
+		config:        params.Config,
+		metrics:       newEthereumNativeParserMetrics(params.Metrics),
+		src20Parser:   options.src20Parser,
+		timestampInMs: options.timestampInMs,
+
+		receiptIndexMismatchTolerator: options.receiptIndexMismatchTolerator,
 	}, nil
 }
 
@@ -461,6 +505,7 @@ func newEthereumNativeParserMetrics(scope tally.Scope) *ethereumNativeParserMetr
 	scope = scope.SubScope("ethereum_native_parser")
 	return &ethereumNativeParserMetrics{
 		gasPriceOutOfRangeCounter: newEthereumNativeParserCounter(scope, gasPriceOutOfRangeFailure),
+		feeCapOutOfRangeCounter:   newEthereumNativeParserCounter(scope, feeCapOutOfRangeFailure),
 	}
 }
 
@@ -492,7 +537,36 @@ func WithEthereumChecksumAddress() internal.ParserFactoryOption {
 	}
 }
 
-func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
+// WithSRC20Parser sets the SRC20 token transfer parser for Seismic chain.
+func WithSRC20Parser(parser SRC20TokenTransferParser) internal.ParserFactoryOption {
+	return func(options any) {
+		if v, ok := options.(*ethereumParserOptions); ok {
+			v.src20Parser = parser
+		}
+	}
+}
+
+// WithTimestampInMs indicates that raw block timestamps are in milliseconds and should be converted to seconds.
+func WithTimestampInMs() internal.ParserFactoryOption {
+	return func(options any) {
+		if v, ok := options.(*ethereumParserOptions); ok {
+			v.timestampInMs = true
+		}
+	}
+}
+
+// WithReceiptIndexMismatchTolerator installs a chain-specific policy that decides whether a
+// receipt/transaction TransactionIndex mismatch is acceptable. Used by chains whose nodes can
+// return blocks that break positional receipt/tx index pairing (e.g. MegaETH duplicate tx hashes).
+func WithReceiptIndexMismatchTolerator(tolerator receiptIndexMismatchTolerator) internal.ParserFactoryOption {
+	return func(options any) {
+		if v, ok := options.(*ethereumParserOptions); ok {
+			v.receiptIndexMismatchTolerator = tolerator
+		}
+	}
+}
+
+func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block, opts ...internal.ParseOption) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
 		return nil, xerrors.New("metadata not found")
@@ -523,14 +597,45 @@ func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 			return nil, xerrors.Errorf("unexpected number of transaction receipts: expected=%v actual=%v", numTransactions, len(transactionReceipts))
 		}
 
+		// txHashCounts is only needed by a chain-specific tolerator (see
+		// WithReceiptIndexMismatchTolerator); the default strict path skips the allocation.
+		var txHashCounts map[string]int
+		if p.receiptIndexMismatchTolerator != nil {
+			txHashCounts = make(map[string]int, len(transactions))
+			for _, t := range transactions {
+				txHashCounts[t.Hash]++
+			}
+		}
+
 		for i, transactionReceipt := range transactionReceipts {
 			transaction := transactions[i]
 
-			if transactionReceipt.TransactionHash != transaction.Hash ||
-				transactionReceipt.TransactionIndex != transaction.Index ||
+			hashOrBlockMismatch := transactionReceipt.TransactionHash != transaction.Hash ||
 				transactionReceipt.BlockHash != header.Hash ||
-				transactionReceipt.BlockNumber != header.Number {
+				transactionReceipt.BlockNumber != header.Number
+			indexMismatch := transactionReceipt.TransactionIndex != transaction.Index
+
+			tolerable := indexMismatch && !hashOrBlockMismatch &&
+				p.receiptIndexMismatchTolerator != nil &&
+				p.receiptIndexMismatchTolerator(transaction, transactionReceipt, transactions, txHashCounts)
+
+			if hashOrBlockMismatch || (indexMismatch && !tolerable) {
 				return nil, xerrors.Errorf("unexpected transaction receipt: transactionReceipt={%+v} transaction={%+v} block={%+v}", transactionReceipt, transaction, header)
+			}
+
+			if tolerable {
+				receiptPointsToHash := ""
+				if transactionReceipt.TransactionIndex < uint64(len(transactions)) {
+					receiptPointsToHash = transactions[transactionReceipt.TransactionIndex].Hash
+				}
+				p.Logger.Warn("tolerating receipt/tx index mismatch by chain-specific policy",
+					zap.String("blockchain", p.config.Chain.Blockchain.String()),
+					zap.String("transaction_hash", transaction.Hash),
+					zap.Uint64("block_number", header.Number),
+					zap.Uint64("expected_transaction_index", transaction.Index),
+					zap.Uint64("receipt_transaction_index", transactionReceipt.TransactionIndex),
+					zap.String("receipt_points_to_transaction_hash", receiptPointsToHash),
+				)
 			}
 		}
 	} else {
@@ -570,14 +675,26 @@ func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 	if numTransactions != len(tokenTransfers) {
 		return nil, xerrors.Errorf("unexpected number of token transfers: expected=%v actual=%v", numTransactions, len(tokenTransfers))
 	}
-
 	transactionToFlattenedTracesMap := make(map[string][]*api.EthereumTransactionFlattenedTrace, 0)
 	if isParityTrace {
-		if err := p.parseTransactionFlattenedParityTraces(blobdata, transactionToFlattenedTracesMap); err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction parity traces: %w", err)
+		if p.config.Blockchain() != common.Blockchain_BLOCKCHAIN_TRON {
+			if err := p.parseTransactionFlattenedParityTraces(blobdata, transactionToFlattenedTracesMap); err != nil {
+				return nil, xerrors.Errorf("failed to parse transaction parity traces: %w", err)
+			}
 		}
 	}
-
+	// post process block data for Tron data, convert hash and account address, and set flattened traces
+	if p.config.Blockchain() == common.Blockchain_BLOCKCHAIN_TRON {
+		if err := postProcessTronBlock(
+			blobdata,
+			header,
+			transactions,
+			transactionReceipts,
+			tokenTransfers,
+			transactionToFlattenedTracesMap); err != nil {
+			return nil, xerrors.Errorf("failed to post process tron block: %w", err)
+		}
+	}
 	for i, transaction := range transactions {
 		transaction.Receipt = transactionReceipts[i]
 		transaction.TokenTransfers = tokenTransfers[i]
@@ -606,8 +723,8 @@ func (p *ethereumNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api
 		Blockchain:      rawBlock.Blockchain,
 		Network:         rawBlock.Network,
 		Tag:             metadata.Tag,
-		Hash:            metadata.Hash,
-		ParentHash:      metadata.ParentHash,
+		Hash:            header.Hash,
+		ParentHash:      header.ParentHash,
 		Height:          metadata.Height,
 		ParentHeight:    metadata.ParentHeight,
 		Timestamp:       header.Timestamp,
@@ -646,6 +763,15 @@ func (p *ethereumNativeParserImpl) GetTransaction(ctx context.Context, nativeBlo
 	return nil, internal.ErrNotImplemented
 }
 
+// toTimestamp converts a raw block timestamp to a protobuf Timestamp.
+// If timestampInMs is true, preserves millisecond precision in the Nanos field.
+func (p *ethereumNativeParserImpl) toTimestamp(rawTimestamp int64) *timestamp.Timestamp {
+	if p.timestampInMs {
+		return utils.ToTimestampFromMs(rawTimestamp)
+	}
+	return utils.ToTimestamp(rawTimestamp)
+}
+
 func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader, []*api.EthereumTransaction, error) {
 	var block EthereumBlock
 	if err := json.Unmarshal(data, &block); err != nil {
@@ -674,7 +800,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 			Index:          transaction.Index.Value(),
 			Value:          transaction.Value.Value(),
 			Type:           transaction.Type.Value(),
-			BlockTimestamp: &timestamp.Timestamp{Seconds: int64(block.Timestamp.Value())},
+			BlockTimestamp: p.toTimestamp(int64(block.Timestamp.Value())),
 			V:              transaction.V.Value(),
 			S:              transaction.S.Value(),
 			R:              transaction.R.Value(),
@@ -700,14 +826,17 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 		}
 		outTransaction.GasPrice = gasPrice
 
+		var maxFeePerGas, maxPriorityFeePerGas uint64
 		if transaction.MaxFeePerGas != nil {
+			maxFeePerGas = p.saturatingFeeCap(transaction.MaxFeePerGas, "maxFeePerGas", transaction.Hash.Value())
 			outTransaction.OptionalMaxFeePerGas = &api.EthereumTransaction_MaxFeePerGas{
-				MaxFeePerGas: transaction.MaxFeePerGas.Value(),
+				MaxFeePerGas: maxFeePerGas,
 			}
 		}
 		if transaction.MaxPriorityFeePerGas != nil {
+			maxPriorityFeePerGas = p.saturatingFeeCap(transaction.MaxPriorityFeePerGas, "maxPriorityFeePerGas", transaction.Hash.Value())
 			outTransaction.OptionalMaxPriorityFeePerGas = &api.EthereumTransaction_MaxPriorityFeePerGas{
-				MaxPriorityFeePerGas: transaction.MaxPriorityFeePerGas.Value(),
+				MaxPriorityFeePerGas: maxPriorityFeePerGas,
 			}
 		}
 
@@ -723,8 +852,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 			var priorityFeePerGas uint64
 			if transaction.MaxFeePerGas != nil && transaction.MaxPriorityFeePerGas != nil {
 				// EIP-1559 transaction
-				priorityFeePerGas = transaction.MaxFeePerGas.Value() - block.BaseFeePerGas.Value()
-				maxPriorityFeePerGas := transaction.MaxPriorityFeePerGas.Value()
+				priorityFeePerGas = maxFeePerGas - block.BaseFeePerGas.Value()
 				if priorityFeePerGas > maxPriorityFeePerGas {
 					priorityFeePerGas = maxPriorityFeePerGas
 				}
@@ -772,7 +900,7 @@ func (p *ethereumNativeParserImpl) parseHeader(data []byte) (*api.EthereumHeader
 		Hash:                  block.Hash.Value(),
 		ParentHash:            block.ParentHash.Value(),
 		Number:                block.Number.Value(),
-		Timestamp:             &timestamp.Timestamp{Seconds: int64(block.Timestamp.Value())},
+		Timestamp:             p.toTimestamp(int64(block.Timestamp.Value())),
 		Transactions:          transactionHashes,
 		Nonce:                 block.Nonce.Value(),
 		Sha3Uncles:            block.Sha3Uncles.Value(),
@@ -897,7 +1025,7 @@ func (p *ethereumNativeParserImpl) parseTransactionReceipts(blobdata *api.Ethere
 		}
 
 		// Field effectiveGasPrice is added to the eth_getTransactionReceipt call for EIP-1559.
-		// Pre-London, it is equal to the transaction’s gasPrice.
+		// Pre-London, it is equal to the transaction's gasPrice.
 		// Post-London, it is equal to the actual gas price paid for inclusion.
 		// Since it's hard to backfill all old blocks, set `effectiveGasPrice` as gasPrice for Pre-London blocks.
 		// Ref: https://hackmd.io/@timbeiko/1559-json-rpc
@@ -1244,7 +1372,6 @@ func (p *ethereumNativeParserImpl) parseTokenTransfers(transactionReceipts []*ap
 			if len(eventLog.Topics) == 3 && eventLog.Topics[0] == TransferEventTopic {
 				// Parse ERC-20 token
 				// https://ethereum.org/en/developers/docs/standards/tokens/erc-20/
-
 				tokenTransfer, err := p.parseERC20TokenTransfer(eventLog)
 				if err != nil {
 					return nil, xerrors.Errorf("failed to parse erc20 token transfer: %w", err)
@@ -1258,6 +1385,17 @@ func (p *ethereumNativeParserImpl) parseTokenTransfers(transactionReceipts []*ap
 				tokenTransfer, err := p.parseERC721TokenTransfer(eventLog)
 				if err != nil {
 					return nil, xerrors.Errorf("failed to parse erc721 token transfer: %w", err)
+				}
+				if tokenTransfer != nil {
+					tokenTransfers = append(tokenTransfers, tokenTransfer)
+				}
+			} else if p.src20Parser != nil && len(eventLog.Topics) == 4 && eventLog.Topics[0] == SRCTransferEventTopic {
+				// Parse SRC-20 token (Seismic only)
+				// Outer topic check avoids unnecessary function calls
+				// SRCTransferEventTopic is exported from seismic_native.go
+				tokenTransfer, err := p.src20Parser.ParseSRC20TokenTransfer(eventLog)
+				if err != nil {
+					return nil, xerrors.Errorf("failed to parse src20 token transfer: %w", err)
 				}
 				if tokenTransfer != nil {
 					tokenTransfers = append(tokenTransfers, tokenTransfer)

@@ -70,6 +70,7 @@ const (
 	pollerTimeSinceLastBlockGauge          = "workflow.poller.time_since_last_block"
 	pollerErrSessionFailedCounter          = "workflow.poller.session_failed"
 	pollerErrScheduleToStartTimeoutCounter = "workflow.poller.schedule_to_start_timeout"
+	pollerErrOutOfSyncNodeCounter          = "workflow.poller.out_of_sync_node"
 	pollerErrUnknownCounter                = "workflow.poller.unknown"
 	pollerFailoverGauge                    = "workflow.poller.failover"
 	pollerConsensusFailoverGauge           = "workflow.poller.consensus_failover"
@@ -204,6 +205,19 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 			}
 			sessionCtx, err = workflow.CreateSession(ctx, so)
 			if err != nil {
+				if IsErrSessionFailed(ctx, err) || IsScheduleToStartTimeout(err) {
+					request.RetryableErrorCount++
+					errMetricName := w.getRetryableErrorMetricName(ctx, err)
+					metrics.Counter(errMetricName).Inc(1)
+
+					if request.RetryableErrorCount <= RetryableErrorLimit {
+						if err := workflow.Sleep(ctx, backoffInterval); err != nil {
+							return err
+						}
+						return w.continueAsNew(ctx, request)
+					}
+					return xerrors.Errorf("retryable errors on session creation exceeded threshold: %w", err)
+				}
 				return xerrors.Errorf("failed to create workflow session: %w", err)
 			}
 			defer workflow.CompleteSession(sessionCtx)
@@ -291,6 +305,25 @@ func (w *Poller) execute(ctx workflow.Context, request *PollerRequest) error {
 				if cfg.FailoverEnabled && !failover && !IsConsensusValidationFailure(err) {
 					return w.triggerFailover(ctx, request)
 				}
+
+				// The master node could not serve a height it reported moments earlier, i.e. the endpoint
+				// group routed consecutive calls to nodes at different heights. The lagging node catches up
+				// on its own, so wait for one backoff interval and retry instead of failing the workflow.
+				// RetryableErrorLimit bounds the number of such failures within one checkpoint window
+				// (RetryableErrorCount resets after a full checkpoint loop), so a node that is really down
+				// still fails the workflow loudly.
+				if IsOutOfSyncNodeFailure(err) {
+					request.RetryableErrorCount += 1
+					metrics.Counter(w.getRetryableErrorMetricName(sessionCtx, err)).Inc(1)
+
+					if request.RetryableErrorCount <= RetryableErrorLimit {
+						if err := workflow.Sleep(ctx, backoffInterval); err != nil {
+							return err
+						}
+						return w.continueAsNew(ctx, request)
+					}
+					return xerrors.Errorf("retryable errors exceeded threshold: %w", err)
+				}
 				return xerrors.Errorf("failed to execute syncer: %w", err)
 			}
 
@@ -345,6 +378,8 @@ func (w *Poller) getRetryableErrorMetricName(sessionCtx workflow.Context, err er
 		return pollerErrSessionFailedCounter
 	} else if IsScheduleToStartTimeout(err) {
 		return pollerErrScheduleToStartTimeoutCounter
+	} else if IsOutOfSyncNodeFailure(err) {
+		return pollerErrOutOfSyncNodeCounter
 	}
 	return pollerErrUnknownCounter
 }

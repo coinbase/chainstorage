@@ -39,10 +39,10 @@ var (
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var deps struct {
 				fx.In
-				Config      *config.Config
-				Client      client.Client `name:"slave"`
-				BlobStorage blobstorage.BlobStorage
-				MetaStorage metastorage.MetaStorage
+				Config              *config.Config
+				Client              client.Client `name:"slave"`
+				SingleBlockUploader blobstorage.SingleBlockUploader
+				MetaStorage         metastorage.MetaStorage
 			}
 
 			app := startApp(
@@ -92,7 +92,7 @@ var (
 					return xerrors.Errorf("failed to get block: %w", err)
 				}
 
-				objectKey, err := deps.BlobStorage.Upload(ctx, block, compression)
+				objectKey, err := deps.SingleBlockUploader.Upload(ctx, block, compression)
 				if err != nil {
 					return xerrors.Errorf("failed to upload block in blob storage: %w", err)
 				}

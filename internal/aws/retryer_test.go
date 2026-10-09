@@ -2,38 +2,33 @@ package aws
 
 import (
 	"errors"
-	"net"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/stretchr/testify/require"
 )
 
-var errReadConnectionReset = awserr.New(
-	request.ErrCodeRequestError,
-	"send request failed",
-	&net.OpError{
-		Op:  "read",
-		Err: errors.New("connection reset"),
-	},
-)
-
-func TestDefaultRetryer(t *testing.T) {
+func TestConnectionResetRetryable_IsRetryable(t *testing.T) {
 	require := require.New(t)
-	req := &request.Request{
-		Error: errReadConnectionReset,
-	}
-	retryer := client.DefaultRetryer{NumMaxRetries: 3}
-	require.False(retryer.ShouldRetry(req))
+
+	retryable := connectionResetRetryable{}
+
+	// Test connection reset error is retryable
+	resetErr := errors.New("read: connection reset")
+	require.Equal(aws.TrueTernary, retryable.IsErrorRetryable(resetErr))
+
+	// Test other errors are unknown (let other retryables decide)
+	otherErr := errors.New("some other error")
+	require.Equal(aws.UnknownTernary, retryable.IsErrorRetryable(otherErr))
+
+	// Test nil error
+	require.Equal(aws.UnknownTernary, retryable.IsErrorRetryable(nil))
 }
 
-func TestCustomRetryer(t *testing.T) {
+func TestNewCustomRetryer(t *testing.T) {
 	require := require.New(t)
-	req := &request.Request{
-		Error: errReadConnectionReset,
-	}
+
 	retryer := newCustomRetryer()
-	require.True(retryer.ShouldRetry(req))
+	require.NotNil(retryer)
+	require.Equal(maxRetries, retryer.MaxAttempts())
 }

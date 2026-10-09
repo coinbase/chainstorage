@@ -9,20 +9,16 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/smithy-go"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
-
-	awsrequest "github.com/aws/aws-sdk-go/aws/request"
-
-	"github.com/coinbase/chainstorage/internal/blockchain/jsonrpc"
 	dynamodbmocks "github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/mocks"
 	"github.com/coinbase/chainstorage/internal/storage/metastorage/dynamodb/model"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
@@ -79,24 +75,24 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetrySuccess() {
 
 	seen := sync.Map{}
 	attempts := 0
-	s.dynamoAPI.EXPECT().TransactGetItemsWithContext(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput, opts ...jsonrpc.Option) (
+	s.dynamoAPI.EXPECT().TransactGetItems(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput, opts ...func(*dynamodb.Options)) (
 			*dynamodb.TransactGetItemsOutput, error) {
 			attempts += 1
 			if attempts == 1 {
 				require.Equal(numItems, len(input.TransactItems))
-				mockCancelReasons := make([]*dynamodb.CancellationReason, numItems)
+				mockCancelReasons := make([]types.CancellationReason, numItems)
 				for i := range mockCancelReasons {
-					mockCancelReasons[i] = &dynamodb.CancellationReason{
+					mockCancelReasons[i] = types.CancellationReason{
 						Code: aws.String("None"),
 					}
 				}
 
-				mockCancelReasons[1] = &dynamodb.CancellationReason{
+				mockCancelReasons[1] = types.CancellationReason{
 					Code:    aws.String("TransactionConflict"),
 					Message: aws.String("Transaction is ongoing for the item"),
 				}
-				return &dynamodb.TransactGetItemsOutput{}, &dynamodb.TransactionCanceledException{
+				return &dynamodb.TransactGetItemsOutput{}, &types.TransactionCanceledException{
 					CancellationReasons: mockCancelReasons,
 				}
 			}
@@ -107,7 +103,7 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetrySuccess() {
 			for _, item := range transactItems {
 				var out StringMap
 				require.Equal(tableName, *item.Get.TableName)
-				err := dynamodbattribute.UnmarshalMap(item.Get.Key, &out)
+				err := attributevalue.UnmarshalMap(item.Get.Key, &out)
 				require.NoError(err)
 				require.NotEmpty(out["pk"])
 				require.NotEmpty(out["sk"])
@@ -126,9 +122,9 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetrySuccess() {
 				}
 			}
 
-			responses := make([]*dynamodb.ItemResponse, end+1-begin)
+			responses := make([]types.ItemResponse, end+1-begin)
 			for i := begin; i <= end; i++ {
-				responses[i-begin] = &dynamodb.ItemResponse{Item: attributesMap[i]}
+				responses[i-begin] = types.ItemResponse{Item: attributesMap[i]}
 			}
 			return &dynamodb.TransactGetItemsOutput{
 				Responses: responses,
@@ -152,22 +148,22 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetryFailure() {
 	ctx := context.Background()
 	keyMaps := makeKeyMapsForTestDDBEntries(numItems)
 
-	s.dynamoAPI.EXPECT().TransactGetItemsWithContext(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput, opts ...jsonrpc.Option) (
+	s.dynamoAPI.EXPECT().TransactGetItems(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, input *dynamodb.TransactGetItemsInput, opts ...func(*dynamodb.Options)) (
 			*dynamodb.TransactGetItemsOutput, error) {
 			require.Equal(numItems, len(input.TransactItems))
-			mockCancelReasons := make([]*dynamodb.CancellationReason, numItems)
+			mockCancelReasons := make([]types.CancellationReason, numItems)
 			for i := range mockCancelReasons {
-				mockCancelReasons[i] = &dynamodb.CancellationReason{
+				mockCancelReasons[i] = types.CancellationReason{
 					Code: aws.String("None"),
 				}
 			}
 
-			mockCancelReasons[1] = &dynamodb.CancellationReason{
+			mockCancelReasons[1] = types.CancellationReason{
 				Code:    aws.String("TransactionConflict"),
 				Message: aws.String("Transaction is ongoing for the item"),
 			}
-			return &dynamodb.TransactGetItemsOutput{}, &dynamodb.TransactionCanceledException{
+			return &dynamodb.TransactGetItemsOutput{}, &types.TransactionCanceledException{
 				CancellationReasons: mockCancelReasons,
 			}
 		}).AnyTimes()
@@ -178,10 +174,8 @@ func (s *DDBTableTestSuite) TestGetItems_TransactionConflict_RetryFailure() {
 func (s *DDBTableTestSuite) TestQueryItem_RequestCanceledFailure() {
 	require := testutil.Require(s.T())
 
-	s.dynamoAPI.EXPECT().QueryWithContext(gomock.Any(), gomock.Any()).
-		Return(nil, awserr.New(awsrequest.CanceledErrorCode,
-			"canceled",
-			nil))
+	s.dynamoAPI.EXPECT().Query(gomock.Any(), gomock.Any()).
+		Return(nil, &smithy.CanceledError{Err: context.Canceled})
 
 	queryResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
 
@@ -193,10 +187,8 @@ func (s *DDBTableTestSuite) TestQueryItem_RequestCanceledFailure() {
 func (s *DDBTableTestSuite) TestQueryItem_QueryFailure() {
 	require := testutil.Require(s.T())
 
-	s.dynamoAPI.EXPECT().QueryWithContext(gomock.Any(), gomock.Any()).
-		Return(nil, awserr.New(awsrequest.ErrCodeRequestError,
-			"Validation error",
-			nil))
+	s.dynamoAPI.EXPECT().Query(gomock.Any(), gomock.Any()).
+		Return(nil, &smithy.GenericAPIError{Code: "ValidationException", Message: "Validation error"})
 
 	queryResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
 
@@ -207,7 +199,7 @@ func (s *DDBTableTestSuite) TestQueryItem_QueryFailure() {
 func (s *DDBTableTestSuite) TestQueryItem_ItemNotFoundErr() {
 	require := testutil.Require(s.T())
 
-	s.dynamoAPI.EXPECT().QueryWithContext(gomock.Any(), gomock.Any()).
+	s.dynamoAPI.EXPECT().Query(gomock.Any(), gomock.Any()).
 		Return(&dynamodb.QueryOutput{}, nil)
 
 	updateResult, err := s.table.QueryItems(context.Background(), &QueryItemsRequest{})
@@ -219,10 +211,10 @@ func (s *DDBTableTestSuite) TestQueryItem_ItemNotFoundErr() {
 
 func testDDBEntriesToAttributeMaps(
 	entries []any,
-) ([]map[string]*dynamodb.AttributeValue, error) {
-	attributes := make([]map[string]*dynamodb.AttributeValue, len(entries))
+) ([]map[string]types.AttributeValue, error) {
+	attributes := make([]map[string]types.AttributeValue, len(entries))
 	for i := range entries {
-		attribute, err := dynamodbattribute.MarshalMap(entries[i])
+		attribute, err := attributevalue.MarshalMap(entries[i])
 		if err != nil {
 			return nil, err
 		}

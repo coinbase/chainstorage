@@ -54,22 +54,35 @@ type (
 	Params struct {
 		fx.In
 		fxparams.Params
-		Parser         parser.Parser
-		Bitcoin        ClientFactory `name:"bitcoin" optional:"true"`
-		Bsc            ClientFactory `name:"bsc" optional:"true"`
-		Ethereum       ClientFactory `name:"ethereum" optional:"true"`
-		Rosetta        ClientFactory `name:"rosetta" optional:"true"`
-		Solana         ClientFactory `name:"solana" optional:"true"`
-		Polygon        ClientFactory `name:"polygon" optional:"true"`
-		Avacchain      ClientFactory `name:"avacchain" optional:"true"`
-		Arbitrum       ClientFactory `name:"arbitrum" optional:"true"`
-		Optimism       ClientFactory `name:"optimism" optional:"true"`
-		Base           ClientFactory `name:"base" optional:"true"`
-		Fantom         ClientFactory `name:"fantom" optional:"true"`
-		Aptos          ClientFactory `name:"aptos" optional:"true"`
-		EthereumBeacon ClientFactory `name:"ethereum/beacon" optional:"true"`
-		CosmosStaking  ClientFactory `name:"cosmos/staking" optional:"true"`
-		CardanoStaking ClientFactory `name:"cardano/staking" optional:"true"`
+		Parser          parser.Parser
+		Bitcoin         ClientFactory `name:"bitcoin" optional:"true"`
+		Bsc             ClientFactory `name:"bsc" optional:"true"`
+		Ethereum        ClientFactory `name:"ethereum" optional:"true"`
+		Rosetta         ClientFactory `name:"rosetta" optional:"true"`
+		Solana          ClientFactory `name:"solana" optional:"true"`
+		Polygon         ClientFactory `name:"polygon" optional:"true"`
+		Avacchain       ClientFactory `name:"avacchain" optional:"true"`
+		Arbitrum        ClientFactory `name:"arbitrum" optional:"true"`
+		Optimism        ClientFactory `name:"optimism" optional:"true"`
+		Base            ClientFactory `name:"base" optional:"true"`
+		Fantom          ClientFactory `name:"fantom" optional:"true"`
+		Aptos           ClientFactory `name:"aptos" optional:"true"`
+		EthereumBeacon  ClientFactory `name:"ethereum/beacon" optional:"true"`
+		CosmosStaking   ClientFactory `name:"cosmos/staking" optional:"true"`
+		CardanoStaking  ClientFactory `name:"cardano/staking" optional:"true"`
+		Tron            ClientFactory `name:"tron" optional:"true"`
+		Story           ClientFactory `name:"story" optional:"true"`
+		EthereumClassic ClientFactory `name:"ethereumclassic" optional:"true"`
+		Plasma          ClientFactory `name:"plasma" optional:"true"`
+		Monad           ClientFactory `name:"monad" optional:"true"`
+		Abstract        ClientFactory `name:"abstract" optional:"true"`
+		Megaeth         ClientFactory `name:"megaeth" optional:"true"`
+		Seismic         ClientFactory `name:"seismic" optional:"true"`
+		Dash            ClientFactory `name:"dash" optional:"true"`
+		Zcash           ClientFactory `name:"zcash" optional:"true"`
+		Tempo           ClientFactory `name:"tempo" optional:"true"`
+		Robinhood       ClientFactory `name:"robinhood" optional:"true"`
+		Arc             ClientFactory `name:"robinhood" optional:"true"`
 	}
 
 	ClientParams struct {
@@ -92,6 +105,7 @@ type (
 
 	ClientOptions struct {
 		BestEffort bool
+		Heartbeat  func(ctx context.Context, details ...any)
 	}
 )
 
@@ -111,8 +125,12 @@ func NewClient(params Params) (Result, error) {
 	sidechain := params.Config.Chain.Sidechain
 	if sidechain == api.SideChain_SIDECHAIN_NONE {
 		switch blockchain {
-		case common.Blockchain_BLOCKCHAIN_BITCOIN:
+		case common.Blockchain_BLOCKCHAIN_BITCOIN, common.Blockchain_BLOCKCHAIN_BITCOINCASH, common.Blockchain_BLOCKCHAIN_LITECOIN, common.Blockchain_BLOCKCHAIN_DOGECOIN:
 			factory = params.Bitcoin
+		case common.Blockchain_BLOCKCHAIN_ZCASH:
+			factory = params.Zcash
+		case common.Blockchain_BLOCKCHAIN_DASH:
+			factory = params.Dash
 		case common.Blockchain_BLOCKCHAIN_BSC:
 			factory = params.Bsc
 		case common.Blockchain_BLOCKCHAIN_ETHEREUM:
@@ -133,6 +151,28 @@ func NewClient(params Params) (Result, error) {
 			factory = params.Base
 		case common.Blockchain_BLOCKCHAIN_APTOS:
 			factory = params.Aptos
+		case common.Blockchain_BLOCKCHAIN_TRON:
+			factory = params.Tron
+		case common.Blockchain_BLOCKCHAIN_STORY:
+			factory = params.Story
+		case common.Blockchain_BLOCKCHAIN_ETHEREUMCLASSIC:
+			factory = params.EthereumClassic
+		case common.Blockchain_BLOCKCHAIN_PLASMA:
+			factory = params.Plasma
+		case common.Blockchain_BLOCKCHAIN_MONAD:
+			factory = params.Monad
+		case common.Blockchain_BLOCKCHAIN_ABSTRACT:
+			factory = params.Abstract
+		case common.Blockchain_BLOCKCHAIN_MEGAETH:
+			factory = params.Megaeth
+		case common.Blockchain_BLOCKCHAIN_SEISMIC:
+			factory = params.Seismic
+		case common.Blockchain_BLOCKCHAIN_TEMPO:
+			factory = params.Tempo
+		case common.Blockchain_BLOCKCHAIN_ROBINHOOD:
+			factory = params.Robinhood
+		case common.Blockchain_BLOCKCHAIN_ARC:
+			factory = params.Arc
 		default:
 			if params.Config.IsRosetta() {
 				factory = params.Rosetta
@@ -196,6 +236,21 @@ func NewClient(params Params) (Result, error) {
 func WithBestEffort() ClientOption {
 	return func(options *ClientOptions) {
 		options.BestEffort = true
+	}
+}
+
+// WithHeartbeat sets a heartbeat callback on the client options.
+// The callback is invoked during long-running operations to signal progress.
+func WithHeartbeat(fn func(ctx context.Context, details ...any)) ClientOption {
+	return func(options *ClientOptions) {
+		options.Heartbeat = fn
+	}
+}
+
+// RecordHeartbeat calls the heartbeat callback if one is set.
+func (o *ClientOptions) RecordHeartbeat(ctx context.Context, details ...any) {
+	if o != nil && o.Heartbeat != nil {
+		o.Heartbeat(ctx, details...)
 	}
 }
 

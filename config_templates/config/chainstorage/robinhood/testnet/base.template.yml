@@ -1,0 +1,56 @@
+chain:
+  block_time: 250ms
+  feature:
+    block_validation_enabled: true
+    block_validation_muted: true
+  irreversible_distance: 1
+sla:
+  block_height_delta: 200
+  block_time_delta: 1m
+  out_of_sync_node_distance: 500
+  out_of_sync_validator_node_distance: 1200
+  tier: 2
+  time_since_last_block: 1m30s
+  event_height_delta: 200
+  event_time_delta: 1m
+  time_since_last_event: 1m30s
+  expected_workflows:
+    - monitor
+    - poller
+    - streamer
+    - cross_validator
+workflows:
+  backfiller:
+    num_concurrent_extractors: 20
+    activity_start_to_close_timeout: 20m
+  cross_validator:
+    backoff_interval: 1s
+    parallelism: 10
+    validation_percentage: 100
+  poller:
+    backoff_interval: 0s
+    consensus_validation: true
+    consensus_validation_muted: true
+    failover_enabled: true
+    fast_sync: true
+    max_blocks_to_sync_per_cycle: 200
+    parallelism: 50
+    session_enabled: true
+  monitor:
+    failover_enabled: true
+  streamer:
+    backoff_interval: 0s
+  migrator:
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
+    activity_start_to_close_timeout: 30m
+    backoff_interval: 5s
+    batch_size: 1000
+    checkpoint_size: 5000
+    task_list: default
+    workflow_identity: workflow.migrator
+    workflow_run_timeout: 24h

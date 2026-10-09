@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -38,24 +40,24 @@ var (
 type (
 	Replicator struct {
 		baseActivity
-		config          *config.Config
-		logger          *zap.Logger
-		client          gateway.Client
-		blockDownloader downloader.BlockDownloader
-		metaStorage     metastorage.MetaStorage
-		blobStorage     blobstorage.BlobStorage
-		retry           retry.RetryWithResult[[]byte]
-		httpClient      *http.Client
+		config              *config.Config
+		logger              *zap.Logger
+		client              gateway.Client
+		blockDownloader     downloader.BlockDownloader
+		metaStorage         metastorage.MetaStorage
+		singleBlockUploader blobstorage.SingleBlockUploader
+		retry               retry.RetryWithResult[[]byte]
+		httpClient          *http.Client
 	}
 
 	ReplicatorParams struct {
 		fx.In
 		fxparams.Params
-		Runtime         cadence.Runtime
-		Client          gateway.Client
-		BlockDownloader downloader.BlockDownloader
-		MetaStorage     metastorage.MetaStorage
-		BlobStorage     blobstorage.BlobStorage
+		Runtime             cadence.Runtime
+		Client              gateway.Client
+		BlockDownloader     downloader.BlockDownloader
+		MetaStorage         metastorage.MetaStorage
+		SingleBlockUploader blobstorage.SingleBlockUploader
 	}
 
 	ReplicatorRequest struct {
@@ -67,8 +69,10 @@ type (
 	}
 
 	ReplicatorResponse struct {
-		StartHeight uint64
-		EndHeight   uint64
+		StartHeight          uint64
+		EndHeight            uint64
+		LatestBlockHeight    uint64
+		LatestBlockTimestamp *timestamppb.Timestamp
 	}
 )
 
@@ -80,15 +84,15 @@ func NewReplicator(params ReplicatorParams) *Replicator {
 		return "/workflow/activity/replicator"
 	}))
 	a := &Replicator{
-		baseActivity:    newBaseActivity(ActivityReplicator, params.Runtime),
-		config:          params.Config,
-		logger:          params.Logger,
-		client:          params.Client,
-		blockDownloader: params.BlockDownloader,
-		metaStorage:     params.MetaStorage,
-		blobStorage:     params.BlobStorage,
-		httpClient:      httpClient,
-		retry:           retry.NewWithResult[[]byte](retry.WithLogger(params.Logger)),
+		baseActivity:        newBaseActivity(ActivityReplicator, params.Runtime),
+		config:              params.Config,
+		logger:              params.Logger,
+		client:              params.Client,
+		blockDownloader:     params.BlockDownloader,
+		metaStorage:         params.MetaStorage,
+		singleBlockUploader: params.SingleBlockUploader,
+		httpClient:          httpClient,
+		retry:               retry.NewWithResult[[]byte](retry.WithLogger(params.Logger)),
 	}
 	a.register(a.execute)
 	return a
@@ -109,7 +113,7 @@ func (a *Replicator) downloadBlockData(ctx context.Context, url string) ([]byte,
 
 		httpResp, err := a.httpClient.Do(req)
 		if err != nil {
-			return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w", err))
+			return nil, retry.Retryable(xerrors.Errorf("failed to download block file: %w, url: %s", err, url))
 		}
 
 		finalizer := finalizer.WithCloser(httpResp.Body)
@@ -139,26 +143,25 @@ func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.Blo
 	}
 	var rawBytes []byte
 	var compressedBytes []byte
-	switch blockFile.Compression {
-	case api.Compression_NONE:
-		rawBytes = bodyBytes
-		if compression == api.Compression_GZIP {
-			compressedBytes, err = storage_utils.Compress(rawBytes, compression)
-			if err != nil {
-				return nil, xerrors.Errorf("failed to compress block data with type %v: %w", compression.String(), err)
-			}
-		}
-	case api.Compression_GZIP:
+
+	sourceCompressionType := blockFile.Compression
+	if sourceCompressionType == compression {
 		compressedBytes = bodyBytes
-		if compression == api.Compression_NONE {
-			rawBytes, err = storage_utils.Decompress(rawBytes, blockFile.Compression)
-			if err != nil {
-				return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", blockFile.Compression.String(), err)
-			}
+		if sourceCompressionType == api.Compression_NONE {
+			rawBytes = bodyBytes
 		}
-	default:
-		return nil, xerrors.Errorf("unknown block file compression type %v", blockFile.Compression.String())
+
+	} else {
+		rawBytes, err = storage_utils.Decompress(bodyBytes, sourceCompressionType)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to decompress block data with type %v: %w", sourceCompressionType.String(), err)
+		}
+		compressedBytes, err = storage_utils.Compress(rawBytes, compression)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to compress block data with type %v: %w", compression.String(), err)
+		}
 	}
+
 	metadata := &api.BlockMetadata{
 		Tag:          blockFile.Tag,
 		Hash:         blockFile.Hash,
@@ -173,7 +176,6 @@ func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.Blo
 	// TODO remove this after the api upgrade
 	if metadata.Timestamp == nil || (metadata.Timestamp.Nanos == 0 && metadata.Timestamp.Seconds == 0) {
 		block := new(api.Block)
-		rawBytes := rawBytes
 		if len(rawBytes) == 0 {
 			rawBytes, err = storage_utils.Decompress(bodyBytes, blockFile.Compression)
 			if err != nil {
@@ -197,7 +199,7 @@ func (a *Replicator) prepareRawBlockData(ctx context.Context, blockFile *api.Blo
 	case api.Compression_NONE:
 		rawBlockData.BlockData = rawBytes
 		return rawBlockData, nil
-	case api.Compression_GZIP:
+	case api.Compression_GZIP, api.Compression_ZSTD:
 		rawBlockData.BlockData = compressedBytes
 		return rawBlockData, nil
 	default:
@@ -229,6 +231,35 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 		i := i
 		group.Go(func() error {
 			blockFile := blocks.Files[i]
+			if blockFile.GetSkipped() || blockFile.GetFileUrl() == "" {
+				if blockFile.GetSkipped() {
+					logger.Debug(
+						"block file skipped; skip download",
+						zap.Uint32("tag", blockFile.Tag),
+						zap.Uint64("height", blockFile.Height),
+						zap.Bool("skipped", blockFile.Skipped),
+					)
+				} else {
+					logger.Warn(
+						"block file url missing; skip download",
+						zap.Uint32("tag", blockFile.Tag),
+						zap.Uint64("height", blockFile.Height),
+						zap.Bool("skipped", blockFile.Skipped),
+					)
+				}
+
+				blockMetas[i] = &api.BlockMetadata{
+					Tag:          blockFile.Tag,
+					Hash:         blockFile.Hash,
+					ParentHash:   blockFile.ParentHash,
+					Height:       blockFile.Height,
+					ParentHeight: blockFile.ParentHeight,
+					Skipped:      blockFile.Skipped,
+					Timestamp:    blockFile.BlockTimestamp,
+				}
+				return nil
+			}
+
 			logger.Debug(
 				"downloading block",
 				zap.Uint32("tag", blockFile.Tag),
@@ -239,7 +270,7 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 			if err != nil {
 				return xerrors.Errorf("failed to prepare raw block data: %w", err)
 			}
-			objectKeyMain, err := a.blobStorage.UploadRaw(errgroupCtx, rawBlockData)
+			objectKeyMain, err := a.singleBlockUploader.UploadRaw(errgroupCtx, rawBlockData)
 			if err != nil {
 				return xerrors.Errorf("failed to upload raw block file: %w", err)
 			}
@@ -258,7 +289,9 @@ func (a *Replicator) execute(ctx context.Context, request *ReplicatorRequest) (*
 	}
 
 	return &ReplicatorResponse{
-		StartHeight: request.StartHeight,
-		EndHeight:   request.EndHeight,
+		StartHeight:          request.StartHeight,
+		EndHeight:            request.EndHeight,
+		LatestBlockHeight:    blockMetas[len(blockMetas)-1].Height,
+		LatestBlockTimestamp: blockMetas[len(blockMetas)-1].Timestamp,
 	}, nil
 }

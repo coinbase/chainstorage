@@ -15,6 +15,7 @@ import (
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/internal"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
+	rosettaparser "github.com/coinbase/chainstorage/internal/blockchain/parser/rosetta"
 	"github.com/coinbase/chainstorage/internal/blockchain/restapi"
 	restapimocks "github.com/coinbase/chainstorage/internal/blockchain/restapi/mocks"
 	"github.com/coinbase/chainstorage/internal/config"
@@ -209,17 +210,20 @@ func TestGetRosettaBlock(t *testing.T) {
 	require.Equal(tag, rawBlock.Metadata.Tag)
 	require.Equal(testutil.MustTimestamp("2021-08-04T18:51:21Z"), rawBlock.Metadata.Timestamp)
 
-	var rosettaParser parser.Parser
+	// The rosetta native parser is instantiated directly because dogecoin is
+	// now dispatched to the bitcoin parser; this test only verifies that the
+	// raw block produced by the rosetta client round-trips through the
+	// generic rosetta parser.
+	var rosettaParser parser.NativeParser
 	app := testapp.New(
 		t,
 		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_DOGECOIN, common.Network_NETWORK_DOGECOIN_MAINNET),
-		Module,
-		parser.Module,
+		fx.Provide(rosettaparser.NewRosettaNativeParser),
 		fx.Populate(&rosettaParser),
 	)
 	defer app.Close()
 
-	nativeBlock, err := rosettaParser.ParseNativeBlock(context.Background(), rawBlock)
+	nativeBlock, err := rosettaParser.ParseBlock(context.Background(), rawBlock)
 	require.NoError(err)
 	require.NotNil(nativeBlock)
 	require.Equal(common.Blockchain_BLOCKCHAIN_DOGECOIN, nativeBlock.Blockchain)

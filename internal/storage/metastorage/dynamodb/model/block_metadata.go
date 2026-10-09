@@ -6,28 +6,36 @@ import (
 )
 
 type BlockMetaDataDDBEntry struct {
-	BlockPid      string `dynamodbav:"block_pid"`
-	BlockRid      string `dynamodbav:"block_rid"`
-	Tag           uint32 `dynamodbav:"tag"`
-	Hash          string `dynamodbav:"block_hash"`
-	ParentHash    string `dynamodbav:"parent_hash"`
-	Height        uint64 `dynamodbav:"height"`
-	ParentHeight  uint64 `dynamodbav:"parent_height"`
-	ObjectKeyMain string `dynamodbav:"object_key_main"`
-	Skipped       bool   `dynamodbav:"skipped"`
-	Timestamp     int64  `dynamodbav:"timestamp"`
+	BlockPid           string `dynamodbav:"block_pid"`
+	BlockRid           string `dynamodbav:"block_rid"`
+	Tag                uint32 `dynamodbav:"tag"`
+	Hash               string `dynamodbav:"block_hash"`
+	ParentHash         string `dynamodbav:"parent_hash"`
+	Height             uint64 `dynamodbav:"height"`
+	ParentHeight       uint64 `dynamodbav:"parent_height"`
+	ObjectKeyMain      string `dynamodbav:"object_key_main"`
+	Skipped            bool   `dynamodbav:"skipped"`
+	Timestamp          int64  `dynamodbav:"timestamp"`
+	ObjectFormat       int32  `dynamodbav:"object_format,omitempty"`
+	ByteOffset         uint64 `dynamodbav:"byte_offset,omitempty"`
+	ByteLength         uint64 `dynamodbav:"byte_length,omitempty"`
+	UncompressedLength uint64 `dynamodbav:"uncompressed_length,omitempty"`
 }
 
 func BlockMetadataToProto(bm *BlockMetaDataDDBEntry) *api.BlockMetadata {
 	v := &api.BlockMetadata{
-		Tag:           bm.Tag,
-		Hash:          bm.Hash,
-		ParentHash:    bm.ParentHash,
-		Height:        bm.Height,
-		ParentHeight:  bm.ParentHeight,
-		ObjectKeyMain: bm.ObjectKeyMain,
-		Skipped:       bm.Skipped,
-		Timestamp:     utils.ToTimestamp(bm.Timestamp),
+		Tag:                bm.Tag,
+		Hash:               bm.Hash,
+		ParentHash:         bm.ParentHash,
+		Height:             bm.Height,
+		ParentHeight:       bm.ParentHeight,
+		ObjectKeyMain:      bm.ObjectKeyMain,
+		Skipped:            bm.Skipped,
+		Timestamp:          utils.ToTimestamp(bm.Timestamp),
+		ObjectFormat:       api.BlockObjectFormat(bm.ObjectFormat),
+		ByteOffset:         bm.ByteOffset,
+		ByteLength:         bm.ByteLength,
+		UncompressedLength: bm.UncompressedLength,
 	}
 
 	return v

@@ -133,3 +133,11 @@ localstack:
 .PHONY: docker-run
 docker-run:
 	docker run --rm --network host --name chainstorage coinbase/chainstorage
+
+# Compares the set-based PersistBlockMetas with the per-block implementation it replaced.
+# Bring up postgres (and optionally toxiproxy) with docker-compose-benchmark.yml first.
+BENCHTIME ?= 20x
+.PHONY: benchmark-postgres
+benchmark-postgres:
+	@echo "--- benchmark-postgres"
+	TEST_TYPE=integration go test ./internal/storage/metastorage/postgres -run='^$$' -bench='BenchmarkPersistBlockMetas|BenchmarkPartitionAndDedupe|BenchmarkBlockMetadataColumnArrays|BenchmarkResolveCanonicalRows' -benchtime=$(BENCHTIME) -v

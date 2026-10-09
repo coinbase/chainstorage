@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
@@ -42,7 +43,7 @@ type (
 )
 
 func newBlockStorage(params Params) (internal.BlockStorage, error) {
-	attrDefs := []*dynamodb.AttributeDefinition{
+	attrDefs := []types.AttributeDefinition{
 		{
 			AttributeName: aws.String(blockPidKeyName),
 			AttributeType: awsStringType,
@@ -52,7 +53,7 @@ func newBlockStorage(params Params) (internal.BlockStorage, error) {
 			AttributeType: awsStringType,
 		},
 	}
-	keySchema := []*dynamodb.KeySchemaElement{
+	keySchema := []types.KeySchemaElement{
 		{
 			AttributeName: aws.String(blockPidKeyName),
 			KeyType:       hashKeyType,
@@ -62,7 +63,7 @@ func newBlockStorage(params Params) (internal.BlockStorage, error) {
 			KeyType:       rangeKeyType,
 		},
 	}
-	var globalSecondaryIndexes []*dynamodb.GlobalSecondaryIndex
+	var globalSecondaryIndexes []types.GlobalSecondaryIndex
 	metadataTable, err := newDDBTable(
 		params.Config.AWS.DynamoDB.BlockTable,
 		reflect.TypeOf(model.BlockMetaDataDDBEntry{}),
@@ -272,18 +273,71 @@ func (a *blockStorageImpl) validateHeight(height uint64) error {
 	return nil
 }
 
+func (a *blockStorageImpl) GetBlockByTimestamp(ctx context.Context, tag uint32, timestamp uint64) (*api.BlockMetadata, error) {
+	// Placeholder implementation - return error indicating not implemented
+	return nil, xerrors.New("GetBlockByTimestamp not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) GetBlockConsolidationShadow(ctx context.Context, block *api.BlockMetadata) (*api.BlockMetadata, error) {
+	return nil, xerrors.New("GetBlockConsolidationShadow not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) GetBlocksConsolidationShadow(ctx context.Context, blocks []*api.BlockMetadata) ([]*api.BlockMetadata, error) {
+	return nil, xerrors.New("GetBlocksConsolidationShadow not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) GetBlocksMissingConsolidationShadow(ctx context.Context, tag uint32, startHeight, endHeight uint64, limit uint64) ([]*internal.BlockMetadataRecord, error) {
+	return nil, xerrors.New("GetBlocksMissingConsolidationShadow not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) GetBlockConsolidationShadowStats(ctx context.Context, tag uint32, startHeight, endHeight uint64) (*internal.ConsolidationShadowStats, error) {
+	return nil, xerrors.New("GetBlockConsolidationShadowStats not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) GetFirstBlockMissingConsolidationShadow(ctx context.Context, tag uint32, startHeight, endHeight uint64) (uint64, bool, error) {
+	return 0, false, xerrors.New("GetFirstBlockMissingConsolidationShadow not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) GetFirstPromotableBlockConsolidationShadow(ctx context.Context, tag uint32, startHeight, endHeight uint64) (uint64, bool, error) {
+	return 0, false, xerrors.New("GetFirstPromotableBlockConsolidationShadow not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) GetBlockConsolidationCursor(ctx context.Context, name string, tag uint32) (uint64, bool, error) {
+	return 0, false, xerrors.New("GetBlockConsolidationCursor not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) SetBlockConsolidationCursor(ctx context.Context, name string, tag uint32, height uint64) error {
+	return xerrors.New("SetBlockConsolidationCursor not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) ResetBlockConsolidationCursor(ctx context.Context, name string, tag uint32, height uint64) error {
+	return xerrors.New("ResetBlockConsolidationCursor not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) PersistBlockConsolidationShadows(ctx context.Context, placements []*internal.ConsolidationShadowPlacement) error {
+	return xerrors.New("PersistBlockConsolidationShadows not implemented for DynamoDB")
+}
+
+func (a *blockStorageImpl) PromoteBlockConsolidationShadows(ctx context.Context, tag uint32, startHeight, endHeight uint64, limit uint64, singleBlockObjectRetention time.Duration) (*internal.ConsolidationPromotionResult, error) {
+	return nil, xerrors.New("PromoteBlockConsolidationShadows not implemented for DynamoDB")
+}
+
 func makeBlockMetaDataDDBEntry(block *api.BlockMetadata) *model.BlockMetaDataDDBEntry {
 	blockMetaDataDDBEntry := model.BlockMetaDataDDBEntry{
-		BlockPid:      getBlockPidForHeight(block.Tag, block.Height),
-		BlockRid:      getBlockRidWithBlockHash(block.Hash),
-		Tag:           block.Tag,
-		Hash:          block.Hash,
-		ParentHash:    block.ParentHash,
-		Height:        block.Height,
-		ParentHeight:  block.ParentHeight,
-		ObjectKeyMain: block.ObjectKeyMain,
-		Skipped:       block.Skipped,
-		Timestamp:     block.GetTimestamp().GetSeconds(),
+		BlockPid:           getBlockPidForHeight(block.Tag, block.Height),
+		BlockRid:           getBlockRidWithBlockHash(block.Hash),
+		Tag:                block.Tag,
+		Hash:               block.Hash,
+		ParentHash:         block.ParentHash,
+		Height:             block.Height,
+		ParentHeight:       block.ParentHeight,
+		ObjectKeyMain:      block.ObjectKeyMain,
+		Skipped:            block.Skipped,
+		Timestamp:          block.GetTimestamp().GetSeconds(),
+		ObjectFormat:       int32(block.GetObjectFormat()),
+		ByteOffset:         block.GetByteOffset(),
+		ByteLength:         block.GetByteLength(),
+		UncompressedLength: block.GetUncompressedLength(),
 	}
 	return &blockMetaDataDDBEntry
 }

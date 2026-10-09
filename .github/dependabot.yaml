@@ -1,7 +1,73 @@
 version: 2
+
+# Policy: ignore semver-major for version updates to reduce noise.
+# Security *alerts* still fire — triage manually when only a major bump fixes it.
+# Ref: aligned with monorepo dependabot policy.
+
 updates:
-  # Maintain dependencies for GitHub Actions
+  # ─── Go modules ───────────────────────────────────────────
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown: &cooldown-policy
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    groups:
+      go_modules:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "go"
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  # ─── GitHub Actions ───────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    cooldown: *cooldown-policy
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  # ─── Docker ───────────────────────────────────────────────
+  # Only tracks Dockerfiles; docker-compose-*.yml is not monitored by design.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown: *cooldown-policy
+    groups:
+      docker:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+      # Pin golang base image to current major.minor.
+      # Upgrading Go affects other services' dependencies and must be
+      # coordinated manually across the org.
+      - dependency-name: "golang"
+        versions: [">= 1.25"]

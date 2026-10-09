@@ -112,7 +112,7 @@ func TestCall_RequestError(t *testing.T) {
 
 	require.Nil(response)
 	require.Error(err)
-	require.Contains(err.Error(), "method=&{hello path 5ns}")
+	require.Contains(err.Error(), "method=&{ hello path 5ns}")
 	require.Contains(err.Error(), "requestBody=[]")
 	require.Contains(err.Error(), "endpoint=node_name")
 
@@ -165,7 +165,7 @@ func TestCall_RequestError_FailedWithRetry(t *testing.T) {
 	require.Nil(response)
 	require.Error(err)
 
-	require.Contains(err.Error(), "method=&{hello path 5ns}")
+	require.Contains(err.Error(), "method=&{ hello path 5ns}")
 	require.Contains(err.Error(), "requestBody=[]")
 	require.Contains(err.Error(), "endpoint=node_name")
 
@@ -179,6 +179,54 @@ func TestCall_RequestError_FailedWithRetry(t *testing.T) {
 	errOut := &DummyErr{}
 	require.NoError(json.Unmarshal([]byte(errHTTP.Response), &errOut))
 	require.Equal("block_not_found", errOut.ErrorCode)
+}
+
+func TestCall_RequestMethod(t *testing.T) {
+	require := testutil.Require(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	httpClient := restapimocks.NewMockHTTPClient(ctrl)
+	// Construct a REST API response with request method in body
+	httpClient.EXPECT().Do(gomock.Any()).DoAndReturn(func(req *http.Request) (*http.Response, error) {
+		method := req.Method
+		body := ioutil.NopCloser(strings.NewReader(`{"method": "` + method + `"}`))
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       body,
+		}, nil
+	}).Times(2)
+
+	var params clientParams
+	app := testapp.New(
+		t,
+		withDummyEndpoints(),
+		fx.Provide(restapi.New),
+		fx.Provide(func() restapi.HTTPClient {
+			return httpClient
+		}),
+		fx.Populate(&params),
+	)
+	defer app.Close()
+
+	client := params.Master
+	require.NotNil(client)
+
+	methods := []string{http.MethodGet, http.MethodPost}
+	for _, method := range methods {
+		response, err := client.Call(context.Background(),
+			&restapi.RequestMethod{Name: "hello", ParamsPath: "path", HTTPMethod: method, Timeout: time.Duration(5)},
+			nil)
+		require.NoError(err)
+		// assert the right method
+		var responseData map[string]string
+		err = json.Unmarshal(response, &responseData)
+		require.NoError(err)
+		require.NotEmpty(responseData)
+		require.Equal(method, responseData["method"])
+
+	}
 }
 
 func TestCall_RequestError_SucceededAfterRetries(t *testing.T) {
@@ -263,7 +311,7 @@ func TestCall_RequestError_WithCustomizedAttempts(t *testing.T) {
 	require.Error(err)
 	require.Nil(response)
 
-	require.Contains(err.Error(), "method=&{hello path 5ns}")
+	require.Contains(err.Error(), "method=&{ hello path 5ns}")
 	require.Contains(err.Error(), "requestBody=[]")
 	require.Contains(err.Error(), "endpoint=node_name")
 

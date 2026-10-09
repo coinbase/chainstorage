@@ -3,6 +3,7 @@ package ethereum
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -359,6 +360,62 @@ func (s *arbitrumParserTestSuite) TestParseArbitrumNativeBlock_WithGethTraces_Su
 	flattenedTraces2 := transaction2.FlattenedTraces
 	require.Equal(3, len(flattenedTraces1))
 	require.Equal(1, len(flattenedTraces2))
+}
+
+// INF-1990: EIP-1559 fee caps are uint256. Arbitrum block 469062165
+// carries maxPriorityFeePerGas 0x1d7c402bcc5127a05a4200 (88 bits), which
+// failed the whole block. Oversized caps saturate to MaxUint64; in-range
+// caps are unchanged.
+func (s *arbitrumParserTestSuite) TestParseArbitrumNativeBlock_FeeCapAbove64Bits() {
+	require := testutil.Require(s.T())
+
+	fixtureHeader, err := fixtures.ReadFile("parser/arbitrum/arb_fixtureheader_22207818.json")
+	require.NoError(err)
+	var header map[string]any
+	require.NoError(json.Unmarshal(fixtureHeader, &header))
+	header["baseFeePerGas"] = "0x5f5e100"
+	txs := header["transactions"].([]any)
+	txs[0].(map[string]any)["maxFeePerGas"] = "0x1d7c402bcc5127a05a4200"
+	txs[0].(map[string]any)["maxPriorityFeePerGas"] = "0x1d7c402bcc5127a05a4200"
+	txs[1].(map[string]any)["maxFeePerGas"] = "0x77359400"
+	txs[1].(map[string]any)["maxPriorityFeePerGas"] = "0x3b9aca00"
+	fixtureHeader, err = json.Marshal(header)
+	require.NoError(err)
+	fixtureReceipt_1, err := fixtures.ReadFile("parser/arbitrum/arb_fixturereceipt_22207818_1.json")
+	require.NoError(err)
+	fixtureReceipt_2, err := fixtures.ReadFile("parser/arbitrum/arb_fixturereceipt_22207818_2.json")
+	require.NoError(err)
+	traces := s.fixtureTracesParsingHelper("parser/arbitrum/arb_debugtrace.json")
+
+	block := &api.Block{
+		Blockchain: common.Blockchain_BLOCKCHAIN_ARBITRUM,
+		Network:    common.Network_NETWORK_ARBITRUM_MAINNET,
+		Metadata: &api.BlockMetadata{
+			Tag:        arbitrumTag,
+			Hash:       arbitrumHash,
+			ParentHash: arbitrumParentHash,
+			Height:     22207818,
+		},
+		Blobdata: &api.Block_Ethereum{
+			Ethereum: &api.EthereumBlobdata{
+				Header:              fixtureHeader,
+				TransactionReceipts: [][]byte{fixtureReceipt_2, fixtureReceipt_1},
+				TransactionTraces:   traces,
+			},
+		},
+	}
+
+	nativeBlock, err := s.parser.ParseNativeBlock(context.Background(), block)
+	require.NoError(err)
+	transactions := nativeBlock.GetEthereum().Transactions
+
+	require.Equal(uint64(math.MaxUint64), transactions[0].GetMaxFeePerGas())
+	require.Equal(uint64(math.MaxUint64), transactions[0].GetMaxPriorityFeePerGas())
+	require.Equal(uint64(math.MaxUint64-100_000_000), transactions[0].GetPriorityFeePerGas())
+
+	require.Equal(uint64(2_000_000_000), transactions[1].GetMaxFeePerGas())
+	require.Equal(uint64(1_000_000_000), transactions[1].GetMaxPriorityFeePerGas())
+	require.Equal(uint64(1_000_000_000), transactions[1].GetPriorityFeePerGas())
 }
 
 func (s *arbitrumParserTestSuite) TestParseArbitrumNativeBlock_WithEmptyTraces_Fail() {

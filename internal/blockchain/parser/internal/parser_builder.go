@@ -79,7 +79,13 @@ func (f *parserFactoryImpl) NewParser() (Parser, error) {
 		return nil, xerrors.Errorf("failed to create native parser: %w", err)
 	}
 
-	rosettaParser, err := f.rosettaParserFactory(f.params, nativeParser)
+	rosettaParserFactory := f.rosettaParserFactory
+	if !f.params.Config.Chain.Feature.RosettaParser {
+		// The chain opted out of the rosetta parser (e.g. dogecoin), even if
+		// the parser it shares with other chains registers a rosetta factory.
+		rosettaParserFactory = NewNotImplementedRosettaParser
+	}
+	rosettaParser, err := rosettaParserFactory(f.params, nativeParser)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create rosetta parser: %w", err)
 	}

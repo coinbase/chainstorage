@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -2380,6 +2381,166 @@ func TestParseEthereumBlock_InvalidTransactionReceipt(t *testing.T) {
 	_, err := parser.ParseNativeBlock(context.Background(), block)
 	require.Error(err)
 	require.Contains(err.Error(), "unexpected transaction receipt")
+}
+
+// TestParseMegaethBlock_DuplicateTransactionReceiptIndex covers the MegaETH-only relaxation
+// for blocks that list the same tx hash multiple times (e.g. mainnet block 10004831). The
+// node returns one canonical receipt (single transactionIndex) for every occurrence, so the
+// positional receipt/tx index check disagrees even though the receipt is correct. The
+// relaxation is scoped strictly: MegaETH only, hash must still match, and the mismatch must be
+// a genuine duplicate-hash artifact.
+func TestParseMegaethBlock_DuplicateTransactionReceiptIndex(t *testing.T) {
+	const (
+		blockHash   = ethereumHash
+		dupTxHash   = "0xe67071db25331ea3a92a4e28b516c95f2d5b62b68329b70386c19e00807f51d8"
+		otherTxHash = "0x7422d3f183f198a4645d60deae5bebb6cd44f12df2c2e24b813ddd1c58da62c3"
+	)
+
+	type txSpec struct {
+		hash  string
+		index string
+	}
+
+	buildBlock := func(blockchain common.Blockchain, network common.Network, txs []txSpec, receipts []txSpec) *api.Block {
+		txJSON := func(s txSpec) string {
+			return fmt.Sprintf(`{
+				"blockHash": "%s",
+				"blockNumber": "0xacc290",
+				"from": "0x4823cc90c145fd6a16ab7668043dbba5ce79cdfc",
+				"gas": "0x15f90",
+				"gasPrice": "0x22cee4f700",
+				"hash": "%s",
+				"input": "0x",
+				"nonce": "0x1f0",
+				"to": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+				"transactionIndex": "%s",
+				"type": "0x0",
+				"value": "0xa"
+			}`, blockHash, s.hash, s.index)
+		}
+		receiptJSON := func(s txSpec) []byte {
+			return []byte(fmt.Sprintf(`{
+				"transactionHash": "%s",
+				"transactionIndex": "%s",
+				"blockHash": "%s",
+				"blockNumber": "0xacc290",
+				"from": "0x98265d92b016df8758f361fb8d2f9a813c82494a",
+				"to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+				"cumulativeGasUsed": "0xbca58c",
+				"gasUsed": "0x1b889",
+				"logsBloom": "0x00",
+				"logs": [],
+				"status": "0x1",
+				"type": "0x0"
+			}`, s.hash, s.index, blockHash))
+		}
+		traceJSON := []byte(`{
+			"type": "CALL",
+			"from": "0x4823cc90c145fd6a16ab7668043dbba5ce79cdfc",
+			"to": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+			"value": "0x0",
+			"gas": "0x10b1c",
+			"gasUsed": "0x4c91",
+			"input": "0x",
+			"output": "0x"
+		}`)
+
+		txsJSON := make([]string, len(txs))
+		for i, s := range txs {
+			txsJSON[i] = txJSON(s)
+		}
+		header := []byte(fmt.Sprintf(`{
+			"hash": "%s",
+			"parentHash": "%s",
+			"number": "0xacc290",
+			"timestamp": "0x5fbd2fb9",
+			"transactions": [%s]
+		}`, blockHash, ethereumParentHash, strings.Join(txsJSON, ",")))
+
+		rawReceipts := make([][]byte, len(receipts))
+		for i, s := range receipts {
+			rawReceipts[i] = receiptJSON(s)
+		}
+		rawTraces := make([][]byte, len(txs))
+		for i := range txs {
+			rawTraces[i] = traceJSON
+		}
+
+		return &api.Block{
+			Blockchain: blockchain,
+			Network:    network,
+			Metadata:   ethereumMetadata,
+			Blobdata: &api.Block_Ethereum{
+				Ethereum: &api.EthereumBlobdata{
+					Header:              header,
+					TransactionReceipts: rawReceipts,
+					TransactionTraces:   rawTraces,
+				},
+			},
+		}
+	}
+
+	newParser := func(t *testing.T, blockchain common.Blockchain, network common.Network) (internal.Parser, func()) {
+		var parser internal.Parser
+		app := testapp.New(
+			t,
+			Module,
+			internal.Module,
+			testapp.WithBlockchainNetwork(blockchain, network),
+			fx.Populate(&parser),
+		)
+		return parser, app.Close
+	}
+
+	t.Run("megaeth duplicate hash is tolerated", func(t *testing.T) {
+		require := testutil.Require(t)
+		// Same hash at index 0 and 1; the node returns the canonical receipt (index 1) for both.
+		block := buildBlock(
+			common.Blockchain_BLOCKCHAIN_MEGAETH,
+			common.Network_NETWORK_MEGAETH_MAINNET,
+			[]txSpec{{dupTxHash, "0x0"}, {dupTxHash, "0x1"}},
+			[]txSpec{{dupTxHash, "0x1"}, {dupTxHash, "0x1"}},
+		)
+		parser, cleanup := newParser(t, common.Blockchain_BLOCKCHAIN_MEGAETH, common.Network_NETWORK_MEGAETH_MAINNET)
+		defer cleanup()
+
+		nativeBlock, err := parser.ParseNativeBlock(context.Background(), block)
+		require.NoError(err)
+		require.NotNil(nativeBlock)
+	})
+
+	t.Run("ethereum with identical data still fails", func(t *testing.T) {
+		require := testutil.Require(t)
+		block := buildBlock(
+			common.Blockchain_BLOCKCHAIN_ETHEREUM,
+			common.Network_NETWORK_ETHEREUM_MAINNET,
+			[]txSpec{{dupTxHash, "0x0"}, {dupTxHash, "0x1"}},
+			[]txSpec{{dupTxHash, "0x1"}, {dupTxHash, "0x1"}},
+		)
+		parser, cleanup := newParser(t, common.Blockchain_BLOCKCHAIN_ETHEREUM, common.Network_NETWORK_ETHEREUM_MAINNET)
+		defer cleanup()
+
+		_, err := parser.ParseNativeBlock(context.Background(), block)
+		require.Error(err)
+		require.Contains(err.Error(), "unexpected transaction receipt")
+	})
+
+	t.Run("megaeth non-duplicate index mismatch still fails", func(t *testing.T) {
+		require := testutil.Require(t)
+		// Two distinct hashes: the index mismatch is NOT a duplicate-hash artifact, so it must fail.
+		block := buildBlock(
+			common.Blockchain_BLOCKCHAIN_MEGAETH,
+			common.Network_NETWORK_MEGAETH_MAINNET,
+			[]txSpec{{dupTxHash, "0x0"}, {otherTxHash, "0x1"}},
+			[]txSpec{{dupTxHash, "0x1"}, {otherTxHash, "0x1"}},
+		)
+		parser, cleanup := newParser(t, common.Blockchain_BLOCKCHAIN_MEGAETH, common.Network_NETWORK_MEGAETH_MAINNET)
+		defer cleanup()
+
+		_, err := parser.ParseNativeBlock(context.Background(), block)
+		require.Error(err)
+		require.Contains(err.Error(), "unexpected transaction receipt")
+	})
 }
 
 func TestParseEthereumBlock_PostLondon(t *testing.T) {

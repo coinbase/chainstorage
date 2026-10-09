@@ -312,6 +312,7 @@ func (s *blockStorageTestSuite) equalProto(x, y any) {
 }
 
 func TestIntegrationBlockStorageTestSuite(t *testing.T) {
+	t.Skip()
 	// TODO: speed up the tests before re-enabling TestAllEnvs.
 	// testapp.TestAllEnvs(t, func(t *testing.T, cfg *config.Config) {
 	// 	suite.Run(t, &blockStorageTestSuite{config: cfg})

@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
@@ -17,7 +18,6 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/log"
-	"github.com/coinbase/chainstorage/internal/utils/pointer"
 )
 
 type (
@@ -27,13 +27,13 @@ type (
 	DLQParams struct {
 		fx.In
 		fxparams.Params
-		Session *session.Session
+		AWSConfig aws.Config
 	}
 
 	dlqImpl struct {
 		config                   *config.Config
 		logger                   *zap.Logger
-		client                   *sqs.SQS
+		client                   *sqs.Client
 		queueURL                 string
 		instrumentSendMessage    instrument.Instrument
 		instrumentResendMessage  instrument.Instrument
@@ -61,10 +61,11 @@ const (
 	topicAttributeDateType   = "String"
 	retriesAttributeName     = "retries"
 	retriesAttributeDataType = "Number"
+	sentTimestampAttribute   = "SentTimestamp"
 )
 
 func New(params DLQParams) (DLQ, error) {
-	client := sqs.New(params.Session)
+	client := sqs.NewFromConfig(params.AWSConfig)
 	metrics := params.Metrics.SubScope("dlq").Tagged(map[string]string{
 		"storage_type": "sqs",
 	})
@@ -78,12 +79,12 @@ func New(params DLQParams) (DLQ, error) {
 		instrumentDeleteMessage:  instrument.New(metrics, "delete_message"),
 	}
 	if params.Config.AWS.IsLocalStack {
-		if err := impl.resetLocalResources(); err != nil {
+		if err := impl.resetLocalResources(context.Background()); err != nil {
 			return nil, xerrors.Errorf("failed to reset local resources: %w", err)
 		}
 	}
 
-	if err := impl.initQueueURL(); err != nil {
+	if err := impl.initQueueURL(context.Background()); err != nil {
 		return nil, xerrors.Errorf("failed to init queue url: %w", err)
 	}
 	return impl, nil
@@ -98,18 +99,18 @@ func (q *dlqImpl) SendMessage(ctx context.Context, message *Message) error {
 		messageBody := string(body)
 
 		input := &sqs.SendMessageInput{
-			QueueUrl: pointer.Ref(q.queueURL),
-			MessageAttributes: map[string]*sqs.MessageAttributeValue{
+			QueueUrl: aws.String(q.queueURL),
+			MessageAttributes: map[string]types.MessageAttributeValue{
 				topicAttributeName: {
-					DataType:    pointer.Ref(topicAttributeDateType),
-					StringValue: pointer.Ref(message.Topic),
+					DataType:    aws.String(topicAttributeDateType),
+					StringValue: aws.String(message.Topic),
 				},
 			},
-			MessageBody:  pointer.Ref(messageBody),
-			DelaySeconds: pointer.Ref(q.config.AWS.DLQ.DelaySecs),
+			MessageBody:  aws.String(messageBody),
+			DelaySeconds: int32(q.config.AWS.DLQ.DelaySecs),
 		}
 
-		if _, err := q.client.SendMessageWithContext(ctx, input); err != nil {
+		if _, err := q.client.SendMessage(ctx, input); err != nil {
 			return xerrors.Errorf("failed to send message: %w", err)
 		}
 
@@ -133,29 +134,29 @@ func (q *dlqImpl) ResendMessage(ctx context.Context, message *Message) error {
 		// Increment the retries counter and resend the same data.
 		retries := strconv.Itoa(message.Retries + 1)
 		input := &sqs.SendMessageInput{
-			QueueUrl: pointer.Ref(q.queueURL),
-			MessageAttributes: map[string]*sqs.MessageAttributeValue{
+			QueueUrl: aws.String(q.queueURL),
+			MessageAttributes: map[string]types.MessageAttributeValue{
 				topicAttributeName: {
-					DataType:    pointer.Ref(topicAttributeDateType),
-					StringValue: pointer.Ref(message.Topic),
+					DataType:    aws.String(topicAttributeDateType),
+					StringValue: aws.String(message.Topic),
 				},
 				retriesAttributeName: {
-					DataType:    pointer.Ref(retriesAttributeDataType),
-					StringValue: pointer.Ref(retries),
+					DataType:    aws.String(retriesAttributeDataType),
+					StringValue: aws.String(retries),
 				},
 			},
-			MessageBody:  pointer.Ref(messageBody),
-			DelaySeconds: pointer.Ref(q.config.AWS.DLQ.DelaySecs),
+			MessageBody:  aws.String(messageBody),
+			DelaySeconds: int32(q.config.AWS.DLQ.DelaySecs),
 		}
 
-		if _, err := q.client.SendMessageWithContext(ctx, input); err != nil {
+		if _, err := q.client.SendMessage(ctx, input); err != nil {
 			return xerrors.Errorf("failed to send message: %w", err)
 		}
 
 		// Delete the original message.
-		if _, err := q.client.DeleteMessageWithContext(ctx, &sqs.DeleteMessageInput{
-			QueueUrl:      pointer.Ref(q.queueURL),
-			ReceiptHandle: pointer.Ref(message.ReceiptHandle),
+		if _, err := q.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+			QueueUrl:      aws.String(q.queueURL),
+			ReceiptHandle: aws.String(message.ReceiptHandle),
 		}); err != nil {
 			return xerrors.Errorf("failed to delete message: %w", err)
 		}
@@ -174,18 +175,18 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 	var message *Message
 	if err := q.instrumentReceiveMessage.Instrument(ctx, func(ctx context.Context) error {
 		input := &sqs.ReceiveMessageInput{
-			QueueUrl:          pointer.Ref(q.queueURL),
-			VisibilityTimeout: pointer.Ref(q.config.AWS.DLQ.VisibilityTimeoutSecs),
-			AttributeNames: []*string{
-				pointer.Ref(sqs.MessageSystemAttributeNameSentTimestamp),
+			QueueUrl:          aws.String(q.queueURL),
+			VisibilityTimeout: int32(q.config.AWS.DLQ.VisibilityTimeoutSecs),
+			AttributeNames: []types.QueueAttributeName{
+				types.QueueAttributeName(sentTimestampAttribute),
 			},
-			MessageAttributeNames: []*string{
-				pointer.Ref(topicAttributeName),
-				pointer.Ref(retriesAttributeName),
+			MessageAttributeNames: []string{
+				topicAttributeName,
+				retriesAttributeName,
 			},
 		}
 
-		output, err := q.client.ReceiveMessageWithContext(ctx, input)
+		output, err := q.client.ReceiveMessage(ctx, input)
 		if err != nil {
 			return xerrors.Errorf("failed to receive message: %w", err)
 		}
@@ -200,24 +201,24 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		}
 
 		outputMessage := output.Messages[0]
-		receiptHandle := pointer.Deref(outputMessage.ReceiptHandle)
+		receiptHandle := aws.ToString(outputMessage.ReceiptHandle)
 
-		sentTimestampAttribute := pointer.Deref(outputMessage.Attributes[sqs.MessageSystemAttributeNameSentTimestamp])
-		sentTimestampEpoch, err := strconv.ParseInt(sentTimestampAttribute, 10, 64)
+		sentTimestampAttr := outputMessage.Attributes[sentTimestampAttribute]
+		sentTimestampEpoch, err := strconv.ParseInt(sentTimestampAttr, 10, 64)
 		if err != nil {
-			return xerrors.Errorf("failed to parse sent timestamp: %v", sentTimestampAttribute)
+			return xerrors.Errorf("failed to parse sent timestamp: %v", sentTimestampAttr)
 		}
 		sentTimestamp := time.Unix(sentTimestampEpoch/1000, 0)
 
 		topicAttribute := outputMessage.MessageAttributes[topicAttributeName]
-		if topicAttribute == nil {
+		if topicAttribute.StringValue == nil {
 			return xerrors.Errorf("topic not found: %v", outputMessage)
 		}
-		topic := pointer.Deref(topicAttribute.StringValue)
+		topic := aws.ToString(topicAttribute.StringValue)
 
 		var retries int
-		if attr := outputMessage.MessageAttributes[retriesAttributeName]; attr != nil {
-			if v, err := strconv.Atoi(pointer.Deref(attr.StringValue)); err == nil {
+		if attr := outputMessage.MessageAttributes[retriesAttributeName]; attr.StringValue != nil {
+			if v, err := strconv.Atoi(aws.ToString(attr.StringValue)); err == nil {
 				retries = v
 			}
 		}
@@ -233,7 +234,7 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 		}
 
 		if data != nil {
-			body := []byte(pointer.Deref(outputMessage.Body))
+			body := []byte(aws.ToString(outputMessage.Body))
 			if err := json.Unmarshal(body, data); err != nil {
 				return xerrors.Errorf("failed to unmarshal message: %w", err)
 			}
@@ -263,9 +264,9 @@ func (q *dlqImpl) ReceiveMessage(ctx context.Context) (*Message, error) {
 
 func (q *dlqImpl) DeleteMessage(ctx context.Context, message *Message) error {
 	return q.instrumentDeleteMessage.Instrument(ctx, func(ctx context.Context) error {
-		if _, err := q.client.DeleteMessageWithContext(ctx, &sqs.DeleteMessageInput{
-			QueueUrl:      pointer.Ref(q.queueURL),
-			ReceiptHandle: pointer.Ref(message.ReceiptHandle),
+		if _, err := q.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+			QueueUrl:      aws.String(q.queueURL),
+			ReceiptHandle: aws.String(message.ReceiptHandle),
 		}); err != nil {
 			return xerrors.Errorf("failed to delete message: %w", err)
 		}
@@ -279,21 +280,21 @@ func (q *dlqImpl) DeleteMessage(ctx context.Context, message *Message) error {
 	})
 }
 
-func (q *dlqImpl) initQueueURL() error {
+func (q *dlqImpl) initQueueURL(ctx context.Context) error {
 	queueURLInput := &sqs.GetQueueUrlInput{
-		QueueName: pointer.Ref(q.config.AWS.DLQ.Name),
+		QueueName: aws.String(q.config.AWS.DLQ.Name),
 	}
 
 	if q.config.AWS.DLQ.OwnerAccountId != "" {
-		queueURLInput.SetQueueOwnerAWSAccountId(q.config.AWS.DLQ.OwnerAccountId)
+		queueURLInput.QueueOwnerAWSAccountId = aws.String(q.config.AWS.DLQ.OwnerAccountId)
 	}
 
-	output, err := q.client.GetQueueUrl(queueURLInput)
+	output, err := q.client.GetQueueUrl(ctx, queueURLInput)
 	if err != nil {
 		return xerrors.Errorf("failed to get queue url (name=%v): %w", q.config.AWS.DLQ.Name, err)
 	}
 
-	queueURL := pointer.Deref(output.QueueUrl)
+	queueURL := aws.ToString(output.QueueUrl)
 	if queueURL == "" {
 		return xerrors.New("empty queue url")
 	}

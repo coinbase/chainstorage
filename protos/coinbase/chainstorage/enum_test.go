@@ -1,10 +1,46 @@
 package chainstorage
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 )
+
+func TestSingleBlockEnumAliasesPreserveRollingRESTCompatibility(t *testing.T) {
+	assert.Equal(
+		t,
+		BlockReadSource_BLOCK_READ_SOURCE_SINGLE_BLOCK,
+		BlockReadSource_BLOCK_READ_SOURCE_LEGACY,
+	)
+	assert.Equal(
+		t,
+		BlockObjectFormat_BLOCK_OBJECT_FORMAT_SINGLE_BLOCK,
+		BlockObjectFormat_BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK,
+	)
+	assert.Equal(t, "BLOCK_READ_SOURCE_LEGACY", BlockReadSource(1).String())
+	assert.Equal(t, "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK", BlockObjectFormat(0).String())
+
+	requestJSON, err := protojson.Marshal(&GetRawBlockRequest{
+		ReadSource: BlockReadSource_BLOCK_READ_SOURCE_SINGLE_BLOCK,
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"readSource":"BLOCK_READ_SOURCE_LEGACY"}`, string(requestJSON))
+
+	for _, name := range []string{"BLOCK_READ_SOURCE_LEGACY", "BLOCK_READ_SOURCE_SINGLE_BLOCK"} {
+		var request GetRawBlockRequest
+		require.NoError(t, protojson.Unmarshal([]byte(fmt.Sprintf(`{"readSource":%q}`, name)), &request))
+		assert.Equal(t, BlockReadSource_BLOCK_READ_SOURCE_SINGLE_BLOCK, request.GetReadSource())
+	}
+
+	for _, name := range []string{"BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK", "BLOCK_OBJECT_FORMAT_SINGLE_BLOCK"} {
+		var file BlockFile
+		require.NoError(t, protojson.Unmarshal([]byte(fmt.Sprintf(`{"objectFormat":%q}`, name)), &file))
+		assert.Equal(t, BlockObjectFormat_BLOCK_OBJECT_FORMAT_SINGLE_BLOCK, file.GetObjectFormat())
+	}
+}
 
 func TestSolanaProgramName(t *testing.T) {
 	expectedNames := map[SolanaProgram]string{

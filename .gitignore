@@ -28,5 +28,8 @@
 # pg 
 postgres_*
 
+# ignore all files in dev-data/
+dev-data/
+
 # ignore binaries
 /scripts/bin

@@ -42,6 +42,26 @@ func (m *MockChainStorageClient) EXPECT() *MockChainStorageClientMockRecorder {
 	return m.recorder
 }
 
+// GetBlockByTimestamp mocks base method.
+func (m *MockChainStorageClient) GetBlockByTimestamp(arg0 context.Context, arg1 *chainstorage.GetBlockByTimestampRequest, arg2 ...grpc.CallOption) (*chainstorage.GetBlockByTimestampResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBlockByTimestamp", varargs...)
+	ret0, _ := ret[0].(*chainstorage.GetBlockByTimestampResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockByTimestamp indicates an expected call of GetBlockByTimestamp.
+func (mr *MockChainStorageClientMockRecorder) GetBlockByTimestamp(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByTimestamp", reflect.TypeOf((*MockChainStorageClient)(nil).GetBlockByTimestamp), varargs...)
+}
+
 // GetBlockByTransaction mocks base method.
 func (m *MockChainStorageClient) GetBlockByTransaction(arg0 context.Context, arg1 *chainstorage.GetBlockByTransactionRequest, arg2 ...grpc.CallOption) (*chainstorage.GetBlockByTransactionResponse, error) {
 	m.ctrl.T.Helper()

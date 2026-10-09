@@ -1,5 +1,18 @@
 aws:
   aws_account: production
+  storage:
+    consolidation:
+      read_shadow_first: true
+storage_type:
+  blob: S3
+  meta: POSTGRES
+cadence:
+  keep_alive_time: 10s
+  keep_alive_timeout: 30s
+cron:
+  batch_consolidator:
+    spec: "@every 15m"
+    workflow_parallelism: 4
 workflows:
   backfiller:
     num_concurrent_extractors: 150

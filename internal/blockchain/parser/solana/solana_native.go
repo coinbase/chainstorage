@@ -221,7 +221,7 @@ func NewSolanaNativeParser(params internal.ParserParams, opts ...internal.Parser
 	}, nil
 }
 
-func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
+func (p *solanaNativeParserImpl) ParseBlock(ctx context.Context, rawBlock *api.Block, opts ...internal.ParseOption) (*api.NativeBlock, error) {
 	metadata := rawBlock.GetMetadata()
 	if metadata == nil {
 		return nil, xerrors.New("metadata not found")
@@ -411,33 +411,45 @@ func (p *solanaNativeParserImpl) parseTransactions(transactions []SolanaTransact
 
 func (p *solanaNativeParserImpl) parseTransactionsV2(transactions []SolanaTransactionV2) ([]*api.SolanaTransactionV2, error) {
 	result := make([]*api.SolanaTransactionV2, len(transactions))
-	for i, v := range transactions {
-		version := p.parseTransactionVersion(v.Version)
-
-		transactionID, err := ValidateSolanaParsedTransactionId(v.Payload.Signatures)
+	for i := range transactions {
+		transaction, err := p.parseTransactionV2(&transactions[i])
 		if err != nil {
 			return nil, err
 		}
-
-		payload, err := p.parseTransactionPayloadV2(v.Payload)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction payload (transactionID=%v, payload={%+v}): %w", transactionID, v.Payload, err)
-		}
-
-		meta, err := p.parseTransactionMetaV2(v.Meta)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to parse transaction meta (transactionID=%v, meta={%+v}): %w", transactionID, v.Meta, err)
-		}
-
-		result[i] = &api.SolanaTransactionV2{
-			TransactionId: transactionID,
-			Payload:       payload,
-			Meta:          meta,
-			Version:       version,
-		}
+		result[i] = transaction
 	}
 
 	return result, nil
+}
+
+// parseTransactionV2 converts one decoded getBlock transaction into its
+// native form. It is the unit shared by ParseBlock (over the whole
+// block's array) and StreamBlockIter (one element at a time), which is
+// what keeps the two paths in parity.
+func (p *solanaNativeParserImpl) parseTransactionV2(v *SolanaTransactionV2) (*api.SolanaTransactionV2, error) {
+	version := p.parseTransactionVersion(v.Version)
+
+	transactionID, err := ValidateSolanaParsedTransactionId(v.Payload.Signatures)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := p.parseTransactionPayloadV2(v.Payload)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to parse transaction payload (transactionID=%v, payload={%+v}): %w", transactionID, v.Payload, err)
+	}
+
+	meta, err := p.parseTransactionMetaV2(v.Meta)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to parse transaction meta (transactionID=%v, meta={%+v}): %w", transactionID, v.Meta, err)
+	}
+
+	return &api.SolanaTransactionV2{
+		TransactionId: transactionID,
+		Payload:       payload,
+		Meta:          meta,
+		Version:       version,
+	}, nil
 }
 
 func (p *solanaNativeParserImpl) parseTransactionMeta(meta *SolanaTransactionMeta, accounts solana.AccountMetaSlice) (*api.SolanaTransactionMeta, error) {

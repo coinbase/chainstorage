@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/xerrors"
 
+	"github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
@@ -62,11 +63,11 @@ func newInstrumentWithResult[T any](method string, scope tally.Scope, logger *za
 	)
 }
 
-func (i *instrumentInterceptor) ParseNativeBlock(ctx context.Context, rawBlock *api.Block) (*api.NativeBlock, error) {
+func (i *instrumentInterceptor) ParseNativeBlock(ctx context.Context, rawBlock *api.Block, opts ...ParseOption) (*api.NativeBlock, error) {
 	return i.instrumentParseNativeBlock.Instrument(
 		ctx,
 		func(ctx context.Context) (*api.NativeBlock, error) {
-			return i.parser.ParseNativeBlock(ctx, rawBlock)
+			return i.parser.ParseNativeBlock(ctx, rawBlock, opts...)
 		},
 		instrument.WithLoggerFields(
 			zap.Reflect("block", rawBlock.Metadata),
@@ -149,4 +150,12 @@ func (i *instrumentInterceptor) ValidateRosettaBlock(ctx context.Context, req *a
 			zap.String("blockHash", actualRosettaBlock.Block.BlockIdentifier.Hash),
 		),
 	)
+}
+
+// ParseStreamNative passes through to the wrapped parser. Streaming
+// instrumentation (per-tx counters, per-block duration) would require
+// hooking the iterator; for now the call is passed through unwrapped
+// so consumers see the real stream object.
+func (i *instrumentInterceptor) ParseStreamNative(ctx context.Context, spooled *downloader.SpooledBlock, opts ...ParseOption) (NativeStreamedBlock, error) {
+	return i.parser.ParseStreamNative(ctx, spooled, opts...)
 }

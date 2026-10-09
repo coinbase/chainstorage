@@ -7,7 +7,9 @@ import (
 	"net"
 	"time"
 
+	filterpb "go.temporal.io/api/filter/v1"
 	"go.temporal.io/api/serviceerror"
+	workflowpb "go.temporal.io/api/workflow/v1"
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
@@ -41,7 +43,7 @@ type (
 		TerminateWorkflow(ctx context.Context, workflowID string, runID string, reason string) error
 		OnStart(ctx context.Context) error
 		OnStop(ctx context.Context) error
-		ListOpenWorkflows(ctx context.Context, namespace string, maxPageSize int32) (*workflowservice.ListOpenWorkflowExecutionsResponse, error)
+		ListOpenWorkflows(ctx context.Context, namespace string, maxPageSize int32, workflowType string) (*workflowservice.ListOpenWorkflowExecutionsResponse, error)
 	}
 
 	RuntimeParams struct {
@@ -57,6 +59,8 @@ type (
 		namespaceClient client.NamespaceClient
 		workers         []worker.Worker
 	}
+
+	listOpenWorkflowsFn func(ctx context.Context, request *workflowservice.ListOpenWorkflowExecutionsRequest) (*workflowservice.ListOpenWorkflowExecutionsResponse, error)
 )
 
 func NewRuntime(params RuntimeParams) (Runtime, error) {
@@ -69,35 +73,9 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 	runtimeLogger := logur.LoggerToKV(zapadapter.New(logger))
 
 	address := params.Config.Cadence.Address
-	tlsConfig := params.Config.Cadence.TLSConfig
-	connectionOptions := client.ConnectionOptions{}
-	if tlsConfig.Enabled && params.Config.Env() != config.EnvLocal {
-		host, _, err := net.SplitHostPort(address)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to parse address (%v): %w", address, err)
-		}
-
-		connectionOptions.TLS = &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			ServerName:         host,
-			InsecureSkipVerify: !tlsConfig.ValidateHostname,
-		}
-
-		if tlsConfig.CertificateAuthority != "" {
-			caCertPool := x509.NewCertPool()
-			if !caCertPool.AppendCertsFromPEM([]byte(tlsConfig.CertificateAuthority)) {
-				return nil, xerrors.Errorf("failed to parse CA certificate: %v", tlsConfig.CertificateAuthority)
-			}
-			connectionOptions.TLS.RootCAs = caCertPool
-		}
-
-		if tlsConfig.ClientCertificate != "" && tlsConfig.ClientPrivateKey != "" {
-			clientCert, err := tls.X509KeyPair([]byte(tlsConfig.ClientCertificate), []byte(tlsConfig.ClientPrivateKey))
-			if err != nil {
-				return nil, xerrors.Errorf("failed to parse client certificate or key (%v): %w", tlsConfig.ClientCertificate, err)
-			}
-			connectionOptions.TLS.Certificates = []tls.Certificate{clientCert}
-		}
+	connectionOptions, err := newConnectionOptions(params.Config.Cadence, params.Config.Env())
+	if err != nil {
+		return nil, err
 	}
 
 	options := client.Options{
@@ -123,12 +101,7 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 		workers[i] = worker.New(
 			workflowClient,
 			workerConfig.TaskList,
-			worker.Options{
-				// Enable this option to allow worker to process sessions. Defaults to false.
-				EnableSessionWorker: true,
-				// If set defines maximum amount of time that workflow task will be allowed to run. Defaults to 1 sec.
-				DeadlockDetectionTimeout: 2 * time.Second,
-			},
+			newWorkerOptions(workerConfig),
 		)
 	}
 
@@ -144,15 +117,115 @@ func NewRuntime(params RuntimeParams) (Runtime, error) {
 
 }
 
-func (r *runtimeImpl) ListOpenWorkflows(ctx context.Context, namespace string, maxPageSize int32) (*workflowservice.ListOpenWorkflowExecutionsResponse, error) {
-	openWorkflows, err := r.workflowClient.ListOpenWorkflow(ctx, &workflowservice.ListOpenWorkflowExecutionsRequest{
-		Namespace:       namespace,
-		MaximumPageSize: maxPageSize,
-	})
-	if err != nil {
-		return nil, xerrors.Errorf("failed to get open workflows: %w", err)
+func newConnectionOptions(cadenceConfig config.CadenceConfig, env config.Env) (client.ConnectionOptions, error) {
+	connectionOptions := client.ConnectionOptions{}
+	if cadenceConfig.KeepAliveTime > 0 {
+		connectionOptions.KeepAliveTime = cadenceConfig.KeepAliveTime
 	}
-	return openWorkflows, nil
+	if cadenceConfig.KeepAliveTimeout > 0 {
+		connectionOptions.KeepAliveTimeout = cadenceConfig.KeepAliveTimeout
+	}
+
+	tlsConfig := cadenceConfig.TLSConfig
+	if tlsConfig.Enabled && env != config.EnvLocal {
+		host, _, err := net.SplitHostPort(cadenceConfig.Address)
+		if err != nil {
+			return client.ConnectionOptions{}, xerrors.Errorf("failed to parse address (%v): %w", cadenceConfig.Address, err)
+		}
+
+		connectionOptions.TLS = &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			ServerName:         host,
+			InsecureSkipVerify: !tlsConfig.ValidateHostname,
+		}
+
+		if tlsConfig.CertificateAuthority != "" {
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM([]byte(tlsConfig.CertificateAuthority)) {
+				return client.ConnectionOptions{}, xerrors.Errorf("failed to parse CA certificate: %v", tlsConfig.CertificateAuthority)
+			}
+			connectionOptions.TLS.RootCAs = caCertPool
+		}
+
+		if tlsConfig.ClientCertificate != "" && tlsConfig.ClientPrivateKey != "" {
+			clientCert, err := tls.X509KeyPair([]byte(tlsConfig.ClientCertificate), []byte(tlsConfig.ClientPrivateKey))
+			if err != nil {
+				return client.ConnectionOptions{}, xerrors.Errorf("failed to parse client certificate or key (%v): %w", tlsConfig.ClientCertificate, err)
+			}
+			connectionOptions.TLS.Certificates = []tls.Certificate{clientCert}
+		}
+	}
+
+	return connectionOptions, nil
+}
+
+// workerStopTimeout is how long worker.Stop waits for running activities to
+// observe the worker-stop channel and unwind. The retention activity uses it
+// to release its row claims (INF-1603); the claim cleanup — an outcome write
+// then the release, each on its own retirement.RetirementClaimCleanupTimeout —
+// is bounded in total by retirement.RetirementClaimCleanupBudget, which must
+// stay below this value (pinned by
+// TestWorkerStopTimeoutCoversRetirementClaimCleanup). It must in
+// turn stay inside fx's stop timeout (15s default) and the pod's termination
+// grace period (30s default) or the process is killed mid-release, which is
+// the exact failure the wait exists to prevent. The SDK cancels every
+// activity's context only after this wait, so before it was set (default
+// 0s) in-flight activities were canceled the instant the worker stopped;
+// this is more grace for all of them, not less.
+const workerStopTimeout = 10 * time.Second
+
+func newWorkerOptions(workerConfig config.WorkerConfig) worker.Options {
+	options := worker.Options{
+		// Enable this option to allow worker to process sessions. Defaults to false.
+		EnableSessionWorker: true,
+		// If set defines maximum amount of time that workflow task will be allowed to run. Defaults to 1 sec.
+		DeadlockDetectionTimeout: 2 * time.Second,
+		WorkerStopTimeout:        workerStopTimeout,
+	}
+	if workerConfig.MaxConcurrentActivityExecutionSize > 0 {
+		options.MaxConcurrentActivityExecutionSize = workerConfig.MaxConcurrentActivityExecutionSize
+	}
+
+	return options
+}
+
+func (r *runtimeImpl) ListOpenWorkflows(ctx context.Context, namespace string, maxPageSize int32, workflowType string) (*workflowservice.ListOpenWorkflowExecutionsResponse, error) {
+	return listOpenWorkflowExecutions(ctx, namespace, maxPageSize, workflowType, r.workflowClient.ListOpenWorkflow)
+}
+
+func listOpenWorkflowExecutions(
+	ctx context.Context,
+	namespace string,
+	maxPageSize int32,
+	workflowType string,
+	listFn listOpenWorkflowsFn,
+) (*workflowservice.ListOpenWorkflowExecutionsResponse, error) {
+	var executions []*workflowpb.WorkflowExecutionInfo
+	var nextPageToken []byte
+	for {
+		request := &workflowservice.ListOpenWorkflowExecutionsRequest{
+			Namespace:       namespace,
+			MaximumPageSize: maxPageSize,
+			NextPageToken:   nextPageToken,
+		}
+		if workflowType != "" {
+			request.Filters = &workflowservice.ListOpenWorkflowExecutionsRequest_TypeFilter{
+				TypeFilter: &filterpb.WorkflowTypeFilter{Name: workflowType},
+			}
+		}
+
+		openWorkflows, err := listFn(ctx, request)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to get open workflows: %w", err)
+		}
+		if openWorkflows != nil {
+			executions = append(executions, openWorkflows.Executions...)
+			nextPageToken = openWorkflows.GetNextPageToken()
+		}
+		if len(nextPageToken) == 0 {
+			return &workflowservice.ListOpenWorkflowExecutionsResponse{Executions: executions}, nil
+		}
+	}
 }
 
 func (r *runtimeImpl) RegisterWorkflow(w any, options workflow.RegisterOptions) {

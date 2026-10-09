@@ -44,6 +44,7 @@ type pollerTestSuite struct {
 	env                       *cadence.TestEnv
 	metaStorage               *metastoragemocks.MockMetaStorage
 	blobStorage               *blobstoragemocks.MockBlobStorage
+	singleBlockUploader       *blobstoragemocks.MockSingleBlockUploader
 	masterBlockchainClient    *clientmocks.MockClient
 	slaveBlockchainClient     *clientmocks.MockClient
 	validatorBlockchainClient *clientmocks.MockClient
@@ -105,7 +106,12 @@ func (s *pollerTestSuite) SetupTest() {
 		EnableSessionWorker: true,
 	})
 	s.metaStorage = metastoragemocks.NewMockMetaStorage(s.ctrl)
+	s.metaStorage.EXPECT().
+		AcquireSingleBlockUploadGuard(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil).
+		AnyTimes()
 	s.blobStorage = blobstoragemocks.NewMockBlobStorage(s.ctrl)
+	s.singleBlockUploader = blobstoragemocks.NewMockSingleBlockUploader(s.ctrl)
 	s.masterBlockchainClient = clientmocks.NewMockClient(s.ctrl)
 	s.slaveBlockchainClient = clientmocks.NewMockClient(s.ctrl)
 	s.validatorBlockchainClient = clientmocks.NewMockClient(s.ctrl)
@@ -117,6 +123,9 @@ func (s *pollerTestSuite) SetupTest() {
 		testapp.WithConfig(cfg),
 		fx.Provide(func() blobstorage.BlobStorage {
 			return s.blobStorage
+		}),
+		fx.Provide(func() blobstorage.SingleBlockUploader {
+			return s.singleBlockUploader
 		}),
 		fx.Provide(func() metastorage.MetaStorage {
 			return s.metaStorage
@@ -204,7 +213,7 @@ func (s *pollerTestSuite) TestPollerSuccess() {
 			s.slaveBlockchainClient.EXPECT().
 				GetBlockByHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&api.Block{Metadata: &api.BlockMetadata{Height: k}}, nil)
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)
@@ -271,7 +280,7 @@ func (s *pollerTestSuite) TestPollerSuccess_FastSync() {
 			s.slaveBlockchainClient.EXPECT().
 				GetBlockByHeight(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&api.Block{Metadata: &api.BlockMetadata{Height: k}}, nil)
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)
@@ -369,7 +378,7 @@ func (s *pollerTestSuite) TestPollerSuccess_FailoverEnabled() {
 					require.True(s.slaveEndpointProvider.HasFailoverContext(ctx))
 					return testutil.MakeBlocksFromStartHeight(curHeight, 1, tag)[0], nil
 				})
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)
@@ -476,7 +485,7 @@ func (s *pollerTestSuite) TestPollerSuccess_ConsensusFailover() {
 					require.True(s.consensusEndpointProvider.HasFailoverContext(ctx))
 					return testutil.MakeBlocksFromStartHeight(curHeight, 1, tag)[0], nil
 				})
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)
@@ -555,7 +564,7 @@ func (s *pollerTestSuite) TestPollerFailure_ConsensusAutomaticFailover() {
 		s.slaveBlockchainClient.EXPECT().
 			GetBlockByHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(testutil.MakeBlocksFromStartHeight(curHeight, 1, tag)[0], nil)
-		s.blobStorage.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any()).Return("someObjectKey", nil).AnyTimes()
+		s.singleBlockUploader.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any()).Return("someObjectKey", nil).AnyTimes()
 	}
 	latestFinalizedHeight := localHeight + heightGap - s.cfg.Chain.IrreversibleDistance + 1
 	s.metaStorage.EXPECT().GetBlockByHeight(gomock.Any(), tag, latestFinalizedHeight).
@@ -605,7 +614,7 @@ func (s *pollerTestSuite) TestPollerFailure_ConsensusValidationFailure() {
 		s.slaveBlockchainClient.EXPECT().
 			GetBlockByHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(testutil.MakeBlocksFromStartHeight(curHeight, 1, tag)[0], nil)
-		s.blobStorage.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any()).Return("someObjectKey", nil).AnyTimes()
+		s.singleBlockUploader.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any()).Return("someObjectKey", nil).AnyTimes()
 	}
 	latestFinalizedHeight := localHeight + heightGap - s.cfg.Chain.IrreversibleDistance + 1
 	s.metaStorage.EXPECT().GetBlockByHeight(gomock.Any(), tag, latestFinalizedHeight).
@@ -672,7 +681,7 @@ func (s *pollerTestSuite) TestPollerSuccess_ConsensusEnabled() {
 			s.slaveBlockchainClient.EXPECT().
 				GetBlockByHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(testutil.MakeBlocksFromStartHeight(curHeight, 1, tag)[0], nil)
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					seen.blocks.LoadOrStore(block.Metadata.Height, true)
@@ -761,7 +770,7 @@ func (s *pollerTestSuite) TestPollerSuccessAfterMasterFallback() {
 				Return(&api.Block{Metadata: &api.BlockMetadata{Height: k}}, nil)
 		}
 		for k := start; k < end; k++ {
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)
@@ -844,7 +853,7 @@ func (s *pollerTestSuite) TestPollerSuccessAfterReprocessing() {
 			s.masterBlockchainClient.EXPECT().
 				GetBlockByHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&api.Block{Metadata: &api.BlockMetadata{Height: k}}, nil)
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)
@@ -987,6 +996,82 @@ func (s *pollerTestSuite) TestPollerFailureWithScheduleToStartTimeout() {
 	require.True(IsContinueAsNewError(err))
 }
 
+func (s *pollerTestSuite) TestPollerFailureWithOutOfSyncNode() {
+	require := testutil.Require(s.T())
+
+	s.cfg.Workflows.Poller.FailoverEnabled = false
+	s.env.OnActivity(activity.ActivitySyncer, mock.Anything, mock.Anything).Return(
+		&activity.SyncerResponse{},
+		temporal.NewApplicationError("block not found by heights [101, 103): RPCError -8: Block height out of range", errors.ErrTypeOutOfSyncNode),
+	)
+
+	_, err := s.poller.Execute(context.Background(), &PollerRequest{
+		Tag:                 tag,
+		RetryableErrorCount: RetryableErrorLimit - 1,
+	})
+	require.Error(err)
+	require.True(IsContinueAsNewError(err))
+}
+
+func (s *pollerTestSuite) TestPollerFailureTooManyOutOfSyncNode() {
+	require := testutil.Require(s.T())
+
+	s.cfg.Workflows.Poller.FailoverEnabled = false
+	s.env.OnActivity(activity.ActivitySyncer, mock.Anything, mock.Anything).Return(
+		&activity.SyncerResponse{},
+		temporal.NewApplicationError("block not found by heights [101, 103): RPCError -8: Block height out of range", errors.ErrTypeOutOfSyncNode),
+	)
+
+	_, err := s.poller.Execute(context.Background(), &PollerRequest{
+		Tag:                 tag,
+		RetryableErrorCount: RetryableErrorLimit,
+	})
+	require.Error(err)
+	require.False(IsContinueAsNewError(err))
+	require.ErrorContains(err, "retryable errors exceeded threshold")
+	require.ErrorContains(err, errors.ErrTypeOutOfSyncNode)
+}
+
+func (s *pollerTestSuite) TestPollerFailureOutOfSyncNodeFailsOverFirst() {
+	// When failover is enabled, an out-of-sync master still triggers failover before the wait-and-retry
+	// path, even after the retry budget is exhausted.
+	require := testutil.Require(s.T())
+
+	s.cfg.Workflows.Poller.FailoverEnabled = true
+	s.env.OnActivity(activity.ActivitySyncer, mock.Anything, mock.Anything).Return(
+		&activity.SyncerResponse{},
+		temporal.NewApplicationError("block not found by heights [101, 103): RPCError -8: Block height out of range", errors.ErrTypeOutOfSyncNode),
+	)
+
+	_, err := s.poller.Execute(context.Background(), &PollerRequest{
+		Tag:                 tag,
+		RetryableErrorCount: RetryableErrorLimit,
+	})
+	require.Error(err)
+	require.True(IsContinueAsNewError(err))
+}
+
+func (s *pollerTestSuite) TestPollerFailureOutOfSyncNodeInFailover() {
+	// Once the poller is already on the failover cluster, an out-of-sync master reaches the wait-and-retry
+	// path; here the retry budget is exhausted, so the workflow fails instead of failing over again.
+	require := testutil.Require(s.T())
+
+	s.cfg.Workflows.Poller.FailoverEnabled = true
+	s.env.OnActivity(activity.ActivitySyncer, mock.Anything, mock.Anything).Return(
+		&activity.SyncerResponse{},
+		temporal.NewApplicationError("block not found by heights [101, 103): RPCError -8: Block height out of range", errors.ErrTypeOutOfSyncNode),
+	)
+
+	_, err := s.poller.Execute(context.Background(), &PollerRequest{
+		Tag:                 tag,
+		Failover:            true,
+		RetryableErrorCount: RetryableErrorLimit,
+	})
+	require.Error(err)
+	require.False(IsContinueAsNewError(err))
+	require.ErrorContains(err, "retryable errors exceeded threshold")
+}
+
 func (s *pollerTestSuite) TestPollerWithTransactionIndexingSuccess() {
 	require := testutil.Require(s.T())
 
@@ -1036,7 +1121,7 @@ func (s *pollerTestSuite) TestPollerWithTransactionIndexingSuccess() {
 						Transactions: []string{"0xa"},
 					},
 				}, nil)
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)
@@ -1122,7 +1207,7 @@ func (s *pollerTestSuite) TestPoller_WithLivenessCheck() {
 			s.slaveBlockchainClient.EXPECT().
 				GetBlockByHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&api.Block{Metadata: &api.BlockMetadata{Height: k}}, nil)
-			s.blobStorage.EXPECT().
+			s.singleBlockUploader.EXPECT().
 				Upload(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, block *api.Block, compression api.Compression) (string, error) {
 					require.Equal(api.Compression_GZIP, compression)

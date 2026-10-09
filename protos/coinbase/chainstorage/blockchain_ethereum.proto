@@ -168,7 +168,32 @@ message EthereumTransactionReceipt {
   oneof optional_blob_gas_used {
     uint64 blob_gas_used = 21;
   }
+  oneof optional_fee {
+    uint64 fee = 22;
+  }
+  oneof optional_net_fee {
+    uint64 net_fee = 23;
+  }
+  oneof optional_net_usage {
+    uint64 net_usage = 24;
+  }
+  oneof optional_energy_usage {
+    uint64 energy_usage = 25;
+  }
+  oneof optional_energy_fee {
+    uint64 energy_fee = 26;
+  }
+  oneof optional_origin_energy_usage {
+    uint64 origin_energy_usage = 27;
+  }
+  oneof optional_energy_usage_total {
+    uint64 energy_usage_total = 28;
+  }
+  oneof optional_energy_penalty_total {
+    uint64 energy_penalty_total = 29;
+  }
 }
+
 
 message EthereumEventLog {
   bool removed = 1;
@@ -215,6 +240,7 @@ message EthereumTransactionFlattenedTrace {
   uint64 block_number = 17;
   string transaction_hash = 18;
   uint64 transaction_index = 19;
+  repeated CallValueInfo call_value_info = 20;
 }
 
 message EthereumTokenTransfer {
@@ -230,6 +256,7 @@ message EthereumTokenTransfer {
   oneof token_transfer {
     ERC20TokenTransfer erc20 = 100;
     ERC721TokenTransfer erc721 = 101;
+    SRC20TokenTransfer src20 = 102;
   }
 }
 
@@ -245,6 +272,12 @@ message ERC721TokenTransfer {
   string token_id = 3;
 }
 
+message SRC20TokenTransfer {
+  string from_address = 1;
+  string to_address = 2;
+  string value = 3;
+}
+
 message EthereumAccountStateProof {
   bytes account_proof = 1;
 }
@@ -257,4 +290,9 @@ message EthereumAccountStateResponse {
   uint64 nonce = 1;
   string storage_hash = 2;
   string code_hash = 3;
+}
+
+message CallValueInfo {
+  string token_id = 1;
+  int64 call_value = 2;
 }

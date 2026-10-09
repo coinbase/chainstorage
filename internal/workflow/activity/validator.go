@@ -327,6 +327,9 @@ func (v *Validator) validateEvents(ctx context.Context, eventTag uint32, startEv
 }
 
 func getValidationEndHeight(startHeight uint64, ingestedLatestBlock *api.BlockMetadata, tipOfChain uint64, request *ValidatorRequest, logger *zap.Logger) (uint64, error) {
+	if request.ValidationHeightPadding > tipOfChain {
+		return startHeight, nil
+	}
 	endHeight := tipOfChain - request.ValidationHeightPadding
 	if ingestedLatestBlock.Height < endHeight {
 		endHeight = ingestedLatestBlock.Height

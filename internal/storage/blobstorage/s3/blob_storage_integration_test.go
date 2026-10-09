@@ -20,11 +20,11 @@ func TestIntegrationBlobStorage(t *testing.T) {
 
 	require := testutil.Require(t)
 
-	var storage internal.BlobStorage
+	var storage internal.BlobStorageCore
 	app := testapp.New(
 		t,
 		testapp.WithIntegration(),
-		fx.Provide(New),
+		fx.Provide(newBlobStorage),
 		s3.Module,
 		fx.Populate(&storage),
 	)
@@ -63,12 +63,12 @@ func TestIntegrationBlobStorageIntegration_GzipFormat(t *testing.T) {
 
 	require := testutil.Require(t)
 
-	var storage internal.BlobStorage
+	var storage internal.BlobStorageCore
 	app := testapp.New(
 		t,
 		testapp.WithIntegration(),
 		testapp.WithBlockchainNetwork(common.Blockchain_BLOCKCHAIN_SOLANA, common.Network_NETWORK_SOLANA_MAINNET),
-		fx.Provide(New),
+		fx.Provide(newBlobStorage),
 		s3.Module,
 		fx.Populate(&storage),
 	)

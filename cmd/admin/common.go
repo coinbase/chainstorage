@@ -281,7 +281,7 @@ func confirm(prompt string) bool {
 		return true
 	}
 
-	fmt.Printf(prompt)
+	fmt.Print(prompt)
 	response, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
 		logger.Error("failed to read from console", zap.Error(err))

@@ -22,6 +22,7 @@ import (
 	"github.com/coinbase/chainstorage/internal/utils/fxparams"
 	"github.com/coinbase/chainstorage/internal/utils/instrument"
 	"github.com/coinbase/chainstorage/internal/utils/log"
+	"github.com/coinbase/chainstorage/internal/utils/syncgroup"
 	"github.com/coinbase/chainstorage/protos/coinbase/c3/common"
 	api "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 )
@@ -61,18 +62,18 @@ const (
 	blobSizeMetricName      = "blob_size"
 )
 
-var _ internal.BlobStorage = (*blobStorageImpl)(nil)
+var _ internal.BlobStorageCore = (*blobStorageImpl)(nil)
 
-func NewFactory(params BlobStorageParams) internal.BlobStorageFactory {
+func newFactory(params BlobStorageParams) internal.BlobStorageFactory {
 	return &blobStorageFactory{params}
 }
 
 // Create implements BlobStorageFactory.
-func (f *blobStorageFactory) Create() (internal.BlobStorage, error) {
-	return New(f.params)
+func (f *blobStorageFactory) Create() (internal.BlobStorageCore, error) {
+	return newBlobStorage(f.params)
 }
 
-func New(params BlobStorageParams) (internal.BlobStorage, error) {
+func newBlobStorage(params BlobStorageParams) (internal.BlobStorageCore, error) {
 	metrics := params.Metrics.SubScope("blob_storage").Tagged(map[string]string{
 		"storage_type": "gcs",
 	})
@@ -162,6 +163,7 @@ func (s *blobStorageImpl) uploadRaw(ctx context.Context, rawBlockData *internal.
 	if !bytes.Equal(checksum, attrs.MD5) {
 		return "", xerrors.Errorf("uploaded block md5 checksum %x is different from expected %x", attrs.MD5, checksum)
 	}
+	rawBlockData.BlockMetadata.StorageGeneration = ""
 
 	// a workaround to use timer
 	s.blobStorageMetrics.blobUploadedSize.Record(time.Duration(size) * time.Millisecond)
@@ -211,10 +213,17 @@ func (s *blobStorageImpl) Upload(ctx context.Context, block *api.Block, compress
 	})
 }
 
+func (s *blobStorageImpl) UploadConsolidated(ctx context.Context, blocks []internal.ConsolidatedBlockPayload) (string, []internal.BlockPlacement, error) {
+	return "", nil, xerrors.New("consolidated block upload is not supported by GCS blob storage")
+}
+
 func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetadata) (*api.Block, error) {
 	return s.instrumentDownload.Instrument(ctx, func(ctx context.Context) (*api.Block, error) {
 		defer s.logDuration("download", time.Now())
 
+		if metadata == nil {
+			return nil, xerrors.New("block metadata is required")
+		}
 		if metadata.Skipped {
 			// No blob data is available when the block is skipped.
 			return &api.Block{
@@ -224,6 +233,12 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 				Metadata:   metadata,
 				Blobdata:   nil,
 			}, nil
+		}
+		if metadata.GetStorageGeneration() != "" {
+			return nil, xerrors.Errorf(
+				"GCS blob storage does not support block storage generation %q",
+				metadata.GetStorageGeneration(),
+			)
 		}
 
 		key := metadata.ObjectKeyMain
@@ -263,9 +278,47 @@ func (s *blobStorageImpl) Download(ctx context.Context, metadata *api.BlockMetad
 	})
 }
 
+func (s *blobStorageImpl) DownloadMany(ctx context.Context, metadatas []*api.BlockMetadata) ([]*api.Block, error) {
+	blocks := make([]*api.Block, len(metadatas))
+	group, ctx := syncgroup.New(ctx, syncgroup.WithThrottling(s.downloadWorkerLimit()))
+	for i := range metadatas {
+		i := i
+		group.Go(func() error {
+			metadata := metadatas[i]
+			block, err := s.Download(ctx, metadata)
+			if err != nil {
+				return xerrors.Errorf("failed to download from GCS blob storage (input={%+v}): %w", metadata, err)
+			}
+			blocks[i] = block
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	return blocks, nil
+}
+
+func (s *blobStorageImpl) downloadWorkerLimit() int {
+	limit := int(s.config.Api.NumWorkers)
+	if limit <= 0 {
+		return 1
+	}
+	return limit
+}
+
 // PreSign implements internal.BlobStorage.
-func (s *blobStorageImpl) PreSign(ctx context.Context, objectKey string) (string, error) {
-	fileUrl, err := s.client.Bucket(s.bucket).SignedURL(objectKey, &storage.SignedURLOptions{
+func (s *blobStorageImpl) PreSign(ctx context.Context, metadata *api.BlockMetadata) (string, error) {
+	if metadata == nil {
+		return "", xerrors.New("block metadata is required")
+	}
+	if metadata.GetStorageGeneration() != "" {
+		return "", xerrors.Errorf(
+			"GCS blob storage does not support block storage generation %q",
+			metadata.GetStorageGeneration(),
+		)
+	}
+	fileUrl, err := s.client.Bucket(s.bucket).SignedURL(metadata.GetObjectKeyMain(), &storage.SignedURLOptions{
 		Expires: time.Now().Add(s.presignedUrlExpiration),
 		Method:  "GET",
 	})

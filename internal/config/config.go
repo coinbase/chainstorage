@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -40,6 +41,7 @@ type (
 		SLA            SLAConfig            `mapstructure:"sla"`
 		FunctionalTest FunctionalTestConfig `mapstructure:"functional_test"`
 		StatsD         *StatsDConfig        `mapstructure:"statsd"`
+		Prometheus     *PrometheusConfig    `mapstructure:"prometheus"`
 
 		namespace string
 		env       Env
@@ -51,9 +53,27 @@ type (
 		DLQType         DLQType         `mapstructure:"dlq"`
 	}
 
-	BlobStorageType int32
-	MetaStorageType int32
-	DLQType         int32
+	BlobStorageType   int32
+	MetaStorageType   int32
+	DLQType           int32
+	ConsolidationMode string
+	StorageGeneration string
+
+	BlockStorageConfig struct {
+		// WriteGeneration selects the physical generation for all new single-block
+		// and consolidated-block writes. "legacy" is the backward-compatible
+		// default and is persisted as an empty generation/SQL NULL.
+		WriteGeneration StorageGeneration `mapstructure:"write_generation"`
+		// Generations resolves non-legacy metadata values (for example, "v2")
+		// to buckets. Once referenced by a metadata row, a mapping is immutable;
+		// future bucket replacements must add a new generation instead of
+		// repointing an existing one.
+		Generations map[string]BlockStorageGenerationConfig `mapstructure:"generations"`
+	}
+
+	BlockStorageGenerationConfig struct {
+		Bucket string `mapstructure:"bucket"`
+	}
 
 	ChainConfig struct {
 		Blockchain       common.Blockchain `mapstructure:"blockchain" validate:"required"`
@@ -69,15 +89,23 @@ type (
 		IrreversibleDistance uint64        `mapstructure:"irreversible_distance" validate:"required"`
 		Rosetta              RosettaConfig `mapstructure:"rosetta"`
 		BlockTime            time.Duration `mapstructure:"block_time" validate:"required"`
+		// CustomParams stores chain-specific custom parameters as key-value pairs.
+		// For example, Seismic uses "src20_aes_key" for encrypted token transfer parsing.
+		CustomParams map[string]string `mapstructure:"custom_params"`
 	}
 
 	ClientConfig struct {
-		Master      JSONRPCConfig     `mapstructure:"master"`
-		Slave       JSONRPCConfig     `mapstructure:"slave"`
-		Validator   JSONRPCConfig     `mapstructure:"validator"`
-		Consensus   JSONRPCConfig     `mapstructure:"consensus"`
-		Retry       ClientRetryConfig `mapstructure:"retry"`
-		HttpTimeout time.Duration     `mapstructure:"http_timeout"`
+		Master                 JSONRPCConfig     `mapstructure:"master"`
+		Slave                  JSONRPCConfig     `mapstructure:"slave"`
+		Validator              JSONRPCConfig     `mapstructure:"validator"`
+		Consensus              JSONRPCConfig     `mapstructure:"consensus"`
+		Additional             JSONRPCConfig     `mapstructure:"additional"`
+		Retry                  ClientRetryConfig `mapstructure:"retry"`
+		HttpTimeout            time.Duration     `mapstructure:"http_timeout"`
+		TxBatchSize            int               `mapstructure:"tx_batch_size"`
+		RpcTimeoutGetBlock     time.Duration     `mapstructure:"rpc_timeout_get_block"`
+		RpcTimeoutGetRawTx     time.Duration     `mapstructure:"rpc_timeout_get_raw_tx"`
+		RpcTimeoutGetBlockHash time.Duration     `mapstructure:"rpc_timeout_get_block_hash"`
 	}
 
 	JSONRPCConfig struct {
@@ -114,15 +142,36 @@ type (
 	}
 
 	AwsConfig struct {
-		Region                 string         `mapstructure:"region" validate:"required"`
-		Bucket                 string         `mapstructure:"bucket" validate:"required"`
-		DynamoDB               DynamoDBConfig `mapstructure:"dynamodb" validate:"required"`
-		IsLocalStack           bool           `mapstructure:"local_stack"`
-		IsResetLocal           bool           `mapstructure:"reset_local"`
-		PresignedUrlExpiration time.Duration  `mapstructure:"presigned_url_expiration" validate:"required"`
-		DLQ                    SQSConfig      `mapstructure:"dlq"`
-		Storage                StorageConfig  `mapstructure:"storage"`
-		AWSAccount             AWSAccount     `mapstructure:"aws_account" validate:"required"`
+		Region string `mapstructure:"region" validate:"required"`
+		// Bucket is the immutable legacy block bucket used by metadata rows whose
+		// storage generation is empty/SQL NULL.
+		Bucket                 string             `mapstructure:"bucket" validate:"required"`
+		BlockStorage           BlockStorageConfig `mapstructure:"block_storage"`
+		Postgres               *PostgresConfig    `mapstructure:"postgres" validate:"required_without=DynamoDB"`
+		DynamoDB               *DynamoDBConfig    `mapstructure:"dynamodb" validate:"required_without=Postgres"`
+		IsLocalStack           bool               `mapstructure:"local_stack"`
+		IsResetLocal           bool               `mapstructure:"reset_local"`
+		PresignedUrlExpiration time.Duration      `mapstructure:"presigned_url_expiration" validate:"required"`
+		DLQ                    SQSConfig          `mapstructure:"dlq"`
+		Storage                StorageConfig      `mapstructure:"storage"`
+		AWSAccount             AWSAccount         `mapstructure:"aws_account" validate:"required"`
+	}
+
+	PostgresConfig struct {
+		Host             string        `mapstructure:"host" validate:"required"`
+		Port             int           `mapstructure:"port" validate:"required"`
+		Database         string        `mapstructure:"database" validate:"required"`
+		User             string        `mapstructure:"user"`
+		Password         string        `mapstructure:"password"`
+		SSLMode          string        `mapstructure:"ssl_mode" validate:"required"`
+		MaxConnections   int           `mapstructure:"max_connections"`
+		MinConnections   int           `mapstructure:"min_connections"`
+		MaxIdleTime      time.Duration `mapstructure:"max_idle_time"`
+		MaxLifetime      time.Duration `mapstructure:"max_lifetime"`
+		ConnectTimeout   time.Duration `mapstructure:"connect_timeout"`
+		StatementTimeout time.Duration `mapstructure:"statement_timeout"`
+		Schema           string        `mapstructure:"schema"`
+		TablePrefix      string        `mapstructure:"table_prefix"`
 	}
 
 	GcpConfig struct {
@@ -149,10 +198,12 @@ type (
 	}
 
 	CadenceConfig struct {
-		Address         string           `mapstructure:"address" validate:"required"`
-		Domain          string           `mapstructure:"domain" validate:"required"`
-		RetentionPeriod int32            `mapstructure:"retention_period" validate:"required"`
-		TLSConfig       CadenceTLSConfig `mapstructure:"tls" validate:"required"`
+		Address          string           `mapstructure:"address" validate:"required"`
+		Domain           string           `mapstructure:"domain" validate:"required"`
+		RetentionPeriod  int32            `mapstructure:"retention_period" validate:"required"`
+		KeepAliveTime    time.Duration    `mapstructure:"keep_alive_time"`
+		KeepAliveTimeout time.Duration    `mapstructure:"keep_alive_timeout"`
+		TLSConfig        CadenceTLSConfig `mapstructure:"tls" validate:"required"`
 	}
 
 	CadenceTLSConfig struct {
@@ -164,19 +215,23 @@ type (
 	}
 
 	WorkflowsConfig struct {
-		Workers         []WorkerConfig                `mapstructure:"workers"`
-		Backfiller      BackfillerWorkflowConfig      `mapstructure:"backfiller"`
-		Poller          PollerWorkflowConfig          `mapstructure:"poller"`
-		Benchmarker     BenchmarkerWorkflowConfig     `mapstructure:"benchmarker"`
-		Monitor         MonitorWorkflowConfig         `mapstructure:"monitor"`
-		Streamer        StreamerWorkflowConfig        `mapstructure:"streamer"`
-		CrossValidator  CrossValidatorWorkflowConfig  `mapstructure:"cross_validator"`
-		EventBackfiller EventBackfillerWorkflowConfig `mapstructure:"event_backfiller"`
-		Replicator      ReplicatorWorkflowConfig      `mapstructure:"replicator"`
+		Workers              []WorkerConfig                     `mapstructure:"workers"`
+		Backfiller           BackfillerWorkflowConfig           `mapstructure:"backfiller"`
+		Poller               PollerWorkflowConfig               `mapstructure:"poller"`
+		Benchmarker          BenchmarkerWorkflowConfig          `mapstructure:"benchmarker"`
+		Monitor              MonitorWorkflowConfig              `mapstructure:"monitor"`
+		Streamer             StreamerWorkflowConfig             `mapstructure:"streamer"`
+		CrossValidator       CrossValidatorWorkflowConfig       `mapstructure:"cross_validator"`
+		EventBackfiller      EventBackfillerWorkflowConfig      `mapstructure:"event_backfiller"`
+		Replicator           ReplicatorWorkflowConfig           `mapstructure:"replicator"`
+		Migrator             MigratorWorkflowConfig             `mapstructure:"migrator"`
+		BatchConsolidator    BatchConsolidatorWorkflowConfig    `mapstructure:"batch_consolidator"`
+		SingleBlockRetention SingleBlockRetentionWorkflowConfig `mapstructure:"single_block_retention"`
 	}
 
 	WorkerConfig struct {
-		TaskList string `mapstructure:"task_list"`
+		TaskList                           string `mapstructure:"task_list"`
+		MaxConcurrentActivityExecutionSize int    `mapstructure:"max_concurrent_activity_execution_size"`
 	}
 
 	WorkflowConfig struct {
@@ -281,6 +336,41 @@ type (
 		BackoffInterval time.Duration `mapstructure:"backoff_interval"`
 	}
 
+	MigratorWorkflowConfig struct {
+		WorkflowConfig  `mapstructure:",squash"`
+		BatchSize       uint64        `mapstructure:"batch_size" validate:"required"`
+		MiniBatchSize   uint64        `mapstructure:"mini_batch_size"`
+		CheckpointSize  uint64        `mapstructure:"checkpoint_size" validate:"required"`
+		Parallelism     int           `mapstructure:"parallelism"`
+		BackoffInterval time.Duration `mapstructure:"backoff_interval"`
+		ContinuousSync  bool          `mapstructure:"continuous_sync"`
+		SyncInterval    time.Duration `mapstructure:"sync_interval"`
+		AutoResume      bool          `mapstructure:"auto_resume"`
+	}
+
+	BatchConsolidatorWorkflowConfig struct {
+		WorkflowConfig     `mapstructure:",squash"`
+		BatchSize          uint64 `mapstructure:"batch_size" validate:"required"`
+		CheckpointSize     uint64 `mapstructure:"checkpoint_size" validate:"required,gtfield=BatchSize"`
+		MaxBlocks          uint64 `mapstructure:"max_blocks"`
+		HistoricalTaskList string `mapstructure:"historical_task_list"`
+	}
+
+	SingleBlockRetentionWorkflowConfig struct {
+		WorkflowConfig  `mapstructure:",squash"`
+		MaxObjectRanges int `mapstructure:"max_object_ranges" validate:"required,gt=0,lte=250"`
+		// RowParallelism bounds how many rows the retention planner processes
+		// concurrently inside one cohort activity. Zero or one is serial. The
+		// cap also bounds worker memory: each Apply worker pins up to two
+		// decompressed CSCB chunks.
+		RowParallelism int `mapstructure:"row_parallelism" validate:"omitempty,gte=0,lte=16"`
+		// RowMemoryBudgetBytes caps the decompressed CSCB chunk working set a
+		// cohort may pin. The planner lowers RowParallelism until the cohort's
+		// measured chunk size fits, so a chain with large blocks runs fewer
+		// workers instead of exhausting the pod (INF-1330).
+		RowMemoryBudgetBytes uint64 `mapstructure:"row_memory_budget_bytes"`
+	}
+
 	RosettaConfig struct {
 		Blockchain              string  `mapstructure:"blockchain"`
 		Network                 string  `mapstructure:"network" validate:"required_with=Blockchain"`
@@ -289,12 +379,18 @@ type (
 		FromRosetta             bool    `mapstructure:"from_rosetta"`
 	}
 
+	// EndpointGroup is decoded from two different sources, so every field needs
+	// both tags: encoding/json when the group arrives as a JSON string (e.g. the
+	// CHAINSTORAGE_CHAIN_CLIENT_MASTER_ENDPOINT_GROUP env var, see UnmarshalText),
+	// and mapstructure when it arrives as a YAML mapping. mapstructure falls back
+	// to a case-insensitive field-name match, which silently drops any key with
+	// an underscore in it, so the tags are not optional.
 	EndpointGroup struct {
-		Endpoints              []Endpoint     `json:"endpoints"`
-		EndpointsFailover      []Endpoint     `json:"endpoints_failover"`
-		UseFailover            bool           `json:"use_failover"`
-		EndpointConfig         EndpointConfig `json:"endpoint_config"`
-		EndpointConfigFailover EndpointConfig `json:"endpoint_config_failover"`
+		Endpoints              []Endpoint     `json:"endpoints" mapstructure:"endpoints"`
+		EndpointsFailover      []Endpoint     `json:"endpoints_failover" mapstructure:"endpoints_failover"`
+		UseFailover            bool           `json:"use_failover" mapstructure:"use_failover"`
+		EndpointConfig         EndpointConfig `json:"endpoint_config" mapstructure:"endpoint_config"`
+		EndpointConfigFailover EndpointConfig `json:"endpoint_config_failover" mapstructure:"endpoint_config_failover"`
 	}
 
 	// endpointGroup must be in sync with EndpointGroup
@@ -307,30 +403,34 @@ type (
 	}
 
 	Endpoint struct {
-		Name       string            `json:"name"`
-		ProviderID string            `json:"provider_id"`
-		Url        string            `json:"url"`
-		User       string            `json:"user"`
-		Password   string            `json:"password"`
-		Weight     uint8             `json:"weight"`
-		ExtraUrls  map[string]string `json:"extra_urls"`
-		RPS        int               `json:"rps"`
+		Name       string            `json:"name" mapstructure:"name"`
+		ProviderID string            `json:"provider_id" mapstructure:"provider_id"`
+		Url        string            `json:"url" mapstructure:"url"`
+		User       string            `json:"user" mapstructure:"user"`
+		Password   string            `json:"password" mapstructure:"password"`
+		Weight     uint8             `json:"weight" mapstructure:"weight"`
+		ExtraUrls  map[string]string `json:"extra_urls" mapstructure:"extra_urls"`
+		RPS        int               `json:"rps" mapstructure:"rps"`
+		// RPSCountBatch makes the rate limiter charge one token per call inside
+		// a JSON-RPC batch request, for providers whose rate limit counts each
+		// batched call individually. Has no effect unless RPS is set.
+		RPSCountBatch bool `json:"rps_count_batch" mapstructure:"rps_count_batch"`
 	}
 
 	EndpointConfig struct {
-		StickySession StickySessionConfig `json:"sticky_session"`
-		Headers       map[string]string   `json:"headers"`
+		StickySession StickySessionConfig `json:"sticky_session" mapstructure:"sticky_session"`
+		Headers       map[string]string   `json:"headers" mapstructure:"headers"`
 	}
 
 	StickySessionConfig struct {
 		// The CookieHash method consistently maps a cookie value to a specific node.
-		CookieHash string `json:"cookie_hash"`
+		CookieHash string `json:"cookie_hash" mapstructure:"cookie_hash"`
 
 		// The CookiePassive method persists the cookie value provided by the server.
-		CookiePassive bool `json:"cookie_passive"`
+		CookiePassive bool `json:"cookie_passive" mapstructure:"cookie_passive"`
 
 		// The HeaderHash method consistently maps a header value to a specific node.
-		HeaderHash string `json:"header_hash"`
+		HeaderHash string `json:"header_hash" mapstructure:"header_hash"`
 	}
 
 	ApiConfig struct {
@@ -357,16 +457,95 @@ type (
 	}
 
 	CronConfig struct {
-		BlockRangeSize         uint64 `mapstructure:"block_range_size" validate:"required"`
-		DisableDLQProcessor    bool   `mapstructure:"disable_dlq_processor"`
-		DisablePollingCanary   bool   `mapstructure:"disable_polling_canary"`
-		DisableStreamingCanary bool   `mapstructure:"disable_streaming_canary"`
-		DisableNodeCanary      bool   `mapstructure:"disable_node_canary"`
-		DisableWorkflowStatus  bool   `mapstructure:"disable_workflow_status"`
+		BlockRangeSize         uint64                         `mapstructure:"block_range_size" validate:"required"`
+		BatchConsolidator      BatchConsolidatorCronConfig    `mapstructure:"batch_consolidator"`
+		SingleBlockRetention   SingleBlockRetentionCronConfig `mapstructure:"single_block_retention"`
+		DisableDLQProcessor    bool                           `mapstructure:"disable_dlq_processor"`
+		DisablePollingCanary   bool                           `mapstructure:"disable_polling_canary"`
+		DisableStreamingCanary bool                           `mapstructure:"disable_streaming_canary"`
+		DisableNodeCanary      bool                           `mapstructure:"disable_node_canary"`
+		DisableWorkflowStatus  bool                           `mapstructure:"disable_workflow_status"`
+	}
+
+	BatchConsolidatorCronConfig struct {
+		Enabled             bool          `mapstructure:"enabled"`
+		Spec                string        `mapstructure:"spec"`
+		Parallelism         int64         `mapstructure:"parallelism"`
+		WorkflowParallelism int           `mapstructure:"workflow_parallelism"`
+		DelayStartDuration  time.Duration `mapstructure:"delay_start_duration"`
+		StartHeight         uint64        `mapstructure:"start_height"`
+	}
+
+	// SingleBlockRetentionCronConfig drives unattended single-block retention.
+	// Enabling it moves the operator's per-run deletion approval into reviewed
+	// configuration: the Approved* fields and the guard assertions are the
+	// standing operator input the cron passes through verbatim, and every
+	// in-workflow fail-closed gate still applies.
+	SingleBlockRetentionCronConfig struct {
+		Enabled             bool          `mapstructure:"enabled"`
+		Spec                string        `mapstructure:"spec"`
+		Parallelism         int64         `mapstructure:"parallelism"`
+		DelayStartDuration  time.Duration `mapstructure:"delay_start_duration"`
+		MaxObjectRanges     int           `mapstructure:"max_object_ranges" validate:"omitempty,gt=0,lte=250"`
+		WorkflowParallelism int           `mapstructure:"workflow_parallelism" validate:"omitempty,gt=0,lte=20"`
+		// WindowBlocks bounds each launched sweep so selection queries stay on
+		// the height index; the window is anchored at the oldest due work.
+		WindowBlocks uint64 `mapstructure:"window_blocks" validate:"omitempty,lte=2000000"`
+		// ApprovedEndHeight zero follows the consolidation frontier and
+		// requires AllowOpenEndedApproval as an explicit opt-in.
+		ApprovedChain               string `mapstructure:"approved_chain"`
+		ApprovedStartHeight         uint64 `mapstructure:"approved_start_height"`
+		ApprovedEndHeight           uint64 `mapstructure:"approved_end_height"`
+		AllowOpenEndedApproval      bool   `mapstructure:"allow_open_ended_approval"`
+		DirectStorageClientsGuarded bool   `mapstructure:"direct_storage_clients_guarded"`
+		SingleBlockWritersGuarded   bool   `mapstructure:"single_block_writers_guarded"`
+		FallbackReadsValidated      bool   `mapstructure:"fallback_reads_validated"`
+		ProductionDeleteEnabled     bool   `mapstructure:"production_delete_enabled"`
+		// PersistFloorWatermark starts each tick's floor walk from the floor
+		// the previous walk found (persisted as a consolidation cursor) rather
+		// than from ApprovedStartHeight, and reconciles the skipped range one
+		// bounded chunk per tick (INF-1571). Off by default: with it off the
+		// walk re-scans every retired row above ApprovedStartHeight on every
+		// tick, which grows at the retention drain rate until it crosses the
+		// statement timeout and stalls retention (INF-1569).
+		PersistFloorWatermark bool `mapstructure:"persist_floor_watermark"`
+		// FloorWalkChunkBlocks bounds every chunk of the persisted-floor walk:
+		// the walk above the floor that resolves the tick's probe start, and
+		// the reconciliation walk below it. 0 selects the default. Sized so one
+		// chunk of fully retired rows stays well inside the statement timeout.
+		FloorWalkChunkBlocks uint64 `mapstructure:"floor_walk_chunk_blocks" validate:"omitempty,lte=5000000"`
 	}
 
 	StorageConfig struct {
-		DataCompression api.Compression `mapstructure:"data_compression"`
+		DataCompression api.Compression     `mapstructure:"data_compression"`
+		Consolidation   ConsolidationConfig `mapstructure:"consolidation"`
+	}
+
+	ConsolidationConfig struct {
+		Enabled                                  bool              `mapstructure:"enabled"`
+		Mode                                     ConsolidationMode `mapstructure:"mode"`
+		Codec                                    api.Compression   `mapstructure:"codec"`
+		CodecLevel                               int               `mapstructure:"codec_level"`
+		ZstdLongDistanceWindowLog                *int              `mapstructure:"zstd_long_distance_window_log"`
+		MaxCompressedBytes                       uint64            `mapstructure:"max_compressed_bytes"`
+		MaxUncompressedBytes                     uint64            `mapstructure:"max_uncompressed_bytes"`
+		MaxBlocks                                uint64            `mapstructure:"max_blocks"`
+		CompressionChunkBlocks                   uint64            `mapstructure:"compression_chunk_blocks"`
+		MaxChunkCompressedBytes                  *uint64           `mapstructure:"max_chunk_compressed_bytes"`
+		MaxChunkUncompressedBytes                *uint64           `mapstructure:"max_chunk_uncompressed_bytes"`
+		FlushInterval                            time.Duration     `mapstructure:"flush_interval"`
+		ShadowTimeout                            time.Duration     `mapstructure:"shadow_timeout"`
+		MaxInflightRawBlocks                     uint64            `mapstructure:"max_inflight_raw_blocks"`
+		MemoryBudgetBytes                        *uint64           `mapstructure:"memory_budget_bytes"`
+		LocalSpillDir                            string            `mapstructure:"local_spill_dir"`
+		LocalSpillMaxBytes                       *uint64           `mapstructure:"local_spill_max_bytes"`
+		ShardSize                                uint64            `mapstructure:"shard_size"`
+		MultipartThreshold                       uint64            `mapstructure:"multipart_threshold"`
+		ReadShadowFirst                          bool              `mapstructure:"read_shadow_first"`
+		PromotionGateHeight                      *uint64           `mapstructure:"promotion_gate_height"`
+		SafePromotionLag                         *uint64           `mapstructure:"safe_promotion_lag"`
+		SingleBlockObjectRetention               time.Duration     `mapstructure:"single_block_object_retention"`
+		SingleBlockShadowWriteAfterSyncerCutover bool              `mapstructure:"single_block_shadow_write_after_syncer_cutover"`
 	}
 
 	SLAConfig struct {
@@ -415,6 +594,24 @@ type (
 	StatsDConfig struct {
 		Address string `mapstructure:"address" validate:"required"`
 		Prefix  string `mapstructure:"prefix"`
+	}
+
+	PrometheusConfig struct {
+		// Port is the port to listen on for the metrics server.
+		Port int `mapstructure:"port" validate:"required"`
+		// MetricsPath is the path to listen on for the metrics server.
+		MetricsPath string `mapstructure:"metrics_path"`
+		// Namespace is the namespace for the metrics.
+		Namespace string `mapstructure:"namespace"`
+		// GlobalLabels are labels that are applied to all metrics.
+		GlobalLabels map[string]string `mapstructure:"global_labels"`
+		// DefaultHistogramBuckets are the default buckets for histogram metrics
+		// if not specified in HistogramBuckets.
+		DefaultHistogramBuckets []float64 `mapstructure:"default_histogram_buckets"`
+		// HistogramBuckets are custom buckets for specific histogram metrics.
+		// This allows for more granular control over the histogram buckets on a
+		// per-metric basis.
+		HistogramBuckets map[string][]float64 `mapstructure:"histogram_buckets"`
 	}
 
 	ConfigOption func(options *configOptions)
@@ -469,6 +666,7 @@ var (
 		"UNSPECIFIED": 0,
 		"DYNAMODB":    1,
 		"FIRESTORE":   2,
+		"POSTGRES":    3,
 	}
 
 	DLQType_value = map[string]int32{
@@ -476,6 +674,8 @@ var (
 		"SQS":         1,
 		"FIRESTORE":   2,
 	}
+
+	storageGenerationPattern = regexp.MustCompile(`^v[1-9][0-9]*$`)
 )
 
 const (
@@ -505,10 +705,30 @@ const (
 	MetaStorageType_UNSPECIFIED MetaStorageType = 0
 	MetaStorageType_DYNAMODB    MetaStorageType = 1
 	MetaStorageType_FIRESTORE   MetaStorageType = 2
+	MetaStorageType_POSTGRES    MetaStorageType = 3
 
 	DLQType_UNSPECIFIED DLQType = 0
 	DLQType_SQS         DLQType = 1
 	DLQType_FIRESTORE   DLQType = 2
+
+	ConsolidationModeSingleBlockOnly ConsolidationMode = "single_block_only"
+	ConsolidationModeShadowDualWrite ConsolidationMode = "shadow_dual_write"
+	ConsolidationModeAutoConsolidate ConsolidationMode = "auto_consolidate"
+	// Historical backfill is the manual catch-up mode. It remains separate from
+	// auto_consolidate, which is the normal serial cron mode.
+	ConsolidationModeHistoricalBackfill        ConsolidationMode = "historical_backfill"
+	ConsolidationModePromoteFinalized          ConsolidationMode = "promote_finalized"
+	ConsolidationModeRepairExistingCSCB        ConsolidationMode = "repair_existing_cscb"
+	ConsolidationModeSyncerConsolidatedPrimary ConsolidationMode = "syncer_consolidated_primary"
+	// DefaultSingleBlockObjectRetention is how long a single-block object
+	// outlives consolidation into a CSCB chunk. It is a repair window: the
+	// single-block originals are the only source a corrupt chunk can be
+	// rebuilt from, so 7 days covers a weekend plus a holiday, where 3 days
+	// let a Friday-evening problem age out before anyone looked on Monday.
+	DefaultSingleBlockObjectRetention = 168 * time.Hour
+
+	StorageGenerationLegacy            StorageGeneration = ""
+	storageGenerationLegacyConfigValue                   = "legacy"
 
 	AWSAccountDevelopment AWSAccount = "development"
 	AWSAccountProduction  AWSAccount = "production"
@@ -522,6 +742,20 @@ const (
 	chainstorageAddressLocal = "http://localhost:9090"
 	tagSidechain             = "sidechain"
 )
+
+func (m ConsolidationMode) IsAutoConsolidate() bool {
+	return m == ConsolidationModeAutoConsolidate
+}
+
+func (m ConsolidationMode) IsShadowWrite() bool {
+	return m == ConsolidationModeShadowDualWrite ||
+		m == ConsolidationModeAutoConsolidate ||
+		m == ConsolidationModeHistoricalBackfill
+}
+
+func (m ConsolidationMode) IsRepairExistingCSCB() bool {
+	return m == ConsolidationModeRepairExistingCSCB
+}
 
 func New(opts ...ConfigOption) (*Config, error) {
 	validate := validator.New()
@@ -569,6 +803,38 @@ func New(opts ...ConfigOption) (*Config, error) {
 		v.SetDefault("aws.local_stack", true)
 		v.SetDefault("aws.reset_local", true)
 	}
+	v.SetDefault("chain.client.tx_batch_size", 100)
+	v.SetDefault("cron.batch_consolidator.enabled", false)
+	v.SetDefault("cron.batch_consolidator.spec", "@every 30m")
+	v.SetDefault("cron.batch_consolidator.parallelism", 1)
+	v.SetDefault("cron.batch_consolidator.delay_start_duration", "1m")
+	v.SetDefault("aws.storage.consolidation.enabled", false)
+	v.SetDefault("aws.storage.consolidation.mode", string(ConsolidationModeSingleBlockOnly))
+	v.SetDefault("aws.block_storage.write_generation", storageGenerationLegacyConfigValue)
+	v.SetDefault("aws.storage.consolidation.codec", "ZSTD")
+	v.SetDefault("aws.storage.consolidation.codec_level", 6)
+	v.SetDefault("aws.storage.consolidation.max_compressed_bytes", 2147483648)
+	v.SetDefault("aws.storage.consolidation.max_uncompressed_bytes", 137438953472)
+	v.SetDefault("aws.storage.consolidation.max_blocks", 1000)
+	v.SetDefault("aws.storage.consolidation.compression_chunk_blocks", 10)
+	v.SetDefault("aws.storage.consolidation.flush_interval", "1m")
+	v.SetDefault("aws.storage.consolidation.shadow_timeout", "30s")
+	v.SetDefault("aws.storage.consolidation.max_inflight_raw_blocks", 4)
+	v.SetDefault("aws.storage.consolidation.memory_budget_bytes", 268435456)
+	v.SetDefault("aws.storage.consolidation.local_spill_dir", "/tmp/chainstorage-cscb")
+	v.SetDefault("aws.storage.consolidation.shard_size", 10000)
+	v.SetDefault("aws.storage.consolidation.multipart_threshold", 134217728)
+	v.SetDefault("aws.storage.consolidation.read_shadow_first", false)
+	v.SetDefault("aws.storage.consolidation.single_block_object_retention", DefaultSingleBlockObjectRetention.String())
+	if err := v.BindEnv("aws.storage.consolidation.max_chunk_uncompressed_bytes"); err != nil {
+		return nil, xerrors.Errorf("failed to bind max_chunk_uncompressed_bytes env: %w", err)
+	}
+	if err := v.BindEnv("aws.storage.consolidation.promotion_gate_height"); err != nil {
+		return nil, xerrors.Errorf("failed to bind promotion_gate_height env: %w", err)
+	}
+	if err := v.BindEnv("aws.storage.consolidation.safe_promotion_lag"); err != nil {
+		return nil, xerrors.Errorf("failed to bind safe_promotion_lag env: %w", err)
+	}
 
 	// Read the data in base.yml
 	if err := v.ReadConfig(configReader); err != nil {
@@ -584,6 +850,7 @@ func New(opts ...ConfigOption) (*Config, error) {
 	if err := mergeInConfig(v, configOpts, envSecrets); err != nil {
 		return nil, xerrors.Errorf("failed to merge in %v config: %w", envSecrets, err)
 	}
+	applyDeprecatedConsolidationAliases(v)
 
 	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
 		mapstructure.TextUnmarshallerHookFunc(),
@@ -599,11 +866,20 @@ func New(opts ...ConfigOption) (*Config, error) {
 	))); err != nil {
 		return nil, xerrors.Errorf("failed to unmarshal config: %w", err)
 	}
+	if cfg.AWS.Storage.Consolidation.Mode == deprecatedConsolidationModeBeforeSingleBlockRename {
+		cfg.AWS.Storage.Consolidation.Mode = ConsolidationModeSingleBlockOnly
+	}
 
 	cfg.setDerivedConfigs(reflect.ValueOf(&cfg))
 
 	if err := validate.Struct(&cfg); err != nil {
 		return nil, xerrors.Errorf("failed to validate config: %w", err)
+	}
+	if err := cfg.validateStorageGenerationConfig(); err != nil {
+		return nil, xerrors.Errorf("failed to validate storage generation config: %w", err)
+	}
+	if err := cfg.validateConsolidationConfig(); err != nil {
+		return nil, xerrors.Errorf("failed to validate consolidation config: %w", err)
 	}
 
 	if cfg.Chain.Blockchain != common.Blockchain_BLOCKCHAIN_ETHEREUM || cfg.Chain.Network != common.Network_NETWORK_ETHEREUM_MAINNET {
@@ -619,6 +895,230 @@ func New(opts ...ConfigOption) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+const (
+	consolidationSingleBlockObjectRetentionKey               = "aws.storage.consolidation.single_block_object_retention"
+	consolidationSingleBlockShadowWriteAfterSyncerCutoverKey = "aws.storage.consolidation.single_block_shadow_write_after_syncer_cutover"
+
+	// Deprecated aliases are accepted only at the configuration boundary so a
+	// rolling deployment can consume the previous production configuration.
+	deprecatedConsolidationModeBeforeSingleBlockRename               ConsolidationMode = "legacy_only"
+	deprecatedConsolidationObjectRetentionKeyBeforeSingleBlockRename                   = "aws.storage.consolidation.legacy_object_retention"
+	deprecatedConsolidationShadowWriteKeyBeforeSingleBlockRename                       = "aws.storage.consolidation.legacy_shadow_write_after_syncer_cutover"
+)
+
+func applyDeprecatedConsolidationAliases(v *viper.Viper) {
+	applyDeprecatedConfigAlias(
+		v,
+		consolidationSingleBlockObjectRetentionKey,
+		deprecatedConsolidationObjectRetentionKeyBeforeSingleBlockRename,
+	)
+	applyDeprecatedConfigAlias(
+		v,
+		consolidationSingleBlockShadowWriteAfterSyncerCutoverKey,
+		deprecatedConsolidationShadowWriteKeyBeforeSingleBlockRename,
+	)
+}
+
+func applyDeprecatedConfigAlias(v *viper.Viper, canonicalKey string, deprecatedKey string) {
+	canonicalEnv := "CHAINSTORAGE_" + strings.ToUpper(strings.ReplaceAll(canonicalKey, ".", "_"))
+	if _, ok := os.LookupEnv(canonicalEnv); ok {
+		return
+	}
+
+	deprecatedEnv := "CHAINSTORAGE_" + strings.ToUpper(strings.ReplaceAll(deprecatedKey, ".", "_"))
+	if value, ok := os.LookupEnv(deprecatedEnv); ok {
+		v.Set(canonicalKey, value)
+		return
+	}
+
+	if !v.InConfig(canonicalKey) && v.InConfig(deprecatedKey) {
+		v.Set(canonicalKey, v.Get(deprecatedKey))
+	}
+}
+
+func (c *Config) validateStorageGenerationConfig() error {
+	writeGeneration, err := normalizeConfiguredStorageGeneration(c.AWS.BlockStorage.WriteGeneration)
+	if err != nil {
+		return xerrors.Errorf("invalid aws.block_storage.write_generation: %w", err)
+	}
+
+	seenBuckets := map[string]string{c.AWS.Bucket: storageGenerationLegacyConfigValue}
+	for generation, location := range c.AWS.BlockStorage.Generations {
+		if !storageGenerationPattern.MatchString(generation) {
+			return xerrors.Errorf("invalid aws.block_storage.generations key %q", generation)
+		}
+		if strings.TrimSpace(location.Bucket) != location.Bucket || location.Bucket == "" {
+			return xerrors.Errorf("aws.block_storage.generations.%s.bucket must be non-empty without surrounding whitespace", generation)
+		}
+		if previousGeneration, ok := seenBuckets[location.Bucket]; ok {
+			return xerrors.Errorf(
+				"aws.block_storage generations %q and %q must use different buckets",
+				previousGeneration,
+				generation,
+			)
+		}
+		seenBuckets[location.Bucket] = generation
+	}
+
+	if len(c.AWS.BlockStorage.Generations) > 0 {
+		switch c.StorageType.BlobStorageType {
+		case BlobStorageType_UNSPECIFIED, BlobStorageType_S3:
+		default:
+			return xerrors.Errorf("non-legacy block storage generations require S3 blob storage, got %v", c.StorageType.BlobStorageType)
+		}
+		if c.StorageType.MetaStorageType != MetaStorageType_POSTGRES {
+			return xerrors.Errorf("non-legacy block storage generations require Postgres meta storage, got %v", c.StorageType.MetaStorageType)
+		}
+	}
+
+	if writeGeneration == StorageGenerationLegacy {
+		return nil
+	}
+	if _, ok := c.AWS.BlockStorage.Generations[string(writeGeneration)]; !ok {
+		return xerrors.Errorf("aws.block_storage.write_generation=%s is not configured in aws.block_storage.generations", writeGeneration)
+	}
+	return nil
+}
+
+func normalizeConfiguredStorageGeneration(generation StorageGeneration) (StorageGeneration, error) {
+	if generation == StorageGenerationLegacy || generation == storageGenerationLegacyConfigValue {
+		return StorageGenerationLegacy, nil
+	}
+	if !storageGenerationPattern.MatchString(string(generation)) {
+		return StorageGenerationLegacy, xerrors.Errorf("unsupported storage generation %q", generation)
+	}
+	return generation, nil
+}
+
+func (c *Config) WriteBlockStorageGeneration() (string, error) {
+	generation, err := normalizeConfiguredStorageGeneration(c.AWS.BlockStorage.WriteGeneration)
+	if err != nil {
+		return "", xerrors.Errorf("invalid aws.block_storage.write_generation: %w", err)
+	}
+	if generation != StorageGenerationLegacy {
+		if _, ok := c.AWS.BlockStorage.Generations[string(generation)]; !ok {
+			return "", xerrors.Errorf("aws.block_storage.write_generation=%s is not configured", generation)
+		}
+	}
+	return string(generation), nil
+}
+
+func (c *Config) ResolveBlockStorageBucket(generation string) (string, error) {
+	if generation == string(StorageGenerationLegacy) {
+		return c.AWS.Bucket, nil
+	}
+	if !storageGenerationPattern.MatchString(generation) {
+		return "", xerrors.Errorf("unsupported block storage generation %q", generation)
+	}
+	location, ok := c.AWS.BlockStorage.Generations[generation]
+	if !ok {
+		return "", xerrors.Errorf("block metadata requires unconfigured storage generation %q", generation)
+	}
+	if strings.TrimSpace(location.Bucket) != location.Bucket || location.Bucket == "" {
+		return "", xerrors.Errorf("block metadata storage generation %q has an invalid bucket", generation)
+	}
+	return location.Bucket, nil
+}
+
+func (c *Config) WriteBlockStorageBucket() (string, error) {
+	generation, err := c.WriteBlockStorageGeneration()
+	if err != nil {
+		return "", err
+	}
+	return c.ResolveBlockStorageBucket(generation)
+}
+
+func (c *Config) validateConsolidationConfig() error {
+	consolidation := c.AWS.Storage.Consolidation
+	switch consolidation.Mode {
+	case ConsolidationModeSingleBlockOnly,
+		ConsolidationModeShadowDualWrite,
+		ConsolidationModeAutoConsolidate,
+		ConsolidationModeHistoricalBackfill,
+		ConsolidationModePromoteFinalized,
+		ConsolidationModeSyncerConsolidatedPrimary:
+	default:
+		return xerrors.Errorf("invalid consolidation mode %q", consolidation.Mode)
+	}
+
+	switch consolidation.Codec {
+	case api.Compression_GZIP, api.Compression_ZSTD:
+	default:
+		return xerrors.Errorf("invalid consolidation codec %v", consolidation.Codec)
+	}
+
+	if !consolidation.Enabled && !consolidation.ReadShadowFirst {
+		return nil
+	}
+
+	switch c.StorageType.BlobStorageType {
+	case BlobStorageType_UNSPECIFIED, BlobStorageType_S3:
+	default:
+		return xerrors.Errorf("consolidation requires S3 blob storage, got %v", c.StorageType.BlobStorageType)
+	}
+	if c.StorageType.MetaStorageType != MetaStorageType_POSTGRES {
+		return xerrors.Errorf("consolidation requires Postgres meta storage until DynamoDB shadow placement and guarded promotion are implemented, got %v", c.StorageType.MetaStorageType)
+	}
+
+	if !consolidation.Enabled {
+		return nil
+	}
+
+	if consolidation.CodecLevel <= 0 {
+		return xerrors.New("consolidation codec_level must be positive")
+	}
+	if consolidation.MaxCompressedBytes == 0 {
+		return xerrors.New("consolidation max_compressed_bytes must be positive")
+	}
+	if consolidation.MaxUncompressedBytes == 0 {
+		return xerrors.New("consolidation max_uncompressed_bytes must be positive")
+	}
+	if consolidation.MaxBlocks == 0 {
+		return xerrors.New("consolidation max_blocks must be positive")
+	}
+	if consolidation.CompressionChunkBlocks == 0 {
+		return xerrors.New("consolidation compression_chunk_blocks must be positive")
+	}
+	if consolidation.MaxChunkUncompressedBytes != nil && *consolidation.MaxChunkUncompressedBytes == 0 {
+		return xerrors.New("consolidation max_chunk_uncompressed_bytes must be positive when set")
+	}
+	if consolidation.ShardSize == 0 {
+		return xerrors.New("consolidation shard_size must be positive")
+	}
+	if consolidation.MultipartThreshold == 0 {
+		return xerrors.New("consolidation multipart_threshold must be positive")
+	}
+	if consolidation.MaxInflightRawBlocks == 0 {
+		return xerrors.New("consolidation max_inflight_raw_blocks must be positive")
+	}
+	if consolidation.MemoryBudgetBytes != nil && *consolidation.MemoryBudgetBytes == 0 {
+		return xerrors.New("consolidation memory_budget_bytes must be positive when set")
+	}
+	if consolidation.LocalSpillMaxBytes != nil && *consolidation.LocalSpillMaxBytes == 0 {
+		return xerrors.New("consolidation local_spill_max_bytes must be positive when set")
+	}
+	if consolidation.FlushInterval <= 0 {
+		return xerrors.New("consolidation flush_interval must be positive")
+	}
+	if consolidation.ShadowTimeout <= 0 {
+		return xerrors.New("consolidation shadow_timeout must be positive")
+	}
+	if consolidation.SingleBlockObjectRetention <= 0 {
+		return xerrors.New("consolidation single_block_object_retention must be positive")
+	}
+	if consolidation.Mode == ConsolidationModePromoteFinalized && consolidation.SafePromotionLag == nil {
+		return xerrors.New("consolidation promote_finalized requires safe_promotion_lag")
+	}
+	if consolidation.SafePromotionLag != nil && *consolidation.SafePromotionLag < c.Chain.IrreversibleDistance {
+		return xerrors.Errorf(
+			"consolidation safe_promotion_lag(%d) must be at least irreversible_distance(%d)",
+			*consolidation.SafePromotionLag,
+			c.Chain.IrreversibleDistance,
+		)
+	}
+	return nil
 }
 
 func GetEnv() Env {
@@ -1045,7 +1545,11 @@ func stringToCompressionHookFunc() mapstructure.DecodeHookFunc {
 			return data, nil
 		}
 
-		return api.Compression_value[data.(string)], nil
+		v, ok := api.Compression_value[strings.ToUpper(data.(string))]
+		if !ok {
+			return nil, xerrors.Errorf("invalid compression type: %v", data)
+		}
+		return v, nil
 	}
 }
 

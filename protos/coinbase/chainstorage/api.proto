@@ -12,11 +12,23 @@ enum Compression {
   NONE = 0;
   // Compressed using gzip.
   GZIP = 1;
+  ZSTD = 2;
 }
 
 enum InitialPosition {
   EARLIEST = 0;
   LATEST = 1;
+}
+
+enum BlockReadSource {
+  option allow_alias = true;
+
+  BLOCK_READ_SOURCE_DEFAULT = 0;
+  // Alias order controls the protojson spelling. Keep the pre-rename name first
+  // until mixed-version REST clients and servers no longer coexist.
+  BLOCK_READ_SOURCE_LEGACY = 1;
+  BLOCK_READ_SOURCE_SINGLE_BLOCK = 1;
+  BLOCK_READ_SOURCE_CONSOLIDATED = 2;
 }
 
 message BlockFile {
@@ -29,6 +41,10 @@ message BlockFile {
   bool skipped = 7;
   Compression compression = 8;
   google.protobuf.Timestamp block_timestamp = 9;
+  uint64 byte_offset = 10;
+  uint64 byte_length = 11;
+  uint64 uncompressed_length = 12;
+  BlockObjectFormat object_format = 13;
 }
 
 message BlockchainEvent {
@@ -75,6 +91,7 @@ message GetBlockFileRequest {
   uint32 tag = 1;
   uint64 height = 2;
   string hash = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetBlockFileResponse {
@@ -85,6 +102,7 @@ message GetBlockFilesByRangeRequest {
   uint32 tag = 1;
   uint64 start_height = 2;
   uint64 end_height = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetBlockFilesByRangeResponse {
@@ -95,6 +113,7 @@ message GetRawBlockRequest {
   uint32 tag = 1;
   uint64 height = 2;
   string hash = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetRawBlockResponse {
@@ -105,6 +124,7 @@ message GetRawBlocksByRangeRequest {
   uint32 tag = 1;
   uint64 start_height = 2;
   uint64 end_height = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetRawBlocksByRangeResponse {
@@ -115,6 +135,7 @@ message GetNativeBlockRequest {
   uint32 tag = 1;
   uint64 height = 2;
   string hash = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetNativeBlockResponse {
@@ -125,6 +146,7 @@ message GetNativeBlocksByRangeRequest {
   uint32 tag = 1;
   uint64 start_height = 2;
   uint64 end_height = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetNativeBlocksByRangeResponse {
@@ -135,6 +157,7 @@ message GetRosettaBlockRequest {
   uint32 tag = 1;
   uint64 height = 2;
   string hash = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetRosettaBlockResponse {
@@ -145,6 +168,7 @@ message GetRosettaBlocksByRangeRequest {
   uint32 tag = 1;
   uint64 start_height = 2;
   uint64 end_height = 3;
+  BlockReadSource read_source = 4;
 }
 
 message GetRosettaBlocksByRangeResponse {
@@ -249,6 +273,19 @@ message GetVerifiedAccountStateResponse {
   ValidateAccountStateResponse response = 1;
 }
 
+message GetBlockByTimestampRequest {
+  uint32 tag = 1;
+  uint64 timestamp = 2; // Unix timestamp in seconds
+}
+
+message GetBlockByTimestampResponse {
+  uint32 tag = 1;
+  string hash = 2;
+  string parent_hash = 3;
+  uint64 height = 4;
+  uint64 timestamp = 5; // Unix timestamp in seconds
+}
+
 service ChainStorage {
   rpc GetLatestBlock (GetLatestBlockRequest) returns (GetLatestBlockResponse);
   rpc GetBlockFile(GetBlockFileRequest) returns (GetBlockFileResponse);
@@ -266,4 +303,5 @@ service ChainStorage {
   rpc GetBlockByTransaction(GetBlockByTransactionRequest) returns (GetBlockByTransactionResponse);
   rpc GetNativeTransaction (GetNativeTransactionRequest) returns (GetNativeTransactionResponse);
   rpc GetVerifiedAccountState (GetVerifiedAccountStateRequest) returns (GetVerifiedAccountStateResponse);
+  rpc GetBlockByTimestamp (GetBlockByTimestampRequest) returns(GetBlockByTimestampResponse);
 }

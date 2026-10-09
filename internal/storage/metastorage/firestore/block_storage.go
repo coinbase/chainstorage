@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"golang.org/x/xerrors"
@@ -243,6 +244,55 @@ func (b *blockStorageImpl) validateHeight(height uint64) error {
 			height, b.blockStartHeight, errors.ErrInvalidHeight)
 	}
 	return nil
+}
+
+func (b *blockStorageImpl) GetBlockByTimestamp(ctx context.Context, tag uint32, timestamp uint64) (*chainstorage.BlockMetadata, error) {
+	// Placeholder implementation - return error indicating not implemented
+	return nil, xerrors.New("GetBlockByTimestamp not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) GetBlockConsolidationShadow(ctx context.Context, block *chainstorage.BlockMetadata) (*chainstorage.BlockMetadata, error) {
+	return nil, xerrors.New("GetBlockConsolidationShadow not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) GetBlocksConsolidationShadow(ctx context.Context, blocks []*chainstorage.BlockMetadata) ([]*chainstorage.BlockMetadata, error) {
+	return nil, xerrors.New("GetBlocksConsolidationShadow not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) GetBlocksMissingConsolidationShadow(ctx context.Context, tag uint32, startHeight, endHeight uint64, limit uint64) ([]*internal.BlockMetadataRecord, error) {
+	return nil, xerrors.New("GetBlocksMissingConsolidationShadow not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) GetBlockConsolidationShadowStats(ctx context.Context, tag uint32, startHeight, endHeight uint64) (*internal.ConsolidationShadowStats, error) {
+	return nil, xerrors.New("GetBlockConsolidationShadowStats not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) GetFirstBlockMissingConsolidationShadow(ctx context.Context, tag uint32, startHeight, endHeight uint64) (uint64, bool, error) {
+	return 0, false, xerrors.New("GetFirstBlockMissingConsolidationShadow not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) GetFirstPromotableBlockConsolidationShadow(ctx context.Context, tag uint32, startHeight, endHeight uint64) (uint64, bool, error) {
+	return 0, false, xerrors.New("GetFirstPromotableBlockConsolidationShadow not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) GetBlockConsolidationCursor(ctx context.Context, name string, tag uint32) (uint64, bool, error) {
+	return 0, false, xerrors.New("GetBlockConsolidationCursor not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) SetBlockConsolidationCursor(ctx context.Context, name string, tag uint32, height uint64) error {
+	return xerrors.New("SetBlockConsolidationCursor not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) ResetBlockConsolidationCursor(ctx context.Context, name string, tag uint32, height uint64) error {
+	return xerrors.New("ResetBlockConsolidationCursor not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) PersistBlockConsolidationShadows(ctx context.Context, placements []*internal.ConsolidationShadowPlacement) error {
+	return xerrors.New("PersistBlockConsolidationShadows not implemented for Firestore")
+}
+
+func (b *blockStorageImpl) PromoteBlockConsolidationShadows(ctx context.Context, tag uint32, startHeight, endHeight uint64, limit uint64, singleBlockObjectRetention time.Duration) (*internal.ConsolidationPromotionResult, error) {
+	return nil, xerrors.New("PromoteBlockConsolidationShadows not implemented for Firestore")
 }
 
 func (b *blockStorageImpl) getLatestBlockDocRef(tag uint32) *firestore.DocumentRef {

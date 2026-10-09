@@ -9,14 +9,26 @@ import (
 )
 
 type (
-	BlobStorage              = internal.BlobStorage
-	BlobStorageFactory       = internal.BlobStorageFactory
-	BlobStorageFactoryParams = internal.BlobStorageFactoryParams
-	RawBlockData             = internal.RawBlockData
+	BlobStorage                = internal.BlobStorage
+	BlobStorageFactory         = internal.BlobStorageFactory
+	BlobStorageFactoryParams   = internal.BlobStorageFactoryParams
+	RawBlockData               = internal.RawBlockData
+	PayloadSource              = internal.PayloadSource
+	BytesPayloadSource         = internal.BytesPayloadSource
+	FilePayloadSource          = internal.FilePayloadSource
+	ConsolidatedBlockPayload   = internal.ConsolidatedBlockPayload
+	BlockPlacement             = internal.BlockPlacement
+	ConsolidatedUploadProgress = internal.ConsolidatedUploadProgress
 )
 
-var Module = fx.Options(
-	fx.Provide(internal.WithBlobStorageFactory),
-	s3.Module,
-	gcs.Module,
+var (
+	NewFilePayloadSource             = internal.NewFilePayloadSource
+	WithConsolidatedUploadProgress   = internal.WithConsolidatedUploadProgress
+	RecordConsolidatedUploadProgress = internal.RecordConsolidatedUploadProgress
+
+	Module = fx.Module("blobstorage",
+		fx.Provide(withBlobStorageFactory),
+		s3.Module,
+		gcs.Module,
+	)
 )

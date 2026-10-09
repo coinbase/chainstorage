@@ -9,6 +9,10 @@ import "google/protobuf/timestamp.proto";
 message BitcoinBlobdata {
   bytes header = 1;
   repeated RepeatedBytes input_transactions = 2;
+  // Full raw JSON from getrawtransaction, keyed by txid.
+  // Preserves complete transaction data including chain-specific fields
+  // (e.g. Dash special transaction payloads) that are stripped from input_transactions.
+  map<string, bytes> raw_input_transactions = 3;
 }
 
 message RepeatedBytes {
@@ -36,6 +40,9 @@ message BitcoinHeader {
   string previous_block_hash = 17;
   string next_block_hash = 18;
   google.protobuf.Timestamp timestamp = 19;
+  // raw_nonce stores the nonce as the original string from the RPC response,
+  // for chains where nonce is not a uint64 (e.g. Zcash Equihash 256-bit nonce).
+  string raw_nonce = 20;
 }
 
 // BitcoinTransaction https://developer.bitcoin.org/reference/rpc/getrawtransaction.html

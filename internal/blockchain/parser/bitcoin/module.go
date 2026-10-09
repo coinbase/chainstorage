@@ -11,4 +11,12 @@ var Module = fx.Options(
 		SetCheckerFactory(NewBitcoinChecker).
 		SetRosettaParserFactory(NewBitcoinRosettaParser).
 		Build(),
+	internal.NewParserBuilder("dash", NewDashNativeParser).
+		SetCheckerFactory(NewBitcoinChecker).
+		SetRosettaParserFactory(NewBitcoinRosettaParser).
+		Build(),
+	internal.NewParserBuilder("zcash", NewZcashNativeParser).
+		SetCheckerFactory(NewBitcoinChecker).
+		SetRosettaParserFactory(NewBitcoinRosettaParser).
+		Build(),
 )

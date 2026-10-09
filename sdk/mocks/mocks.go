@@ -5,6 +5,11 @@
 //
 //	mockgen -destination sdk/mocks/mocks.go -package sdkmocks github.com/coinbase/chainstorage/sdk Client,Parser,Session
 //
+// StreamNativeBlocksByRange (INF-1635) was added in the generated style by
+// hand: newer mockgen releases resolve the sdk.ParseOption alias through to
+// parser/internal, which sdk_test cannot import. Regenerate with the same
+// mockgen that produced the rest of this file, or re-apply that method.
+//
 
 // Package sdkmocks is a generated GoMock package.
 package sdkmocks
@@ -54,6 +59,21 @@ func (m *MockClient) GetBlock(arg0 context.Context, arg1 uint64, arg2 string) (*
 func (mr *MockClientMockRecorder) GetBlock(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockClient)(nil).GetBlock), arg0, arg1, arg2)
+}
+
+// GetBlockByTimestamp mocks base method.
+func (m *MockClient) GetBlockByTimestamp(arg0 context.Context, arg1 uint32, arg2 uint64) (*chainstorage.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockByTimestamp", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*chainstorage.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockByTimestamp indicates an expected call of GetBlockByTimestamp.
+func (mr *MockClientMockRecorder) GetBlockByTimestamp(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByTimestamp", reflect.TypeOf((*MockClient)(nil).GetBlockByTimestamp), arg0, arg1, arg2)
 }
 
 // GetBlockByTransaction mocks base method.
@@ -233,6 +253,66 @@ func (mr *MockClientMockRecorder) GetTag() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTag", reflect.TypeOf((*MockClient)(nil).GetTag))
 }
 
+// OpenRawBlockPayload mocks base method.
+func (m *MockClient) OpenRawBlockPayload(arg0 context.Context, arg1 uint64, arg2 string) (*sdk.RawBlockPayload, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenRawBlockPayload", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*sdk.RawBlockPayload)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenRawBlockPayload indicates an expected call of OpenRawBlockPayload.
+func (mr *MockClientMockRecorder) OpenRawBlockPayload(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenRawBlockPayload", reflect.TypeOf((*MockClient)(nil).OpenRawBlockPayload), arg0, arg1, arg2)
+}
+
+// OpenRawBlockPayloadWithTag mocks base method.
+func (m *MockClient) OpenRawBlockPayloadWithTag(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 string) (*sdk.RawBlockPayload, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenRawBlockPayloadWithTag", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*sdk.RawBlockPayload)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenRawBlockPayloadWithTag indicates an expected call of OpenRawBlockPayloadWithTag.
+func (mr *MockClientMockRecorder) OpenRawBlockPayloadWithTag(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenRawBlockPayloadWithTag", reflect.TypeOf((*MockClient)(nil).OpenRawBlockPayloadWithTag), arg0, arg1, arg2, arg3)
+}
+
+// OpenRawBlockPayloadsByRange mocks base method.
+func (m *MockClient) OpenRawBlockPayloadsByRange(arg0 context.Context, arg1, arg2 uint64) (sdk.RawBlockPayloadIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenRawBlockPayloadsByRange", arg0, arg1, arg2)
+	ret0, _ := ret[0].(sdk.RawBlockPayloadIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenRawBlockPayloadsByRange indicates an expected call of OpenRawBlockPayloadsByRange.
+func (mr *MockClientMockRecorder) OpenRawBlockPayloadsByRange(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenRawBlockPayloadsByRange", reflect.TypeOf((*MockClient)(nil).OpenRawBlockPayloadsByRange), arg0, arg1, arg2)
+}
+
+// OpenRawBlockPayloadsByRangeWithTag mocks base method.
+func (m *MockClient) OpenRawBlockPayloadsByRangeWithTag(arg0 context.Context, arg1 uint32, arg2, arg3 uint64) (sdk.RawBlockPayloadIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenRawBlockPayloadsByRangeWithTag", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(sdk.RawBlockPayloadIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenRawBlockPayloadsByRangeWithTag indicates an expected call of OpenRawBlockPayloadsByRangeWithTag.
+func (mr *MockClientMockRecorder) OpenRawBlockPayloadsByRangeWithTag(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenRawBlockPayloadsByRangeWithTag", reflect.TypeOf((*MockClient)(nil).OpenRawBlockPayloadsByRangeWithTag), arg0, arg1, arg2, arg3)
+}
+
 // SetBlockValidation mocks base method.
 func (m *MockClient) SetBlockValidation(arg0 bool) {
 	m.ctrl.T.Helper()
@@ -284,6 +364,46 @@ func (mr *MockClientMockRecorder) StreamChainEvents(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StreamChainEvents", reflect.TypeOf((*MockClient)(nil).StreamChainEvents), arg0, arg1)
 }
 
+// StreamNativeBlock mocks base method.
+func (m *MockClient) StreamNativeBlock(arg0 context.Context, arg1 uint32, arg2 uint64, arg3 string, arg4 ...sdk.ParseOption) (sdk.NativeStreamedBlock, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1, arg2, arg3}
+	for _, a := range arg4 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "StreamNativeBlock", varargs...)
+	ret0, _ := ret[0].(sdk.NativeStreamedBlock)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StreamNativeBlock indicates an expected call of StreamNativeBlock.
+func (mr *MockClientMockRecorder) StreamNativeBlock(arg0, arg1, arg2, arg3 any, arg4 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1, arg2, arg3}, arg4...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StreamNativeBlock", reflect.TypeOf((*MockClient)(nil).StreamNativeBlock), varargs...)
+}
+
+// StreamNativeBlocksByRange mocks base method.
+func (m *MockClient) StreamNativeBlocksByRange(arg0 context.Context, arg1 uint32, arg2, arg3 uint64, arg4 ...sdk.ParseOption) (sdk.NativeStreamedBlockIterator, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1, arg2, arg3}
+	for _, a := range arg4 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "StreamNativeBlocksByRange", varargs...)
+	ret0, _ := ret[0].(sdk.NativeStreamedBlockIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StreamNativeBlocksByRange indicates an expected call of StreamNativeBlocksByRange.
+func (mr *MockClientMockRecorder) StreamNativeBlocksByRange(arg0, arg1, arg2, arg3 any, arg4 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1, arg2, arg3}, arg4...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StreamNativeBlocksByRange", reflect.TypeOf((*MockClient)(nil).StreamNativeBlocksByRange), varargs...)
+}
+
 // MockParser is a mock of Parser interface.
 type MockParser struct {
 	ctrl     *gomock.Controller
@@ -323,18 +443,23 @@ func (mr *MockParserMockRecorder) GetNativeTransaction(arg0, arg1, arg2 any) *go
 }
 
 // ParseNativeBlock mocks base method.
-func (m *MockParser) ParseNativeBlock(arg0 context.Context, arg1 *chainstorage.Block) (*chainstorage.NativeBlock, error) {
+func (m *MockParser) ParseNativeBlock(arg0 context.Context, arg1 *chainstorage.Block, arg2 ...sdk.ParseOption) (*chainstorage.NativeBlock, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseNativeBlock", arg0, arg1)
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ParseNativeBlock", varargs...)
 	ret0, _ := ret[0].(*chainstorage.NativeBlock)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ParseNativeBlock indicates an expected call of ParseNativeBlock.
-func (mr *MockParserMockRecorder) ParseNativeBlock(arg0, arg1 any) *gomock.Call {
+func (mr *MockParserMockRecorder) ParseNativeBlock(arg0, arg1 any, arg2 ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseNativeBlock", reflect.TypeOf((*MockParser)(nil).ParseNativeBlock), arg0, arg1)
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseNativeBlock", reflect.TypeOf((*MockParser)(nil).ParseNativeBlock), varargs...)
 }
 
 // ParseRosettaBlock mocks base method.

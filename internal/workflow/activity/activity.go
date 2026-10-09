@@ -15,21 +15,28 @@ import (
 )
 
 const (
-	ActivityExtractor       = "activity.extractor"
-	ActivityLoader          = "activity.loader"
-	ActivitySyncer          = "activity.syncer"
-	ActivityLivenessCheck   = "activity.liveness_check"
-	ActivityReader          = "activity.reader"
-	ActivityValidator       = "activity.validator"
-	ActivityStreamer        = "activity.streamer"
-	ActivityCrossValidator  = "activity.cross_validator"
-	ActivityEventReader     = "activity.event_reader"
-	ActivityEventReconciler = "activity.event_reconciler"
-	ActivityEventLoader     = "activity.event_loader"
-	ActivityReplicator      = "activity.replicator"
-	ActivityUpdateWatermark = "activity.update_watermark"
-
-	loggerMsg = "activity.request"
+	ActivityExtractor                    = "activity.extractor"
+	ActivityLoader                       = "activity.loader"
+	ActivitySyncer                       = "activity.syncer"
+	ActivityLivenessCheck                = "activity.liveness_check"
+	ActivityReader                       = "activity.reader"
+	ActivityValidator                    = "activity.validator"
+	ActivityStreamer                     = "activity.streamer"
+	ActivityCrossValidator               = "activity.cross_validator"
+	ActivityEventReader                  = "activity.event_reader"
+	ActivityEventReconciler              = "activity.event_reconciler"
+	ActivityEventLoader                  = "activity.event_loader"
+	ActivityReplicator                   = "activity.replicator"
+	ActivityUpdateWatermark              = "activity.update_watermark"
+	ActivityLatestBlock                  = "activity.latest_block"
+	ActivityBatchConsolidator            = "activity.batch_consolidator"
+	ActivityBatchConsolidatorStats       = "activity.batch_consolidator.stats"
+	ActivityBatchConsolidatorLatestBlock = "activity.batch_consolidator.latest_block"
+	ActivityBatchConsolidatorPlan        = "activity.batch_consolidator.plan"
+	ActivityBatchConsolidatorCursor      = "activity.batch_consolidator.cursor"
+	ActivitySingleBlockRetentionSelect   = "activity.single_block_retention.select"
+	ActivitySingleBlockRetentionProcess  = "activity.single_block_retention.process"
+	loggerMsg                            = "activity.request"
 
 	resultTypeTag     = "result_type"
 	resultTypeSuccess = "success"
@@ -37,6 +44,8 @@ const (
 
 	reorgDistanceCheckMetric = "reorg_distance_check"
 )
+
+const ActivityBatchConsolidatorRepairCandidates = "activity.batch_consolidator.repair_candidates"
 
 type baseActivity struct {
 	name       string

@@ -36,3 +36,17 @@ workflows:
     validation_start_height: 22207816 # CREL nodes do not support arb_trace API which was used before the NITRO upgrade
     validation_percentage: 1
     irreversible_distance: 500
+  migrator:
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
+    activity_start_to_close_timeout: 30m
+    backoff_interval: 5s
+    batch_size: 1000
+    checkpoint_size: 5000
+    task_list: default
+    workflow_identity: workflow.migrator
+    workflow_run_timeout: 24h

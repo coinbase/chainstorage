@@ -3,11 +3,14 @@ package main
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/testsuite"
+	"go.uber.org/fx"
 
 	"github.com/coinbase/chainstorage/internal/cadence"
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/testapp"
+	"github.com/coinbase/chainstorage/sdk/services"
 )
 
 type (
@@ -19,6 +22,13 @@ type (
 
 func (s CronTestSuite) T() *testing.T {
 	return s.t
+}
+
+func TestCronAppDependencyGraph(t *testing.T) {
+	manager := services.NewManager()
+	defer manager.Shutdown()
+
+	require.NoError(t, fx.ValidateApp(cronAppOptions(manager)...))
 }
 
 func TestIntegrationCron(t *testing.T) {

@@ -46,12 +46,16 @@ func (s *benchmarkerTestSuite) SetupTest() {
 	blockchainClient := clientmocks.NewMockClient(s.ctrl)
 	metadataAccessor := metastoragemocks.NewMockMetaStorage(s.ctrl)
 	blobStorage := blobstoragemocks.NewMockBlobStorage(s.ctrl)
+	singleBlockUploader := blobstoragemocks.NewMockSingleBlockUploader(s.ctrl)
 	s.app = testapp.New(
 		s.T(),
 		Module,
 		cadence.WithTestEnv(s.env),
 		fx.Provide(func() blobstorage.BlobStorage {
 			return blobStorage
+		}),
+		fx.Provide(func() blobstorage.SingleBlockUploader {
+			return singleBlockUploader
 		}),
 		fx.Provide(fx.Annotated{
 			Name: "slave",

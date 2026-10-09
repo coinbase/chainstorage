@@ -1,0 +1,143 @@
+version: 2.1
+
+orbs:
+  aws-cli: circleci/aws-cli@5.4.2
+
+executors:
+  chainstorage:
+    docker:
+      - image: ${CIPHEROWL_ECR_URL}/cipherowl/circleci:latest
+    working_directory: ~/chainstorage
+    environment:
+      # ECR registry that hosts both the docker-hub pull-through cache (base
+      # images) and the published chainstorage image.
+      ECR_REGISTRY: 471112991249.dkr.ecr.us-east-1.amazonaws.com
+      IMAGE_REPO: 471112991249.dkr.ecr.us-east-1.amazonaws.com/cipherowl/chainstorage
+
+commands:
+  build_image:
+    description: >
+      Assume the CircleCI OIDC role, log in to ECR, and build the chainstorage
+      image tagged with the short git sha. Does not push.
+    steps:
+      - aws-cli/setup:
+          role_arn: ${CIRCLECI_OIDC_ARN}
+      - run:
+          name: Log in to ECR
+          command: |
+            aws ecr get-login-password --region us-east-1 \
+              | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+      - run:
+          name: Build chainstorage image
+          # The Go build inside the Dockerfile is silent for minutes; raise the
+          # default 10m no-output timeout so it is not killed mid-build.
+          no_output_timeout: 30m
+          command: |
+            SHORT_SHA=$(git rev-parse --short=7 HEAD)
+            docker build --platform linux/amd64 \
+              --build-arg BASE_REGISTRY="${ECR_REGISTRY}/docker-hub/" \
+              -t "${IMAGE_REPO}:${SHORT_SHA}" .
+
+jobs:
+  build_and_test:
+    docker:
+      - image: ${CIPHEROWL_ECR_URL}/cipherowl/circleci:latest
+    working_directory: ~/chainstorage
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: default
+      - run:
+          name: Install dependencies
+          command: |
+            set +x
+            make bootstrap
+      - run:
+          name: Run unit tests
+          command: "make test"
+      - run:
+          name: Run integration tests
+          command: |
+            set +x
+
+            docker compose -f docker-compose-testing.yml up -d --force-recreate
+            sleep 10
+
+            # Due to how the remote docker engine works with docker-compose
+            # in circleci, we have to run our integration tests from
+            # a remote container so that the tests can access network services
+            # spun up by docker-compose.
+            docker create -v /home/circleci --name chainstorage alpine:3.21 /bin/true
+            # docker cp /home/circleci/go chainstorage:/home/circleci/go
+            docker cp /home/circleci/chainstorage chainstorage:/home/circleci/chainstorage
+
+            docker run --network chainstorage_default \
+              --volumes-from chainstorage \
+              -w /home/circleci/chainstorage \
+              -e CHAINSTORAGE_AWS_POSTGRES_HOST=postgres \
+              -e CHAINSTORAGE_AWS_POSTGRES_PORT=5432 \
+              -e CHAINSTORAGE_AWS_POSTGRES_USER=postgres \
+              -e CHAINSTORAGE_AWS_POSTGRES_PASSWORD=postgres \
+              -e CHAINSTORAGE_AWS_POSTGRES_DATABASE=postgres \
+              ${CIPHEROWL_ECR_URL}/cipherowl/circleci:latest \
+              /bin/bash -c "sudo chown -R circleci:circleci ~/ && make bootstrap && \
+                echo '🔧 Test databases already set up by init script' && \
+                TEST_TYPE=integration go test ./... -v -p=1 -parallel=1 -timeout=15m -failfast -run=TestIntegration"
+      - run:
+          name: Run functional tests
+          command: |
+            set +x
+            echo "functional tests skipped"
+
+            # docker run --network chainstorage_default \
+            #  --volumes-from chainstorage \
+            #  -w /home/circleci/chainstorage \
+            #  ${CIPHEROWL_ECR_URL}/cipherowl/circleci:latest \
+            #  /bin/bash -c "sudo chown -R circleci:circleci ~/ && make bootstrap && TEST_TYPE=functional go test ./... -v -p=1 -parallel=1 -timeout=45m -failfast -run=TestIntegration"
+            
+            docker compose -f docker-compose-testing.yml down
+
+  # Runs on every branch: proves the Dockerfile still builds. Never pushes.
+  build-image:
+    executor: chainstorage
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: default
+      - build_image
+
+  # Runs on master only, after build_and_test passes: builds and pushes the
+  # sha-pinned tag. No latest/master tags are published; the monorepo pins the
+  # short sha printed at the end of this job.
+  publish-image:
+    executor: chainstorage
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: default
+      - build_image
+      - run:
+          name: Push chainstorage image
+          command: |
+            SHORT_SHA=$(git rev-parse --short=7 HEAD)
+            IMAGE="${IMAGE_REPO}:${SHORT_SHA}"
+            docker push "${IMAGE}"
+            echo
+            echo "Pushed ${IMAGE}"
+
+workflows:
+  version: 2
+  default:
+    jobs:
+      - build_and_test:
+          name: build_and_test
+          context: cipherowl_build_context
+      - build-image:
+          context: cipherowl_build_context
+      - publish-image:
+          context: cipherowl_build_context
+          requires:
+            - build_and_test
+          filters:
+            branches:
+              only: master

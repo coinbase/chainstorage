@@ -1,0 +1,1347 @@
+{
+  "generated_at": "2026-06-22T05:28:49Z",
+  "command": "/Users/boyangxu/.cache/go/build/9d/9d56949bbf7c987975c8069d8d0715461b3dfd2181f50913602759aaaff0ad2f-d/admin --blockchain solana --network mainnet --env production cscb validate --start-height 428058000 --end-height 428059000 --chunk-blocks 25 --random-samples 5 --random-seed 914 --iterations 3 --full-object-iterations 1 --fallback-height 428057999 --timeout 5m --server-address localhost:19090 --grpc --report-json docs/reports/INF-914-cscb-dual-read-validation.json --report-md docs/reports/INF-914-cscb-dual-read-validation.md",
+  "environment": "production",
+  "blockchain": "BLOCKCHAIN_SOLANA",
+  "network": "NETWORK_SOLANA_MAINNET",
+  "tag": 2,
+  "start_height": 428058000,
+  "end_height": 428059000,
+  "chunk_blocks": 25,
+  "random_seed": 914,
+  "random_samples": 5,
+  "iterations": 3,
+  "full_object_iterations": 1,
+  "fallback_height": 428057999,
+  "server_address_override": "localhost:19090",
+  "grpc_transport_override": true,
+  "client_id": "INF-914-cscb-dual-read-validation",
+  "passed": true,
+  "total_cases": 18,
+  "passed_cases": 18,
+  "failed_cases": 0,
+  "correctness_mismatches": 0,
+  "observed_fallback_blocks": 1,
+  "cases": [
+    {
+      "name": "single_first_block",
+      "kind": "single",
+      "start_height": 428058000,
+      "end_height": 428058001,
+      "heights": [
+        428058000
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 1389.387,
+          "p95_ms": 1728.344,
+          "min_ms": 1251.48,
+          "max_ms": 1728.344
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2847939
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058000,
+          "last_height": 428058000
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 553.336,
+          "p95_ms": 571.616,
+          "min_ms": 460.878,
+          "max_ms": 571.616
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 2882226
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 8915187,
+          "metadata_uncompressed_bytes": 8915187,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058000,
+          "last_height": 428058000
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.3982590883605504,
+      "bytes_ratio_consolidated_vs_legacy": 1.0120392325818777,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "0e0e470e962f11735a8de95a692a8d5c0542cddace6f2c5f4e7481a889a11df7",
+      "first_canonical_hash_consolidated": "0e0e470e962f11735a8de95a692a8d5c0542cddace6f2c5f4e7481a889a11df7"
+    },
+    {
+      "name": "single_last_block",
+      "kind": "single",
+      "start_height": 428058999,
+      "end_height": 428059000,
+      "heights": [
+        428058999
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 218.822,
+          "p95_ms": 1013.836,
+          "min_ms": 198.491,
+          "max_ms": 1013.836
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2247348
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058999,
+          "last_height": 428058999
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 399.035,
+          "p95_ms": 521.437,
+          "min_ms": 362.858,
+          "max_ms": 521.437
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 3777807
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 6842578,
+          "metadata_uncompressed_bytes": 6842578,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058999,
+          "last_height": 428058999
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 1.8235597883211012,
+      "bytes_ratio_consolidated_vs_legacy": 1.681006679873344,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "c3b881848de06cadbedb95271bfdc6992ff752c5a010f4b708abf22a8d7dbe07",
+      "first_canonical_hash_consolidated": "c3b881848de06cadbedb95271bfdc6992ff752c5a010f4b708abf22a8d7dbe07"
+    },
+    {
+      "name": "single_chunk_boundary_428058024",
+      "kind": "single",
+      "start_height": 428058024,
+      "end_height": 428058025,
+      "heights": [
+        428058024
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 207.551,
+          "p95_ms": 288.986,
+          "min_ms": 175.27,
+          "max_ms": 288.986
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 3084087
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058024,
+          "last_height": 428058024
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 1039.391,
+          "p95_ms": 1052.372,
+          "min_ms": 936.045,
+          "max_ms": 1052.372
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 39109401
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 10758103,
+          "metadata_uncompressed_bytes": 10758103,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058024,
+          "last_height": 428058024
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 5.007882399988437,
+      "bytes_ratio_consolidated_vs_legacy": 12.68103039894789,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "62b48b812677a5b3c5042d9fcd0113561e6cabc3f679586645aa1f2024cb7d00",
+      "first_canonical_hash_consolidated": "62b48b812677a5b3c5042d9fcd0113561e6cabc3f679586645aa1f2024cb7d00"
+    },
+    {
+      "name": "single_chunk_boundary_428058025",
+      "kind": "single",
+      "start_height": 428058025,
+      "end_height": 428058026,
+      "heights": [
+        428058025
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 681.192,
+          "p95_ms": 688.676,
+          "min_ms": 309.035,
+          "max_ms": 688.676
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2469318
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058025,
+          "last_height": 428058025
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 417.139,
+          "p95_ms": 441.671,
+          "min_ms": 344.894,
+          "max_ms": 441.671
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 2451210
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 7925570,
+          "metadata_uncompressed_bytes": 7925570,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058025,
+          "last_height": 428058025
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.6123662638433804,
+      "bytes_ratio_consolidated_vs_legacy": 0.9926668011167455,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "07f3cf2f7356f80d7f9b3928ff11888187c7c3af7d2f0d896a5e670643d66630",
+      "first_canonical_hash_consolidated": "07f3cf2f7356f80d7f9b3928ff11888187c7c3af7d2f0d896a5e670643d66630"
+    },
+    {
+      "name": "single_chunk_boundary_428058049",
+      "kind": "single",
+      "start_height": 428058049,
+      "end_height": 428058050,
+      "heights": [
+        428058049
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 190.734,
+          "p95_ms": 710.165,
+          "min_ms": 176.139,
+          "max_ms": 710.165
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2358117
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058049,
+          "last_height": 428058049
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 872.054,
+          "p95_ms": 897.705,
+          "min_ms": 782.807,
+          "max_ms": 897.705
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 33572286
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 7593128,
+          "metadata_uncompressed_bytes": 7593128,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058049,
+          "last_height": 428058049
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 4.572095169188503,
+      "bytes_ratio_consolidated_vs_legacy": 14.236904275742043,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "636c30d02e3390276e0091ca9928603d8f1e507ef5be9ccd818a99f644732028",
+      "first_canonical_hash_consolidated": "636c30d02e3390276e0091ca9928603d8f1e507ef5be9ccd818a99f644732028"
+    },
+    {
+      "name": "single_chunk_boundary_428058050",
+      "kind": "single",
+      "start_height": 428058050,
+      "end_height": 428058051,
+      "heights": [
+        428058050
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 658.691,
+          "p95_ms": 698.487,
+          "min_ms": 251.748,
+          "max_ms": 698.487
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2188680
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058050,
+          "last_height": 428058050
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 452.178,
+          "p95_ms": 471.371,
+          "min_ms": 360.972,
+          "max_ms": 471.371
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 2255577
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 7301670,
+          "metadata_uncompressed_bytes": 7301670,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058050,
+          "last_height": 428058050
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.6864796998896295,
+      "bytes_ratio_consolidated_vs_legacy": 1.0305649980810352,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "5c5d5d0db508d736390aaffd5a4470c3f7ffddb32a5967d280b0b556e59b4c19",
+      "first_canonical_hash_consolidated": "5c5d5d0db508d736390aaffd5a4470c3f7ffddb32a5967d280b0b556e59b4c19"
+    },
+    {
+      "name": "single_chunk_boundary_428058074",
+      "kind": "single",
+      "start_height": 428058074,
+      "end_height": 428058075,
+      "heights": [
+        428058074
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 208.264,
+          "p95_ms": 766.694,
+          "min_ms": 176.772,
+          "max_ms": 766.694
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 3051528
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058074,
+          "last_height": 428058074
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 912.411,
+          "p95_ms": 1308.56,
+          "min_ms": 875.434,
+          "max_ms": 1308.56
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 36464772
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 10799431,
+          "metadata_uncompressed_bytes": 10799431,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058074,
+          "last_height": 428058074
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 4.3810308070525865,
+      "bytes_ratio_consolidated_vs_legacy": 11.949676358860216,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "68f1ef051c791e532127a753fb58da3677d5bce8f7bb7c5bceca7ab9ff44ab7c",
+      "first_canonical_hash_consolidated": "68f1ef051c791e532127a753fb58da3677d5bce8f7bb7c5bceca7ab9ff44ab7c"
+    },
+    {
+      "name": "single_chunk_boundary_428058075",
+      "kind": "single",
+      "start_height": 428058075,
+      "end_height": 428058076,
+      "heights": [
+        428058075
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 684.618,
+          "p95_ms": 1262.177,
+          "min_ms": 199.987,
+          "max_ms": 1262.177
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2627094
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058075,
+          "last_height": 428058075
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 398.145,
+          "p95_ms": 501.07,
+          "min_ms": 382.178,
+          "max_ms": 501.07
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 2465205
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 8888611,
+          "metadata_uncompressed_bytes": 8888611,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058075,
+          "last_height": 428058075
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.5815578906777209,
+      "bytes_ratio_consolidated_vs_legacy": 0.9383771574218509,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "f0faa51f65d2278bfde95eb2444ccd22386d40d3c6b79bd4ff2a5e9b913edf57",
+      "first_canonical_hash_consolidated": "f0faa51f65d2278bfde95eb2444ccd22386d40d3c6b79bd4ff2a5e9b913edf57"
+    },
+    {
+      "name": "single_random_428058100",
+      "kind": "single",
+      "start_height": 428058100,
+      "end_height": 428058101,
+      "heights": [
+        428058100
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 718.612,
+          "p95_ms": 1282.682,
+          "min_ms": 700.807,
+          "max_ms": 1282.682
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2908002
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058100,
+          "last_height": 428058100
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 421.256,
+          "p95_ms": 423.046,
+          "min_ms": 349.698,
+          "max_ms": 423.046
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 2756445
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 9653365,
+          "metadata_uncompressed_bytes": 9653365,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058100,
+          "last_height": 428058100
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.5862078562562273,
+      "bytes_ratio_consolidated_vs_legacy": 0.9478827731205137,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "178de0a69cedd530d65e26b5c0657114e251d15dccb29e9c61955342e52dda83",
+      "first_canonical_hash_consolidated": "178de0a69cedd530d65e26b5c0657114e251d15dccb29e9c61955342e52dda83"
+    },
+    {
+      "name": "single_random_428058118",
+      "kind": "single",
+      "start_height": 428058118,
+      "end_height": 428058119,
+      "heights": [
+        428058118
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 1272.78,
+          "p95_ms": 1463.85,
+          "min_ms": 1212.492,
+          "max_ms": 1463.85
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 1939224
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058118,
+          "last_height": 428058118
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 3170.186,
+          "p95_ms": 6313.939,
+          "min_ms": 2924.594,
+          "max_ms": 6313.939
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 30511797
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 6627227,
+          "metadata_uncompressed_bytes": 6627227,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058118,
+          "last_height": 428058118
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 2.490757240057198,
+      "bytes_ratio_consolidated_vs_legacy": 15.734024021979925,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "382f8598c23a17710a3abb7162ecd9cdfebd5b15a7ef883ed22fbed73c086397",
+      "first_canonical_hash_consolidated": "382f8598c23a17710a3abb7162ecd9cdfebd5b15a7ef883ed22fbed73c086397"
+    },
+    {
+      "name": "single_random_428058141",
+      "kind": "single",
+      "start_height": 428058141,
+      "end_height": 428058142,
+      "heights": [
+        428058141
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 984.129,
+          "p95_ms": 1626.596,
+          "min_ms": 895.663,
+          "max_ms": 1626.596
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 3889650
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058141,
+          "last_height": 428058141
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 3797.58,
+          "p95_ms": 4665.425,
+          "min_ms": 2487.59,
+          "max_ms": 4665.425
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 36896916
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 11708771,
+          "metadata_uncompressed_bytes": 11708771,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058141,
+          "last_height": 428058141
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 3.858823385958548,
+      "bytes_ratio_consolidated_vs_legacy": 9.485921869576954,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "7f6b184b49151bdd44b8b2b2b1fe219d2678593ebf5cb7e384925921c4e3356b",
+      "first_canonical_hash_consolidated": "7f6b184b49151bdd44b8b2b2b1fe219d2678593ebf5cb7e384925921c4e3356b"
+    },
+    {
+      "name": "single_random_428058339",
+      "kind": "single",
+      "start_height": 428058339,
+      "end_height": 428058340,
+      "heights": [
+        428058339
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 913.407,
+          "p95_ms": 1296.782,
+          "min_ms": 888.824,
+          "max_ms": 1296.782
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 2794089
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058339,
+          "last_height": 428058339
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 1415.481,
+          "p95_ms": 2200.593,
+          "min_ms": 1096.766,
+          "max_ms": 2200.593
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 29017683
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 8447888,
+          "metadata_uncompressed_bytes": 8447888,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058339,
+          "last_height": 428058339
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 1.5496717235580633,
+      "bytes_ratio_consolidated_vs_legacy": 10.385382498553195,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "d7a2448d89026352190c721845f3f317e23311605a6112526ba7a739ae777066",
+      "first_canonical_hash_consolidated": "d7a2448d89026352190c721845f3f317e23311605a6112526ba7a739ae777066"
+    },
+    {
+      "name": "single_random_428058828",
+      "kind": "single",
+      "start_height": 428058828,
+      "end_height": 428058829,
+      "heights": [
+        428058828
+      ],
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 1492.801,
+          "p95_ms": 1633.386,
+          "min_ms": 881.652,
+          "max_ms": 1633.386
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 3594321
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058828,
+          "last_height": 428058828
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 922.264,
+          "p95_ms": 978.437,
+          "min_ms": 605.366,
+          "max_ms": 978.437
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 11397528
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1,
+          "skipped_count": 0,
+          "metadata_byte_length": 12007263,
+          "metadata_uncompressed_bytes": 12007263,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058828,
+          "last_height": 428058828
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.6178077319080039,
+      "bytes_ratio_consolidated_vs_legacy": 3.170982224459084,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "25ee3596b012244de477ca5a4d79864a0472cd6dcc8a985010d0ebf87b03bd5f",
+      "first_canonical_hash_consolidated": "25ee3596b012244de477ca5a4d79864a0472cd6dcc8a985010d0ebf87b03bd5f"
+    },
+    {
+      "name": "range_within_one_chunk",
+      "kind": "range",
+      "start_height": 428058005,
+      "end_height": 428058015,
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 2996.342,
+          "p95_ms": 3001.567,
+          "min_ms": 2891.89,
+          "max_ms": 3001.567
+        },
+        "http": {
+          "requests": 30,
+          "bytes": 22951683
+        },
+        "files": {
+          "count": 10,
+          "legacy_object_count": 10,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058005,
+          "last_height": 428058014
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 2013.972,
+          "p95_ms": 2089.991,
+          "min_ms": 1583.112,
+          "max_ms": 2089.991
+        },
+        "http": {
+          "requests": 9,
+          "bytes": 24104910
+        },
+        "files": {
+          "count": 10,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 10,
+          "skipped_count": 0,
+          "metadata_byte_length": 72347946,
+          "metadata_uncompressed_bytes": 72347946,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058005,
+          "last_height": 428058014
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.672143567056097,
+      "bytes_ratio_consolidated_vs_legacy": 1.0502458577874223,
+      "canonical_hashes_compared": 10,
+      "first_canonical_hash_legacy": "41960aeeec354c48c1f133a447f79cd4a96954187a76447e4683d91f5239ddad",
+      "first_canonical_hash_consolidated": "41960aeeec354c48c1f133a447f79cd4a96954187a76447e4683d91f5239ddad"
+    },
+    {
+      "name": "range_across_chunk_boundary",
+      "kind": "range",
+      "start_height": 428058020,
+      "end_height": 428058030,
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 2977.525,
+          "p95_ms": 3042.113,
+          "min_ms": 1368.422,
+          "max_ms": 3042.113
+        },
+        "http": {
+          "requests": 30,
+          "bytes": 21927276
+        },
+        "files": {
+          "count": 10,
+          "legacy_object_count": 10,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058020,
+          "last_height": 428058029
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 3097.036,
+          "p95_ms": 5206.642,
+          "min_ms": 2334.32,
+          "max_ms": 5206.642
+        },
+        "http": {
+          "requests": 12,
+          "bytes": 45903672
+        },
+        "files": {
+          "count": 10,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 10,
+          "skipped_count": 0,
+          "metadata_byte_length": 72287021,
+          "metadata_uncompressed_bytes": 72287021,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058020,
+          "last_height": 428058029
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 1.040137698256102,
+      "bytes_ratio_consolidated_vs_legacy": 2.093450732320786,
+      "canonical_hashes_compared": 10,
+      "first_canonical_hash_legacy": "a90299cae6b502a6bf518c887995fd04f680fef17b45e891371a078353ac7419",
+      "first_canonical_hash_consolidated": "a90299cae6b502a6bf518c887995fd04f680fef17b45e891371a078353ac7419"
+    },
+    {
+      "name": "range_two_chunks",
+      "kind": "range",
+      "start_height": 428058000,
+      "end_height": 428058050,
+      "iterations": 3,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 4055.683,
+          "p95_ms": 4705.356,
+          "min_ms": 3396.787,
+          "max_ms": 4705.356
+        },
+        "http": {
+          "requests": 150,
+          "bytes": 118865385
+        },
+        "files": {
+          "count": 50,
+          "legacy_object_count": 50,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058000,
+          "last_height": 428058049
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 4934.945,
+          "p95_ms": 5072.744,
+          "min_ms": 2676.124,
+          "max_ms": 5072.744
+        },
+        "http": {
+          "requests": 12,
+          "bytes": 72384303
+        },
+        "files": {
+          "count": 50,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 50,
+          "skipped_count": 0,
+          "metadata_byte_length": 385274802,
+          "metadata_uncompressed_bytes": 385274802,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058000,
+          "last_height": 428058049
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 1.2167975159794293,
+      "bytes_ratio_consolidated_vs_legacy": 0.6089603209546665,
+      "canonical_hashes_compared": 50,
+      "first_canonical_hash_legacy": "0e0e470e962f11735a8de95a692a8d5c0542cddace6f2c5f4e7481a889a11df7",
+      "first_canonical_hash_consolidated": "0e0e470e962f11735a8de95a692a8d5c0542cddace6f2c5f4e7481a889a11df7"
+    },
+    {
+      "name": "range_full_object",
+      "kind": "range",
+      "start_height": 428058000,
+      "end_height": 428059000,
+      "iterations": 1,
+      "expect_fallback": false,
+      "observed_fallback": false,
+      "observed_fallback_blocks": 0,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 1,
+          "p50_ms": 103929.955,
+          "p95_ms": 103929.955,
+          "min_ms": 103929.955,
+          "max_ms": 103929.955
+        },
+        "http": {
+          "requests": 1000,
+          "bytes": 907486583
+        },
+        "files": {
+          "count": 1000,
+          "legacy_object_count": 1000,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428058000,
+          "last_height": 428058999
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 1,
+          "p50_ms": 39572.801,
+          "p95_ms": 39572.801,
+          "min_ms": 39572.801,
+          "max_ms": 39572.801
+        },
+        "http": {
+          "requests": 43,
+          "bytes": 567346484
+        },
+        "files": {
+          "count": 1000,
+          "legacy_object_count": 0,
+          "consolidated_object_count": 1000,
+          "skipped_count": 0,
+          "metadata_byte_length": 8876157284,
+          "metadata_uncompressed_bytes": 8876157284,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_CSCB_BATCH"
+          ],
+          "first_height": 428058000,
+          "last_height": 428058999
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.3807641502394569,
+      "bytes_ratio_consolidated_vs_legacy": 0.6251844320655923,
+      "canonical_hashes_compared": 1000,
+      "first_canonical_hash_legacy": "0e0e470e962f11735a8de95a692a8d5c0542cddace6f2c5f4e7481a889a11df7",
+      "first_canonical_hash_consolidated": "0e0e470e962f11735a8de95a692a8d5c0542cddace6f2c5f4e7481a889a11df7"
+    },
+    {
+      "name": "single_consolidated_miss_fallback",
+      "kind": "single",
+      "start_height": 428057999,
+      "end_height": 428058000,
+      "heights": [
+        428057999
+      ],
+      "iterations": 3,
+      "expect_fallback": true,
+      "observed_fallback": true,
+      "observed_fallback_blocks": 1,
+      "correct": true,
+      "passed": true,
+      "legacy": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 447.05,
+          "p95_ms": 2794.868,
+          "min_ms": 420.81,
+          "max_ms": 2794.868
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 3351267
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428057999,
+          "last_height": 428057999
+        },
+        "error_count": 0
+      },
+      "consolidated": {
+        "latency": {
+          "samples": 3,
+          "p50_ms": 421.771,
+          "p95_ms": 805.597,
+          "min_ms": 412.696,
+          "max_ms": 805.597
+        },
+        "http": {
+          "requests": 3,
+          "bytes": 3351267
+        },
+        "files": {
+          "count": 1,
+          "legacy_object_count": 1,
+          "consolidated_object_count": 0,
+          "skipped_count": 0,
+          "metadata_byte_length": 0,
+          "metadata_uncompressed_bytes": 0,
+          "formats": [
+            "BLOCK_OBJECT_FORMAT_LEGACY_SINGLE_BLOCK"
+          ],
+          "first_height": 428057999,
+          "last_height": 428057999
+        },
+        "error_count": 0
+      },
+      "latency_ratio_consolidated_vs_legacy": 0.9434537523766916,
+      "bytes_ratio_consolidated_vs_legacy": 1,
+      "canonical_hashes_compared": 1,
+      "first_canonical_hash_legacy": "f1762d11493396aba7147080fa3f96964ddbd0daf07c06af08df04ef347973d2",
+      "first_canonical_hash_consolidated": "f1762d11493396aba7147080fa3f96964ddbd0daf07c06af08df04ef347973d2"
+    }
+  ]
+}

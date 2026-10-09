@@ -18,5 +18,13 @@ var Module = fx.Options(
 	fx.Provide(NewEventReconciler),
 	fx.Provide(NewEventLoader),
 	fx.Provide(NewReplicator),
+	fx.Provide(NewLatestBlock),
 	fx.Provide(NewUpdateWatermark),
+	fx.Provide(NewMigrator),
+	fx.Provide(NewBatchConsolidator),
+	fx.Provide(NewSingleBlockRetention),
+	fx.Provide(NewGetLatestBlockHeightActivity),
+	fx.Provide(NewGetLatestBlockFromPostgresActivity),
+	fx.Provide(NewGetLatestEventFromPostgresActivity),
+	fx.Provide(NewGetMaxEventIdActivity),
 )

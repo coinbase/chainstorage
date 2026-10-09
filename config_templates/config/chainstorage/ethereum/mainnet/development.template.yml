@@ -22,6 +22,20 @@ sla:
     - streamer/event_tag=2
     - cross_validator
 workflows:
+  migrator:
+    activity_retry:
+      backoff_coefficient: 2
+      initial_interval: 10s
+      maximum_attempts: 3
+      maximum_interval: 3m
+    activity_schedule_to_close_timeout: 1h
+    activity_start_to_close_timeout: 30m
+    backoff_interval: 5s
+    batch_size: 1000
+    checkpoint_size: 5000
+    task_list: default
+    workflow_identity: workflow.migrator
+    workflow_run_timeout: 24h
   poller:
     failover_enabled: false
   monitor:

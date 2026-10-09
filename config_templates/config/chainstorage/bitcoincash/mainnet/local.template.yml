@@ -1,0 +1,30 @@
+
+chain:
+  client:
+    master:
+      endpoint_group:
+        endpoints:
+          - name: getblock
+            url: https://go.getblock.io/9fab7739b91042e7903fca6001e81b23
+            weight: 1
+            rps: 1
+    slave:
+      endpoint_group:
+        endpoints:
+          - name: getblock
+            url: https://go.getblock.io/9fab7739b91042e7903fca6001e81b23
+            weight: 1
+            rps: 1
+    validator:
+      endpoint_group:
+        endpoints:
+          - name: getblock
+            url: https://go.getblock.io/9fab7739b91042e7903fca6001e81b23
+            weight: 1
+            rps: 1
+workflows:
+  poller:
+    failover_enabled: false
+  monitor:
+    failover_enabled: false
+

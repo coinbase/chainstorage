@@ -1,0 +1,20 @@
+version: "3"
+
+# Overlay for docker-compose-testing.yml that adds a TCP proxy in front of Postgres so local
+# benchmarks can emulate production round-trip latency (Aurora is ~1 ms per statement; local
+# Docker is ~0.1 ms). Used by BenchmarkPersistBlockMetas in internal/storage/metastorage/postgres.
+#
+#   docker-compose -f docker-compose-testing.yml -f docker-compose-benchmark.yml up -d postgres toxiproxy
+#   curl -s -X POST localhost:8474/proxies -d '{"name":"postgres","listen":"0.0.0.0:5434","upstream":"postgres:5432"}'
+#   curl -s -X POST localhost:8474/proxies/postgres/toxics -d '{"type":"latency","attributes":{"latency":1}}'
+#   TEST_TYPE=integration CHAINSTORAGE_AWS_POSTGRES_PORT=5434 make benchmark-postgres
+#
+# TLS is passed through unchanged, so ssl_mode=require keeps working through the proxy.
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    ports:
+      - "8474:8474"
+      - "5434:5434"
+    depends_on:
+      - postgres

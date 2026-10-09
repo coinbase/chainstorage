@@ -46,15 +46,17 @@ type (
 		Slave      endpoints.EndpointProvider `name:"slave"`
 		Validator  endpoints.EndpointProvider `name:"validator"`
 		Consensus  endpoints.EndpointProvider `name:"consensus"`
+		Additional endpoints.EndpointProvider `name:"additional"`
 		HTTPClient HTTPClient                 `optional:"true"` // Injected by unit test.
 	}
 
 	ClientResult struct {
 		fx.Out
-		Master    Client `name:"master"`
-		Slave     Client `name:"slave"`
-		Validator Client `name:"validator"`
-		Consensus Client `name:"consensus"`
+		Master     Client `name:"master"`
+		Slave      Client `name:"slave"`
+		Validator  Client `name:"validator"`
+		Consensus  Client `name:"consensus"`
+		Additional Client `name:"additional"`
 	}
 
 	HTTPError struct {
@@ -66,6 +68,7 @@ type (
 	// The 'Name' is just used for annotation.
 	// For example, in Aptos, the 'ParamsPath' for block 1 will be: "/blocks/by_height/1?with_transactions=true".
 	RequestMethod struct {
+		HTTPMethod string
 		Name       string
 		ParamsPath string
 		Timeout    time.Duration
@@ -106,12 +109,16 @@ func New(params ClientParams) (ClientResult, error) {
 	if err != nil {
 		return ClientResult{}, xerrors.Errorf("failed to create consensus client: %w", err)
 	}
-
+	additional, err := newClient(params, params.Additional)
+	if err != nil {
+		return ClientResult{}, xerrors.Errorf("failed to create additional client: %w", err)
+	}
 	return ClientResult{
-		Master:    master,
-		Slave:     slave,
-		Validator: validator,
-		Consensus: consensus,
+		Master:     master,
+		Slave:      slave,
+		Validator:  validator,
+		Consensus:  consensus,
+		Additional: additional,
 	}, nil
 }
 
@@ -171,9 +178,7 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, method *RequestMethod,
 
 	ctx, cancel := context.WithTimeout(ctx, method.Timeout)
 	defer cancel()
-
-	// TODO: will handle both GET and POST.
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, bytes.NewReader(requestBody))
+	request, err := http.NewRequestWithContext(ctx, method.HTTPMethod, url, bytes.NewReader(requestBody))
 	if err != nil {
 		err = c.sanitizedError(err)
 		return nil, xerrors.Errorf("failed to create request: %w", err)
@@ -199,6 +204,19 @@ func (c *clientImpl) makeHTTPRequest(ctx context.Context, method *RequestMethod,
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, retry.Retryable(xerrors.Errorf("failed to read http response: %w", err))
+	}
+
+	// Check for incomplete response based on Content-Length header
+	expectedLen := response.ContentLength
+	if expectedLen > 0 && int64(len(responseBody)) != expectedLen {
+		c.logger.Warn(
+			"incomplete http response detected",
+			zap.String("method", method.Name),
+			zap.Int64("expected_bytes", expectedLen),
+			zap.Int("actual_bytes", len(responseBody)),
+			zap.String("response_preview", truncateString(string(responseBody), 200)),
+		)
+		return nil, retry.Retryable(xerrors.Errorf("incomplete http response: received %d bytes, expected %d bytes", len(responseBody), expectedLen))
 	}
 
 	if response.StatusCode != http.StatusOK {
@@ -262,4 +280,15 @@ func (c *clientImpl) sanitizedError(err error) error {
 		err = uerr.Err
 	}
 	return err
+}
+
+// truncateString truncates a string to the specified max length, adding "..." if truncated.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
 }

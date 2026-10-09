@@ -1,0 +1,23 @@
+# VCS and editor state
+.git
+.github
+.claude
+.idea
+.ijwb
+.vscode
+*.swp
+*.swo
+
+# Build output (make bin regenerates it inside the image)
+bin/
+tmp/
+.buildkite-caches/
+gomock_reflect_*
+
+# Local docker-compose data and logs
+dev-data/
+postgres_*
+*.log
+
+# Local secrets
+**/.secrets.yml

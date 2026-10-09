@@ -21,6 +21,7 @@ import (
 	jsonrpcmocks "github.com/coinbase/chainstorage/internal/blockchain/jsonrpc/mocks"
 	"github.com/coinbase/chainstorage/internal/blockchain/parser"
 	"github.com/coinbase/chainstorage/internal/blockchain/restapi"
+	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/dlq"
 	"github.com/coinbase/chainstorage/internal/utils/fixtures"
 	"github.com/coinbase/chainstorage/internal/utils/retry"
@@ -287,6 +288,67 @@ func TestEthereumClient_GetBlockByHeight(t *testing.T) {
 	require.Equal(2, len(blobdata.TransactionReceipts))
 	require.NotNil(blobdata.TransactionTraces)
 	require.Nil(blobdata.Uncles)
+}
+
+func TestEthereumClient_GetBlockByHeight_WithTxBatchSize(t *testing.T) {
+	require := testutil.Require(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	rpcClient := jsonrpcmocks.NewMockClient(ctrl)
+
+	blockResponse := &jsonrpc.Response{
+		Result: json.RawMessage(fixtureBlock),
+	}
+	rpcClient.EXPECT().Call(
+		gomock.Any(), ethGetBlockByNumberMethod, jsonrpc.Params{
+			"0xacc290",
+			true,
+		},
+	).Return(blockResponse, nil)
+
+	// The fixture block has 2 transactions. With tx_batch_size set to 1,
+	// the receipts must be fetched via 2 batch calls of 1 receipt each.
+	rpcClient.EXPECT().BatchCall(
+		gomock.Any(), ethGetTransactionReceiptMethod, gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, method *jsonrpc.RequestMethod, batchParams []jsonrpc.Params, opts ...jsonrpc.Option) ([]*jsonrpc.Response, error) {
+		require.Equal(1, len(batchParams))
+		return []*jsonrpc.Response{
+			{Result: json.RawMessage(fixtureReceipt)},
+		}, nil
+	}).Times(2)
+
+	traceResponse := &jsonrpc.Response{
+		Result: json.RawMessage(fixtureBlockTrace),
+	}
+	rpcClient.EXPECT().Call(
+		gomock.Any(), ethTraceBlockByHashMethod, gomock.Any(),
+	).Return(traceResponse, nil)
+
+	cfg, err := config.New()
+	require.NoError(err)
+	cfg.Chain.Client.TxBatchSize = 1
+
+	var result internal.ClientParams
+	app := testapp.New(
+		t,
+		Module,
+		testModule(rpcClient),
+		testapp.WithConfig(cfg),
+		fx.Populate(&result),
+	)
+	defer app.Close()
+
+	client := result.Master
+	require.NotNil(client)
+
+	block, err := client.GetBlockByHeight(context.Background(), tag, ethereumHeight)
+	require.NoError(err)
+
+	blobdata := block.GetEthereum()
+	require.NotNil(blobdata)
+	require.Equal(2, len(blobdata.TransactionReceipts))
 }
 
 func TestEthereumClient_GetBlockByHeightWithoutTransactions(t *testing.T) {

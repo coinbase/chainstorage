@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -23,6 +24,14 @@ func TestGetCompressionType(t *testing.T) {
 		{
 			fileURL:     "a.gzip",
 			compression: api.Compression_GZIP,
+		},
+		{
+			fileURL:     "bzstd",
+			compression: api.Compression_NONE,
+		},
+		{
+			fileURL:     "b.zstd",
+			compression: api.Compression_ZSTD,
 		},
 	}
 	for _, test := range tests {
@@ -55,6 +64,20 @@ func TestCompress(t *testing.T) {
 			api.Compression_GZIP,
 		},
 		{
+			"emptyData",
+			[]byte{},
+			api.Compression_ZSTD,
+		},
+		{
+			"blockDataCompression",
+			[]byte(`
+			{
+				"hash": "0xbaa42c",
+				"number": "0xacc290",
+			}`),
+			api.Compression_ZSTD,
+		},
+		{
 			"blockData",
 			[]byte(`
 			{
@@ -73,7 +96,7 @@ func TestCompress(t *testing.T) {
 
 			decompressed, err := Decompress(compressed, test.compression)
 			require.NoError(err)
-			require.Equal(decompressed, test.data)
+			require.True(bytes.Equal(decompressed, test.data))
 		})
 	}
 }
@@ -93,6 +116,11 @@ func TestGetObjectKey(t *testing.T) {
 			"key2",
 			api.Compression_NONE,
 			"key2",
+		},
+		{
+			"key3",
+			api.Compression_ZSTD,
+			"key3.zstd",
 		},
 	}
 	for _, test := range tests {

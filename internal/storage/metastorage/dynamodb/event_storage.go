@@ -7,10 +7,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/storage/internal/errors"
@@ -96,7 +96,7 @@ func newEventStorage(params Params) (internal.EventStorage, error) {
 
 func createEventTable(params Params) (ddbTable, error) {
 	heightIndexName := params.Config.AWS.DynamoDB.EventTableHeightIndex
-	attrDefs := []*dynamodb.AttributeDefinition{
+	attrDefs := []types.AttributeDefinition{
 		{
 			AttributeName: aws.String(eventIdKeyName),
 			AttributeType: awsNumberType,
@@ -106,25 +106,25 @@ func createEventTable(params Params) (ddbTable, error) {
 			AttributeType: awsNumberType,
 		},
 	}
-	keySchema := []*dynamodb.KeySchemaElement{
+	keySchema := []types.KeySchemaElement{
 		{
 			AttributeName: aws.String(eventIdKeyName),
 			KeyType:       hashKeyType,
 		},
 	}
-	globalSecondaryIndexes := []*dynamodb.GlobalSecondaryIndex{
+	globalSecondaryIndexes := []types.GlobalSecondaryIndex{
 		{
 			IndexName: aws.String(heightIndexName),
-			KeySchema: []*dynamodb.KeySchemaElement{
+			KeySchema: []types.KeySchemaElement{
 				{
 					AttributeName: aws.String(heightKeyName),
 					KeyType:       hashKeyType,
 				},
 			},
-			Projection: &dynamodb.Projection{
-				ProjectionType: aws.String(dynamodb.ProjectionTypeAll),
+			Projection: &types.Projection{
+				ProjectionType: types.ProjectionTypeAll,
 			},
-			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+			ProvisionedThroughput: &types.ProvisionedThroughput{
 				ReadCapacityUnits:  aws.Int64(1),
 				WriteCapacityUnits: aws.Int64(1),
 			},
@@ -150,7 +150,7 @@ func createVersionedEventTable(params Params) (ddbTable, error) {
 	}
 
 	versionedEventBlockIndexName := params.Config.AWS.DynamoDB.VersionedEventTableBlockIndex
-	attrDefs := []*dynamodb.AttributeDefinition{
+	attrDefs := []types.AttributeDefinition{
 		{
 			AttributeName: aws.String(eventIdKeyName),
 			AttributeType: awsStringType,
@@ -160,25 +160,25 @@ func createVersionedEventTable(params Params) (ddbTable, error) {
 			AttributeType: awsStringType,
 		},
 	}
-	keySchema := []*dynamodb.KeySchemaElement{
+	keySchema := []types.KeySchemaElement{
 		{
 			AttributeName: aws.String(eventIdKeyName),
 			KeyType:       hashKeyType,
 		},
 	}
-	globalSecondaryIndexes := []*dynamodb.GlobalSecondaryIndex{
+	globalSecondaryIndexes := []types.GlobalSecondaryIndex{
 		{
 			IndexName: aws.String(versionedEventBlockIndexName),
-			KeySchema: []*dynamodb.KeySchemaElement{
+			KeySchema: []types.KeySchemaElement{
 				{
 					AttributeName: aws.String(blockIdKeyName),
 					KeyType:       hashKeyType,
 				},
 			},
-			Projection: &dynamodb.Projection{
-				ProjectionType: aws.String(dynamodb.ProjectionTypeAll),
+			Projection: &types.Projection{
+				ProjectionType: types.ProjectionTypeAll,
 			},
-			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+			ProvisionedThroughput: &types.ProvisionedThroughput{
 				ReadCapacityUnits:  aws.Int64(1),
 				WriteCapacityUnits: aws.Int64(1),
 			},

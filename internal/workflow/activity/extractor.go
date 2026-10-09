@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 
+	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/workflow"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -21,19 +22,21 @@ import (
 type (
 	Extractor struct {
 		baseActivity
-		blockchainClient client.Client
-		blobStorage      blobstorage.BlobStorage
-		metaStorage      metastorage.MetaStorage
-		failoverManager  endpoints.FailoverManager
+		blockchainClient    client.Client
+		blobStorage         blobstorage.BlobStorage
+		singleBlockUploader blobstorage.SingleBlockUploader
+		metaStorage         metastorage.MetaStorage
+		failoverManager     endpoints.FailoverManager
 	}
 
 	ExtractorParams struct {
 		fx.In
-		Runtime          cadence.Runtime
-		BlockchainClient client.Client `name:"slave"`
-		BlobStorage      blobstorage.BlobStorage
-		MetaStorage      metastorage.MetaStorage
-		FailoverManager  endpoints.FailoverManager
+		Runtime             cadence.Runtime
+		BlockchainClient    client.Client `name:"slave"`
+		BlobStorage         blobstorage.BlobStorage
+		SingleBlockUploader blobstorage.SingleBlockUploader
+		MetaStorage         metastorage.MetaStorage
+		FailoverManager     endpoints.FailoverManager
 	}
 
 	ExtractorRequest struct {
@@ -53,11 +56,12 @@ type (
 
 func NewExtractor(params ExtractorParams) *Extractor {
 	a := &Extractor{
-		baseActivity:     newBaseActivity(ActivityExtractor, params.Runtime),
-		blockchainClient: params.BlockchainClient,
-		blobStorage:      params.BlobStorage,
-		metaStorage:      params.MetaStorage,
-		failoverManager:  params.FailoverManager,
+		baseActivity:        newBaseActivity(ActivityExtractor, params.Runtime),
+		blockchainClient:    params.BlockchainClient,
+		blobStorage:         params.BlobStorage,
+		singleBlockUploader: params.SingleBlockUploader,
+		metaStorage:         params.MetaStorage,
+		failoverManager:     params.FailoverManager,
 	}
 	a.register(a.execute)
 
@@ -89,12 +93,18 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 		ctx = failoverCtx
 	}
 
+	heartbeatOpt := client.WithHeartbeat(func(ctx context.Context, details ...any) {
+		activity.RecordHeartbeat(ctx, details...)
+	})
+
 	result := make([]*api.BlockMetadata, len(request.Heights))
 	group, ctx := syncgroup.New(ctx)
 	for i, height := range request.Heights {
 		i := i
 		height := height
 		group.Go(func() error {
+			activity.RecordHeartbeat(ctx, "extractor.block.start", height)
+
 			var block *api.Block
 			var err error
 			if request.UpgradeFromTag != nil {
@@ -112,7 +122,7 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 			}
 
 			if block == nil {
-				var opts []client.ClientOption
+				opts := []client.ClientOption{heartbeatOpt}
 				if request.WithBestEffort {
 					// This option is enabled while reprocessing extractors.
 					// The block is queried in a best-effort manner and partial data may be returned.
@@ -126,11 +136,14 @@ func (a *Extractor) execute(ctx context.Context, request *ExtractorRequest) (*Ex
 				}
 			}
 
-			objectKey, err := a.blobStorage.Upload(ctx, block, request.DataCompression)
+			activity.RecordHeartbeat(ctx, "extractor.block.fetched", height)
+
+			objectKey, err := a.singleBlockUploader.Upload(ctx, block, request.DataCompression)
 			if err != nil {
 				logger.Error("failed to upload to blob store", zap.Error(err))
 				return xerrors.Errorf("failed to upload to blob store: %w", err)
 			}
+			activity.RecordHeartbeat(ctx, "extractor.block.uploaded", height)
 
 			block.Metadata.ObjectKeyMain = objectKey
 			result[i] = block.Metadata

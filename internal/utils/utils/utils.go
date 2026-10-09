@@ -37,6 +37,19 @@ func ToTimestamp(seconds int64) *timestamppb.Timestamp {
 	}
 }
 
+// ToTimestampFromMs converts a millisecond timestamp to a protobuf Timestamp,
+// preserving the sub-second precision in the Nanos field.
+func ToTimestampFromMs(ms int64) *timestamppb.Timestamp {
+	if ms == 0 {
+		return nil
+	}
+
+	return &timestamppb.Timestamp{
+		Seconds: ms / 1000,
+		Nanos:   int32((ms % 1000) * 1_000_000),
+	}
+}
+
 func SinceTimestamp(timestamp *timestamppb.Timestamp) time.Duration {
 	var res time.Duration
 	if timestamp.GetSeconds() > 0 || timestamp.GetNanos() > 0 {

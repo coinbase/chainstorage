@@ -1,6 +1,8 @@
 package client
 
 import (
+	"context"
+
 	"go.uber.org/fx"
 
 	"github.com/coinbase/chainstorage/internal/blockchain/client/aptos"
@@ -33,4 +35,8 @@ var (
 
 func WithBestEffort() ClientOption {
 	return internal.WithBestEffort()
+}
+
+func WithHeartbeat(fn func(ctx context.Context, details ...any)) ClientOption {
+	return internal.WithHeartbeat(fn)
 }

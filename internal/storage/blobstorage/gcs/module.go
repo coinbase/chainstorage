@@ -7,6 +7,6 @@ import (
 var Module = fx.Options(
 	fx.Provide(fx.Annotated{
 		Name:   "blobstorage/gcs",
-		Target: NewFactory,
-	}),
+		Target: newFactory,
+	}, fx.Private),
 )

@@ -47,3 +47,28 @@ func TestNewReporterDefaultWithStatsD(t *testing.T) {
 		require.Equal(true, reporter.Capabilities().Tagging())
 	})
 }
+
+func TestNewReporterDefaultWithPrometheus(t *testing.T) {
+	testapp.TestAllConfigs(t, func(t *testing.T, cfg *config.Config) {
+		require := testutil.Require(t)
+		cfg.Prometheus = &config.PrometheusConfig{
+			// use any available port
+			Port: 0,
+		}
+
+		var reporter tally.StatsReporter
+		app := testapp.New(
+			t,
+			testapp.WithConfig(cfg),
+			fx.Provide(NewStatsReporter),
+			fx.Populate(&reporter),
+		)
+
+		// close app after the test so that the port is released
+		t.Cleanup(app.Close)
+
+		require.NotEqual(tally.NullStatsReporter, reporter)
+		require.Equal(true, reporter.Capabilities().Reporting())
+		require.Equal(true, reporter.Capabilities().Tagging())
+	})
+}

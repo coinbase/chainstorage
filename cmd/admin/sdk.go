@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 
 	"github.com/coinbase/chainstorage/sdk/services"
 
@@ -23,6 +24,7 @@ var (
 		eventTag        uint32
 		tag             uint32
 		blockValidation bool
+		readSource      string
 	}
 
 	sdkCmd = &cobra.Command{
@@ -33,7 +35,15 @@ var (
 		Use:   "range",
 		Short: "Fetch and parse blocks in the given range.",
 		RunE: newSDKCommand(func(session sdk.Session) error {
-			resp, err := session.Client().GetBlocksByRangeWithTag(context.Background(), sdkFlags.tag, sdkFlags.startHeight, sdkFlags.endHeight)
+			readSource, err := parseBlockReadSource(sdkFlags.readSource)
+			if err != nil {
+				return err
+			}
+			readSourceClient, err := getReadSourceClient(session.Client())
+			if err != nil {
+				return err
+			}
+			resp, err := readSourceClient.GetBlocksByRangeWithTagAndReadSource(context.Background(), sdkFlags.tag, sdkFlags.startHeight, sdkFlags.endHeight, readSource)
 			if err != nil {
 				return xerrors.Errorf("failed to get block file metadata: %w", err)
 			}
@@ -56,7 +66,15 @@ var (
 				client.SetBlockValidation(true)
 			}
 
-			rawBlock, err := client.GetBlockWithTag(context.Background(), sdkFlags.tag, sdkFlags.startHeight, sdkFlags.hash)
+			readSource, err := parseBlockReadSource(sdkFlags.readSource)
+			if err != nil {
+				return err
+			}
+			readSourceClient, err := getReadSourceClient(client)
+			if err != nil {
+				return err
+			}
+			rawBlock, err := readSourceClient.GetBlockWithTagAndReadSource(context.Background(), sdkFlags.tag, sdkFlags.startHeight, sdkFlags.hash, readSource)
 			if err != nil {
 				return xerrors.Errorf("failed to get block file metadata: %w", err)
 			}
@@ -143,6 +161,29 @@ var (
 	}
 )
 
+func getReadSourceClient(client sdk.Client) (sdk.ReadSourceClient, error) {
+	readSourceClient, ok := client.(sdk.ReadSourceClient)
+	if !ok {
+		return nil, xerrors.Errorf("sdk client %T does not support read source override", client)
+	}
+	return readSourceClient, nil
+}
+
+func parseBlockReadSource(value string) (api.BlockReadSource, error) {
+	switch strings.ToLower(value) {
+	case "", "default":
+		return api.BlockReadSource_BLOCK_READ_SOURCE_DEFAULT, nil
+	case "single-block", "single_block":
+		return api.BlockReadSource_BLOCK_READ_SOURCE_SINGLE_BLOCK, nil
+	case "legacy": // Backward-compatible input; canonical help text advertises single-block only.
+		return api.BlockReadSource_BLOCK_READ_SOURCE_SINGLE_BLOCK, nil
+	case "consolidated":
+		return api.BlockReadSource_BLOCK_READ_SOURCE_CONSOLIDATED, nil
+	default:
+		return api.BlockReadSource_BLOCK_READ_SOURCE_DEFAULT, xerrors.Errorf("invalid read source %q: expected default, single-block, or consolidated", value)
+	}
+}
+
 func newSDKCommand(fn func(session sdk.Session) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		if err := initializeChainInfoFromFlags(); err != nil {
@@ -172,8 +213,10 @@ func init() {
 	sdkCmd.PersistentFlags().Uint64Var(&sdkFlags.endHeight, "end-height", 0, "block end height")
 	sdkCmd.PersistentFlags().Uint32Var(&sdkFlags.tag, "tag", 0, "block tag")
 
+	blocksByRangeCmd.Flags().StringVar(&sdkFlags.readSource, "read-source", "default", "block read source: default, single-block, or consolidated")
 	getBlockCmd.Flags().StringVar(&sdkFlags.hash, "hash", "", "block hash (optional)")
 	getBlockCmd.Flags().BoolVar(&sdkFlags.blockValidation, "block-validation", false, "validate block (optional)")
+	getBlockCmd.Flags().StringVar(&sdkFlags.readSource, "read-source", "default", "block read source: default, single-block, or consolidated")
 
 	streamBlockCmd.Flags().Int64Var(&sdkFlags.sequence, "sequence", 0, "last processed event sequence")
 	streamBlockCmd.Flags().Uint32Var(&sdkFlags.eventTag, "event-tag", 0, "event tag")

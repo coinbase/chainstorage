@@ -102,7 +102,7 @@ func (r *testRuntime) TerminateWorkflow(ctx context.Context, workflowID string, 
 	return nil
 }
 
-func (t *testRuntime) ListOpenWorkflows(ctx context.Context, namespace string, maxPageSize int32) (*workflowservice.ListOpenWorkflowExecutionsResponse, error) {
+func (t *testRuntime) ListOpenWorkflows(ctx context.Context, namespace string, maxPageSize int32, workflowType string) (*workflowservice.ListOpenWorkflowExecutionsResponse, error) {
 	return nil, nil
 }
 

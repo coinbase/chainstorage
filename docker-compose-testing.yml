@@ -2,7 +2,7 @@ version: "3"
 
 services:
   localstack:
-    image: localstack/localstack:2.3.2
+    image: localstack/localstack:3.1.0
     ports:
       - 4566:4566
       - 4510-4559:4510-4559  # external services port range
@@ -14,3 +14,23 @@ services:
       - AWS_SECRET_ACCESS_KEY=requirednotused
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+  postgres:
+    image: postgres:13
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      # Shared passwords for the per-network roles created by the init script
+      - CHAINSTORAGE_WORKER_PASSWORD=worker_password
+      - CHAINSTORAGE_SERVER_PASSWORD=server_password
+    command: >
+      postgres
+      -c ssl=on
+      -c ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+      -c ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+    volumes:
+      # Creates roles and databases automatically
+      - ./scripts/init-local-postgres.sh:/docker-entrypoint-initdb.d/init-local-postgres.sh
+    restart: always

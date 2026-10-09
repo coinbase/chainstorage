@@ -27,6 +27,7 @@ type (
 		headers             map[string]string
 		rootCAs             *x509.CertPool
 		rps                 int
+		rpsCountBatch       bool
 	}
 
 	// stickySessionJar implements passive cookie affinity.
@@ -49,6 +50,7 @@ type (
 		logger      *zap.Logger
 		headers     map[string]string
 		rateLimiter *ratelimiter.RateLimiter
+		countBatch  bool
 	}
 )
 
@@ -98,7 +100,7 @@ func newDefaultClient(options *clientOptions) (*http.Client, error) {
 		Timeout:   options.timeout,
 		Transport: transport,
 	}
-	wrapClient := WrapHTTPClient(client, options.headers, options.rps)
+	wrapClient := WrapHTTPClient(client, options.headers, options.rps, options.rpsCountBatch)
 	return wrapClient, nil
 }
 
@@ -129,7 +131,7 @@ func newStickyClient(options *clientOptions) (*http.Client, error) {
 		headers[key] = val
 	}
 
-	wrapClient := WrapHTTPClient(client, headers, options.rps)
+	wrapClient := WrapHTTPClient(client, headers, options.rps, options.rpsCountBatch)
 	return wrapClient, nil
 }
 
@@ -202,5 +204,15 @@ func withRootCAs(roots *x509.CertPool) ClientOption {
 func withRPS(rps int) ClientOption {
 	return func(opts *clientOptions) {
 		opts.rps = rps
+	}
+}
+
+// withRPSCountBatch makes the endpoint's rate limiter charge one token per
+// call inside a JSON-RPC batch request (see WithRequestWeight). It has no
+// effect unless withRPS is also set, since no rate limiter is created
+// otherwise.
+func withRPSCountBatch(countBatch bool) ClientOption {
+	return func(opts *clientOptions) {
+		opts.rpsCountBatch = countBatch
 	}
 }

@@ -4,48 +4,40 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 )
-
-type customRetryer struct {
-	client.DefaultRetryer
-}
 
 const (
 	// Use the same configurations as the DynamoDB client.
-	// Ref: https://github.com/aws/aws-sdk-go/blob/6fcfde5b3429cb00ea9dfc16157299cc6ec0bcaf/service/dynamodb/customizations.go#L33
 	maxRetries    = 10
 	minRetryDelay = 50 * time.Millisecond
+	maxRetryDelay = 5 * time.Second
 )
 
-var _ request.Retryer = &customRetryer{}
-
-func newCustomRetryer() request.Retryer {
-	return &customRetryer{
-		DefaultRetryer: client.DefaultRetryer{
-			NumMaxRetries: maxRetries,
-			MinRetryDelay: minRetryDelay,
-		},
-	}
+// newCustomRetryer creates a custom retryer for AWS SDK v2.
+func newCustomRetryer() aws.Retryer {
+	return retry.NewStandard(func(o *retry.StandardOptions) {
+		o.MaxAttempts = maxRetries
+		o.MaxBackoff = maxRetryDelay
+		o.Retryables = append(o.Retryables, connectionResetRetryable{})
+	})
 }
 
-// isErrReadConnectionReset returns true if the underlying error is a read connection reset error.
+// connectionResetRetryable implements retry.IsErrorRetryable for connection reset errors.
+type connectionResetRetryable struct{}
+
+// IsErrorRetryable returns true if the error is a read connection reset error.
 //
 // A read connection reset error is thrown when the SDK is unable to read the response of an underlying API request
-// due to a connection reset. The DefaultRetryer does not treat this error as a retryable error since the SDK has no
+// due to a connection reset. The default retryer does not treat this error as a retryable error since the SDK has no
 // knowledge about whether the given operation is idempotent or whether it would be safe to retry.
-// Ref: https://github.com/aws/aws-sdk-go/pull/2926#issuecomment-553637658.
 //
 // In this project all operations with S3 or DynamoDB (read, write, list) are considered idempotent,
 // and therefore this error can be treated as retryable.
-func isErrReadConnectionReset(err error) bool {
-	// The error string must match the one in
-	// https://github.com/aws/aws-sdk-go/blob/main/aws/request/connection_reset_error.go.
-	return err != nil && strings.Contains(err.Error(), "read: connection reset")
-}
-
-// ShouldRetry overrides the implementation defined in client.DefaultRetryer.
-func (sr *customRetryer) ShouldRetry(r *request.Request) bool {
-	return sr.DefaultRetryer.ShouldRetry(r) || isErrReadConnectionReset(r.Error)
+func (connectionResetRetryable) IsErrorRetryable(err error) aws.Ternary {
+	if err != nil && strings.Contains(err.Error(), "read: connection reset") {
+		return aws.TrueTernary
+	}
+	return aws.UnknownTernary
 }

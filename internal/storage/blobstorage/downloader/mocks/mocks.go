@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	downloader "github.com/coinbase/chainstorage/internal/storage/blobstorage/downloader"
 	chainstorage "github.com/coinbase/chainstorage/protos/coinbase/chainstorage"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -53,4 +54,79 @@ func (m *MockBlockDownloader) Download(arg0 context.Context, arg1 *chainstorage.
 func (mr *MockBlockDownloaderMockRecorder) Download(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Download", reflect.TypeOf((*MockBlockDownloader)(nil).Download), arg0, arg1)
+}
+
+// DownloadMany mocks base method.
+func (m *MockBlockDownloader) DownloadMany(arg0 context.Context, arg1 []*chainstorage.BlockFile) ([]*chainstorage.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DownloadMany", arg0, arg1)
+	ret0, _ := ret[0].([]*chainstorage.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DownloadMany indicates an expected call of DownloadMany.
+func (mr *MockBlockDownloaderMockRecorder) DownloadMany(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadMany", reflect.TypeOf((*MockBlockDownloader)(nil).DownloadMany), arg0, arg1)
+}
+
+// DownloadStream mocks base method.
+func (m *MockBlockDownloader) DownloadStream(arg0 context.Context, arg1 *chainstorage.BlockFile) (*downloader.SpooledBlock, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DownloadStream", arg0, arg1)
+	ret0, _ := ret[0].(*downloader.SpooledBlock)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DownloadStream indicates an expected call of DownloadStream.
+func (mr *MockBlockDownloaderMockRecorder) DownloadStream(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadStream", reflect.TypeOf((*MockBlockDownloader)(nil).DownloadStream), arg0, arg1)
+}
+
+// OpenRawBlockPayload mocks base method.
+func (m *MockBlockDownloader) OpenRawBlockPayload(arg0 context.Context, arg1 *chainstorage.BlockFile) (*downloader.RawBlockPayload, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenRawBlockPayload", arg0, arg1)
+	ret0, _ := ret[0].(*downloader.RawBlockPayload)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenRawBlockPayload indicates an expected call of OpenRawBlockPayload.
+func (mr *MockBlockDownloaderMockRecorder) OpenRawBlockPayload(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenRawBlockPayload", reflect.TypeOf((*MockBlockDownloader)(nil).OpenRawBlockPayload), arg0, arg1)
+}
+
+// OpenRawBlockPayloads mocks base method.
+func (m *MockBlockDownloader) OpenRawBlockPayloads(arg0 context.Context, arg1 []*chainstorage.BlockFile) (downloader.RawBlockPayloadIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenRawBlockPayloads", arg0, arg1)
+	ret0, _ := ret[0].(downloader.RawBlockPayloadIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenRawBlockPayloads indicates an expected call of OpenRawBlockPayloads.
+func (mr *MockBlockDownloaderMockRecorder) OpenRawBlockPayloads(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenRawBlockPayloads", reflect.TypeOf((*MockBlockDownloader)(nil).OpenRawBlockPayloads), arg0, arg1)
+}
+
+// OpenSpooledBlocks mocks base method.
+func (m *MockBlockDownloader) OpenSpooledBlocks(arg0 context.Context, arg1 []*chainstorage.BlockFile) (downloader.SpooledBlockIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenSpooledBlocks", arg0, arg1)
+	ret0, _ := ret[0].(downloader.SpooledBlockIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenSpooledBlocks indicates an expected call of OpenSpooledBlocks.
+func (mr *MockBlockDownloaderMockRecorder) OpenSpooledBlocks(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenSpooledBlocks", reflect.TypeOf((*MockBlockDownloader)(nil).OpenSpooledBlocks), arg0, arg1)
 }

@@ -2,6 +2,7 @@ package endpoints
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http/cookiejar"
@@ -14,7 +15,6 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"golang.org/x/xerrors"
 
 	"github.com/coinbase/chainstorage/internal/config"
 	"github.com/coinbase/chainstorage/internal/utils/testutil"
@@ -71,6 +71,47 @@ func TestEndpointProvider(t *testing.T) {
 			actualPickedProbability,
 		)
 	}
+}
+
+func TestEndpointProvider_UrlExpandEnv_Curly(t *testing.T) {
+	require := testutil.Require(t)
+
+	t.Setenv("URL_TOKEN", "abc")
+
+	logger := zaptest.NewLogger(t)
+	cfg, err := config.New()
+	require.NoError(err)
+
+	endpointGroup := &config.EndpointGroup{
+		Endpoints: []config.Endpoint{
+			{Name: "e1", Url: "https://example.com/v2/{URL_TOKEN}", Weight: 1},
+		},
+	}
+
+	ctx := context.Background()
+	provider, err := newEndpointProvider(logger, cfg, tally.NoopScope, endpointGroup, "master")
+	require.NoError(err)
+
+	pick, err := provider.GetEndpoint(ctx)
+	require.NoError(err)
+	require.Equal("https://example.com/v2/abc", pick.Config.Url)
+}
+
+func TestEndpointProvider_UrlExpandEnv_MissingVar(t *testing.T) {
+	require := testutil.Require(t)
+
+	logger := zaptest.NewLogger(t)
+	cfg, err := config.New()
+	require.NoError(err)
+
+	endpointGroup := &config.EndpointGroup{
+		Endpoints: []config.Endpoint{
+			{Name: "e1", Url: "https://example.com/v2/{MISSING_TOKEN}", Weight: 1},
+		},
+	}
+
+	_, err = newEndpointProvider(logger, cfg, tally.NoopScope, endpointGroup, "master")
+	require.ErrorContains(err, "failed to expand endpoint url for \"e1\": endpoint url contains unresolved placeholder(s): https://example.com/v2/{MISSING_TOKEN}")
 }
 
 func TestEndpointProvider_WithFailover(t *testing.T) {
@@ -212,7 +253,7 @@ func TestEndpointProvider_EmptyEndpoints(t *testing.T) {
 	_, err = ep.WithFailoverContext(ctx)
 	require.Equal([]string{"foo"}, getActiveEndpoints(ctx, ep))
 	require.Error(err)
-	require.True(xerrors.Is(err, ErrFailoverUnavailable))
+	require.True(errors.Is(err, ErrFailoverUnavailable))
 }
 
 func TestEndpointProvider_StickySessionCookieHash(t *testing.T) {

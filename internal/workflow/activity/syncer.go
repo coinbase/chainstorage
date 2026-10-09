@@ -49,7 +49,7 @@ type (
 		baseActivity
 		heartbeater               Heartbeater
 		metaStorage               metastorage.MetaStorage
-		blobStorage               blobstorage.BlobStorage
+		singleBlockUploader       blobstorage.SingleBlockUploader
 		masterBlockchainClient    client.Client // Used as the source-of-truth for resolving the canonical chain. It should be connected to a single-node cluster.
 		slaveBlockchainClient     client.Client // Used to ingest data concurrently. It may be connected to multiple clusters for load balancing purposes.
 		consensusBlockchainClient client.Client // Used to run consensus validation. It may be connected to multiple clusters for load balancing purposes.
@@ -61,12 +61,12 @@ type (
 	SyncerParams struct {
 		fx.In
 		fxparams.Params
-		Runtime          cadence.Runtime
-		Heartbeater      Heartbeater
-		MetaStorage      metastorage.MetaStorage
-		BlobStorage      blobstorage.BlobStorage
-		BlockchainClient client.ClientParams
-		FailoverManager  endpoints.FailoverManager
+		Runtime             cadence.Runtime
+		Heartbeater         Heartbeater
+		MetaStorage         metastorage.MetaStorage
+		SingleBlockUploader blobstorage.SingleBlockUploader
+		BlockchainClient    client.ClientParams
+		FailoverManager     endpoints.FailoverManager
 	}
 
 	SyncerRequest struct {
@@ -119,7 +119,7 @@ func NewSyncer(params SyncerParams) *Syncer {
 		baseActivity:              newBaseActivity(ActivitySyncer, params.Runtime),
 		heartbeater:               params.Heartbeater,
 		metaStorage:               params.MetaStorage,
-		blobStorage:               params.BlobStorage,
+		singleBlockUploader:       params.SingleBlockUploader,
 		masterBlockchainClient:    params.BlockchainClient.Master,
 		slaveBlockchainClient:     params.BlockchainClient.Slave,
 		consensusBlockchainClient: params.BlockchainClient.Consensus,
@@ -181,7 +181,7 @@ func (a *Syncer) execute(ctx context.Context, request *SyncerRequest) (*SyncerRe
 
 	result, err := a.handleReorg(ctx, logger, request.Tag, request.FastSync, request.IrreversibleDistance, request.NumBlocksToSkip)
 	if err != nil {
-		return nil, xerrors.Errorf("failed to handle reorg: %w", err)
+		return nil, asOutOfSyncNodeError(xerrors.Errorf("failed to handle reorg: %w", err))
 	}
 	if result.forkHeight >= result.canonicalChainTipHeight {
 		// The master block node is behind the local block store.
@@ -218,10 +218,14 @@ func (a *Syncer) execute(ctx context.Context, request *SyncerRequest) (*SyncerRe
 			})
 		}
 	} else {
+		// Record heartbeat before potentially slow blockchain call
+		a.heartbeater.RecordHeartbeat(ctx)
 		inMetadatas, err = a.masterBlockchainClient.BatchGetBlockMetadata(ctx, request.Tag, start, end)
 		if err != nil {
-			return nil, xerrors.Errorf("failed to get metadata for blocks from %d to %d: %w", start, end-1, err)
+			return nil, asOutOfSyncNodeError(xerrors.Errorf("failed to get metadata for blocks from %d to %d: %w", start, end-1, err))
 		}
+		// Record heartbeat after blockchain call
+		a.heartbeater.RecordHeartbeat(ctx)
 
 		// Check if the first block to be synced is a valid descendant of the local fork block.
 		// If the condition is not met, it is likely that master node experienced a block chain reorg right after
@@ -548,27 +552,31 @@ func (a *Syncer) getBlocks(
 ) ([]*api.BlockMetadata, error) {
 	batchSize := len(blockMetadatas)
 	outMetadatas := make([]*api.BlockMetadata, 0, batchSize)
-	processed, reprocess, err := a.getBlocksInParallel(ctx, logger, blockMetadatas, parallelism, false, dataCompression, fastSync, transactionIndexingParallelism)
+	processed, failures, err := a.getBlocksInParallel(ctx, logger, blockMetadatas, parallelism, false, dataCompression, fastSync, transactionIndexingParallelism)
 	if err != nil {
 		return nil, err
 	}
 	outMetadatas = append(outMetadatas, processed...)
-	if len(reprocess) > 0 {
+	if len(failures) > 0 {
 		// Enable best-effort tracing when reprocessing blocks that are failed in the first time.
 		// This option is only applied to the reprocessing phase so that chances of getting partial
 		// block data is minimized.
+		reprocess := blockMetadatasOf(failures)
 		a.metrics.reprocessCounter.Inc(int64(len(reprocess)))
 		logger.Warn(
 			"reprocessing blocks",
 			zap.Int("numBlocks", len(reprocess)),
 			zap.Reflect("blocks", a.shortenBlocks(reprocess)),
+			zap.String("cause", summarizeBlockFailures(failures)),
 		)
 		reprocessed, failed, err := a.getBlocksInParallel(ctx, logger, reprocess, parallelismOfBestEffort, true, dataCompression, fastSync, transactionIndexingParallelism)
 		if err != nil {
 			return nil, err
 		}
 		if len(failed) > 0 {
-			return nil, xerrors.Errorf("failed to get %d blocks after attempting twice: %+v", len(failed), failed)
+			// Report why the blocks failed, not just which ones: this error is what Temporal records
+			// and what the alert surfaces, and the underlying cause is otherwise only in the pod logs.
+			return nil, xerrors.Errorf("failed to get %d blocks after attempting twice: %v", len(failed), summarizeBlockFailures(failed))
 		}
 		outMetadatas = append(outMetadatas, reprocessed...)
 	}
@@ -590,7 +598,7 @@ func (a *Syncer) getBlocksInParallel(
 	dataCompression api.Compression,
 	fastSync bool,
 	transactionIndexingParallelism int,
-) ([]*api.BlockMetadata, []*api.BlockMetadata, error) {
+) ([]*api.BlockMetadata, []*blockFailure, error) {
 	batchSize := len(blockMetadatas)
 	if parallelism > batchSize {
 		parallelism = batchSize
@@ -603,25 +611,31 @@ func (a *Syncer) getBlocksInParallel(
 
 	outChannel := make(chan *api.BlockMetadata, batchSize)
 	defer close(outChannel)
-	reprocessChannel := make(chan *api.BlockMetadata, batchSize)
+	reprocessChannel := make(chan *blockFailure, batchSize)
 	defer close(reprocessChannel)
 	g, ctx := syncgroup.New(ctx)
 
 	for i := 0; i < parallelism; i++ {
 		g.Go(func() error {
 			for metadata := range inputChannel {
+				// Record heartbeat before processing each block to prevent timeout
+				a.heartbeater.RecordHeartbeat(ctx)
+
 				block, err := a.safeGetBlock(ctx, logger, metadata, withBestEffort, dataCompression, fastSync, transactionIndexingParallelism)
 				if err != nil {
 					logger.Warn("failed to get block",
 						zap.Error(err),
 						zap.Bool("best_effort", withBestEffort),
 						zap.Reflect("block", metadata))
-					reprocessChannel <- metadata
+					reprocessChannel <- &blockFailure{metadata: metadata, err: err}
 					outChannel <- nil
 				} else {
 					reprocessChannel <- nil
 					outChannel <- block
 				}
+
+				// Record heartbeat after processing each block
+				a.heartbeater.RecordHeartbeat(ctx)
 			}
 			return nil
 		})
@@ -631,7 +645,7 @@ func (a *Syncer) getBlocksInParallel(
 		return nil, nil, xerrors.Errorf("failed to get blocks: %w", err)
 	}
 	processed := make([]*api.BlockMetadata, 0, batchSize)
-	reprocess := make([]*api.BlockMetadata, 0, batchSize)
+	failures := make([]*blockFailure, 0, batchSize)
 	for i := 0; i < batchSize; i++ {
 		processedBlock := <-outChannel
 		if processedBlock != nil {
@@ -639,10 +653,10 @@ func (a *Syncer) getBlocksInParallel(
 		}
 		failed := <-reprocessChannel
 		if failed != nil {
-			reprocess = append(reprocess, failed)
+			failures = append(failures, failed)
 		}
 	}
-	return processed, reprocess, nil
+	return processed, failures, nil
 }
 
 func (a *Syncer) safeGetBlock(
@@ -724,7 +738,7 @@ func (a *Syncer) safeGetBlock(
 }
 
 func (a *Syncer) uploadBlockToBlobStorage(ctx context.Context, outBlock *api.Block, dataCompression api.Compression) error {
-	objectKey, err := a.blobStorage.Upload(ctx, outBlock, dataCompression)
+	objectKey, err := a.singleBlockUploader.Upload(ctx, outBlock, dataCompression)
 	if err != nil {
 		return xerrors.Errorf("failed to upload block hash %s to blob storage: %w", outBlock.Metadata.Hash, err)
 	}
@@ -830,4 +844,15 @@ func parseConsensusErrorType(failureReason string) string {
 		return errors.ErrTypeConsensusClusterFailure
 	}
 	return errors.ErrTypeConsensusValidationFailure
+}
+
+// asOutOfSyncNodeError converts ErrBlockNotFound from the master node into a typed application error.
+// The syncer only asks the master for heights at or below the tip the master itself just reported, so a
+// missing block means the endpoint group routed the call to a node that is behind the one that reported
+// the tip. The poller treats this as transient and retries after a backoff instead of failing.
+func asOutOfSyncNodeError(err error) error {
+	if xerrors.Is(err, client.ErrBlockNotFound) {
+		return temporal.NewApplicationErrorWithCause("master node cannot serve a height it reported", errors.ErrTypeOutOfSyncNode, err)
+	}
+	return err
 }

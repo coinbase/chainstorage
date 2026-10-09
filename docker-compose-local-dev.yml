@@ -1,0 +1,126 @@
+version: "3"
+volumes:
+  localstack_data: {}
+  temporal_postgres_data: {}
+  chainstorage_postgres_data: {}
+services:
+  localstack:
+    image: localstack/localstack:3.1.0
+    ports:
+      - 4566:4566
+      - 4510-4559:4510-4559 # external services port range
+    environment:
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=requirednotused
+      - AWS_SECRET_ACCESS_KEY=requirednotused
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./bin/localstack:/docker-entrypoint-initaws.d
+      - ./bin/localstack/policies:/policies
+      - ./dev-data/localstack:/var/lib/localstack
+  temporal-postgres:
+    image: postgres:15.6-alpine
+    ports:
+      - ${TEMPORAL_POSTGRES_PORT:-5432}:5432
+    environment:
+      - POSTGRES_USER=temporal
+      - POSTGRES_PASSWORD=temporal
+      - POSTGRES_DB=temporal
+    volumes:
+      - ./dev-data/temporal-pg:/var/lib/postgresql/data
+      - ./scripts/init-temporal-postgres.sh:/docker-entrypoint-initdb.d/init-temporal-postgres.sh
+
+  chainstorage-postgres:
+    image: postgres:15.6-alpine
+    ports:
+      - ${CHAINSTORAGE_POSTGRES_PORT:-5433}:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      # Shared passwords for the per-network roles created by the init script
+      - CHAINSTORAGE_WORKER_PASSWORD=worker_password
+      - CHAINSTORAGE_SERVER_PASSWORD=server_password
+    volumes:
+      - ./dev-data/chainstorage-pg:/var/lib/postgresql/data
+      - ./scripts/init-local-postgres.sh:/docker-entrypoint-initdb.d/init-local-postgres.sh
+
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    ports:
+      - 7233:7233
+    labels:
+      service_group: temporal
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgres
+      - USE_HOSTNAME_IP=true
+    restart: always
+    depends_on:
+      - temporal-postgres
+  temporal-ui:
+    image: temporalio/ui:2.23.0
+    ports:
+      - 8088:8080
+    labels:
+      service_group: temporal-web
+    environment:
+      - TEMPORAL_CSRF_COOKIE_INSECURE=true
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+  temporal-admin-tools:
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    image: temporalio/admin-tools:1.22.0
+    stdin_open: true
+    tty: true
+  s3manager:
+    image: cloudlena/s3manager:latest
+    ports:
+      - 8081:8080
+    environment:
+      - ENDPOINT=localstack:4566
+      - REGION=us-east-1
+      - ACCESS_KEY_ID=requirednotused
+      - SECRET_ACCESS_KEY=requirednotused
+      - USE_SSL=false
+    depends_on:
+      - localstack
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:4.6.1
+    ports:
+      - 8082:8001
+    environment:
+      - DYNAMO_ENDPOINT=localstack:4566
+      - REGION=us-east-1
+      - ACCESS_KEY_ID=requirednotused
+      - SECRET_ACCESS_KEY=requirednotused
+      - USE_SSL=false
+    depends_on:
+      - localstack
+  # chainstorage-server:
+  #   image: pika-chainstorage
+  #   command: ["/app/server"]
+  #   ports:
+  #     - 9090:9090
+  #   environment:
+  #     - CHAINSTORAGE_CONFIG=tron_mainnet
+  #     - CHAINSTORAGE_SDK_AUTH_HEADER=cb-nft-api-token
+  #     - CHAINSTORAGE_SDK_AUTH_TOKEN=123321
+  #   depends_on:
+  #     - localstack
+  #     - temporal
+  #   restart: always
+  #   network_mode: host
+
+# SETUP: Just run 'docker-compose -f docker-compose-local-dev.yml up -d'
+# Everything is automatically set up - databases, roles, and permissions

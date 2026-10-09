@@ -27,32 +27,38 @@ import (
 
 type (
 	Manager struct {
-		config          *config.Config
-		logger          *zap.Logger
-		runtime         cadence.Runtime
-		backfiller      *Backfiller
-		poller          *Poller
-		benchmarker     *Benchmarker
-		monitor         *Monitor
-		streamer        *Streamer
-		crossValidator  *CrossValidator
-		eventBackfiller *EventBackfiller
-		replicator      *Replicator
+		config               *config.Config
+		logger               *zap.Logger
+		runtime              cadence.Runtime
+		backfiller           *Backfiller
+		poller               *Poller
+		benchmarker          *Benchmarker
+		monitor              *Monitor
+		streamer             *Streamer
+		crossValidator       *CrossValidator
+		eventBackfiller      *EventBackfiller
+		replicator           *Replicator
+		migrator             *Migrator
+		batchConsolidator    *BatchConsolidator
+		singleBlockRetention *SingleBlockRetention
 	}
 
 	ManagerParams struct {
 		fx.In
 		fxparams.Params
-		Lifecycle       fx.Lifecycle
-		Runtime         cadence.Runtime
-		Backfiller      *Backfiller
-		Poller          *Poller
-		Benchmarker     *Benchmarker
-		Monitor         *Monitor
-		Streamer        *Streamer
-		CrossValidator  *CrossValidator
-		EventBackfiller *EventBackfiller
-		Replicator      *Replicator
+		Lifecycle            fx.Lifecycle
+		Runtime              cadence.Runtime
+		Backfiller           *Backfiller
+		Poller               *Poller
+		Benchmarker          *Benchmarker
+		Monitor              *Monitor
+		Streamer             *Streamer
+		CrossValidator       *CrossValidator
+		EventBackfiller      *EventBackfiller
+		Replicator           *Replicator
+		Migrator             *Migrator
+		BatchConsolidator    *BatchConsolidator
+		SingleBlockRetention *SingleBlockRetention
 	}
 
 	InstrumentedRequest interface {
@@ -79,17 +85,20 @@ const (
 
 func NewManager(params ManagerParams) *Manager {
 	mgr := &Manager{
-		config:          params.Config,
-		logger:          log.WithPackage(params.Logger),
-		runtime:         params.Runtime,
-		backfiller:      params.Backfiller,
-		poller:          params.Poller,
-		benchmarker:     params.Benchmarker,
-		monitor:         params.Monitor,
-		streamer:        params.Streamer,
-		crossValidator:  params.CrossValidator,
-		eventBackfiller: params.EventBackfiller,
-		replicator:      params.Replicator,
+		config:               params.Config,
+		logger:               log.WithPackage(params.Logger),
+		runtime:              params.Runtime,
+		backfiller:           params.Backfiller,
+		poller:               params.Poller,
+		benchmarker:          params.Benchmarker,
+		monitor:              params.Monitor,
+		streamer:             params.Streamer,
+		crossValidator:       params.CrossValidator,
+		eventBackfiller:      params.EventBackfiller,
+		replicator:           params.Replicator,
+		migrator:             params.Migrator,
+		batchConsolidator:    params.BatchConsolidator,
+		singleBlockRetention: params.SingleBlockRetention,
 	}
 
 	params.Lifecycle.Append(fx.Hook{
@@ -158,6 +167,10 @@ func (w *baseWorkflow) validateRequestCtx(ctx context.Context, request any) erro
 }
 
 func (w *baseWorkflow) startWorkflow(ctx context.Context, workflowID string, request any) (client.WorkflowRun, error) {
+	return w.startWorkflowOnTaskList(ctx, workflowID, w.config.Base().TaskList, request)
+}
+
+func (w *baseWorkflow) startWorkflowOnTaskList(ctx context.Context, workflowID string, taskList string, request any) (client.WorkflowRun, error) {
 	if err := w.validateRequestCtx(ctx, request); err != nil {
 		return nil, err
 	}
@@ -165,7 +178,7 @@ func (w *baseWorkflow) startWorkflow(ctx context.Context, workflowID string, req
 	cfg := w.config.Base()
 	workflowOptions := client.StartWorkflowOptions{
 		ID:                                       workflowID,
-		TaskQueue:                                cfg.TaskList,
+		TaskQueue:                                taskList,
 		WorkflowRunTimeout:                       cfg.WorkflowRunTimeout,
 		WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
 		WorkflowExecutionErrorWhenAlreadyStarted: true,
@@ -248,9 +261,13 @@ func (w *baseWorkflow) getMetricsHandler(ctx workflow.Context) client.MetricsHan
 }
 
 func (w *baseWorkflow) withActivityOptions(ctx workflow.Context) workflow.Context {
+	return w.withActivityOptionsOnTaskList(ctx, w.config.Base().TaskList)
+}
+
+func (w *baseWorkflow) withActivityOptionsOnTaskList(ctx workflow.Context, taskList string) workflow.Context {
 	cfg := w.config.Base()
 	return workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		TaskQueue:              cfg.TaskList,
+		TaskQueue:              taskList,
 		StartToCloseTimeout:    cfg.ActivityStartToCloseTimeout,
 		ScheduleToCloseTimeout: cfg.ActivityScheduleToCloseTimeout,
 		HeartbeatTimeout:       cfg.ActivityHeartbeatTimeout,
@@ -316,6 +333,10 @@ func IsScheduleToStartTimeout(err error) bool {
 
 func IsNodeProviderFailed(err error) bool {
 	return strings.Contains(err.Error(), a.ErrTypeNodeProvider)
+}
+
+func IsOutOfSyncNodeFailure(err error) bool {
+	return strings.Contains(err.Error(), a.ErrTypeOutOfSyncNode)
 }
 
 func IsConsensusClusterFailure(err error) bool {

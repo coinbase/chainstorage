@@ -174,6 +174,9 @@ func (v *CrossValidator) execute(ctx context.Context, request *CrossValidatorReq
 }
 
 func (v *CrossValidator) getValidationEndHeight(startHeight uint64, latestPersistedHeight uint64, tipOfChain uint64, request *CrossValidatorRequest, logger *zap.Logger) (uint64, error) {
+	if request.ValidationHeightPadding > tipOfChain {
+		return startHeight, nil
+	}
 	endHeight := tipOfChain - request.ValidationHeightPadding
 	if latestPersistedHeight < endHeight {
 		endHeight = latestPersistedHeight
